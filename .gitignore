@@ -1,0 +1,18 @@
+# Task Manager (Jira-like)
+
+node_modules/
+dist/
+build/
+.next/
+.env
+.env.local
+*.log
+coverage/
+.DS_Store
+Thumbs.db
+pgdata/
+uploads/
+*.swp
+*.swo
+.idea/
+.vscode/

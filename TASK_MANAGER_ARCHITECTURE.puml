@@ -1,0 +1,372 @@
+@startuml current-layout
+title Hiện trạng — coupling và lệch SRS/ERD
+left to right direction
+skinparam componentStyle rectangle
+skinparam wrapWidth 220
+
+note as N1
+  Kết luận: tách deploy frontend/backend là đúng.
+  Không bị dính chặt theo kiểu monolith UI+API.
+  Vấn đề là **nội bộ từng app** và **hợp đồng dùng chung chưa sống**.
+end note
+
+package "Repo (monorepo lỏng)" {
+  [SRS + ERD] as Docs
+  [shared\n@task-manager/shared] as Shared
+  package "frontend (Vite + 1 file JS)" {
+    [src/main.js God object] as FEGod
+    [src/styles.css] as FECss
+  }
+  package "backend (NestJS)" {
+    [AppModule] as App
+    [modules/* 18 feature] as Mods
+    [database/entities] as Ents
+    [common/*.local.ts] as LocalConst
+  }
+}
+
+Docs ..> Ents : ERD 90 entity\ncode mới cover một phần
+Shared -[#red,dashed]-> FEGod : không import
+Shared -[#red,dashed]-> Mods : không import
+LocalConst -[#red]-> Shared : copy thủ công\nerror-codes / permission-keys
+FEGod --> Mods : fetch URL cứng\nstate + view + API trộn
+App --> Mods
+Mods --> Ents
+
+note bottom of FEGod
+  SRS §3.4.2 cần 6 nhóm màn hình.
+  Hiện: 1 global state, innerHTML, prompt/alert,
+  không router, không client API, không type.
+end note
+
+note bottom of Mods
+  Tách module Nest khá tốt (auth, org, project, issue…).
+  IssueModule ôm search + attachment + security.
+  SavedFilter nằm dưới issue/.
+  Thiếu Configuration Schemes (workflow_scheme,
+  priority/field/screen schemes) so với ERD.
+end note
+@enduml
+
+@startuml target-system
+title Mục tiêu hệ thống — 3 process + hợp đồng dùng chung (SRS §2.1, §7.1)
+left to right direction
+skinparam componentStyle rectangle
+
+actor "Org / Project member" as User
+actor Worker as W
+
+package "shared (npm workspace)" {
+  [enums] as Enums
+  [ERROR_CODES] as Err
+  [PERMISSION_KEYS] as Perm
+  [command / query DTO types] as Dto
+}
+
+rectangle "Frontend SPA" as FE {
+  [app shell + router] as Shell
+  [feature screens] as Screens
+  [api client] as ApiClient
+}
+
+rectangle "API (NestJS)" as API {
+  [HTTP controllers] as Http
+  [application services] as AppSvc
+  [domain rules / FSM] as Domain
+}
+
+rectangle "Worker" as WK {
+  [outbox publisher] as Outbox
+  [notification delivery] as Notif
+  [background jobs] as Jobs
+}
+
+database PostgreSQL
+database Redis
+cloud "Object storage" as Store
+
+User --> Shell
+Shell --> Screens
+Screens --> ApiClient
+ApiClient --> Http : REST, error-code ổn định
+Http --> AppSvc
+AppSvc --> Domain
+AppSvc --> PostgreSQL
+AppSvc --> Redis : session/idempotency/cache
+AppSvc --> Store : attachment
+AppSvc --> Outbox : cùng transaction (NFR-REL-01)
+W --> WK
+WK --> PostgreSQL
+WK --> Redis
+
+Enums <.. FE
+Enums <.. API
+Err <.. FE
+Err <.. API
+Perm <.. FE
+Perm <.. API
+Dto <.. FE
+Dto <.. API
+
+note right of WK
+  Worker không impersonate user (SRS actor Worker).
+  Recheck permission/filter lúc chạy job/webhook.
+end note
+@enduml
+
+@startuml bounded-contexts
+title Bounded context = gói ERD + catalog SRS (không để UI quyết định module)
+top to bottom direction
+skinparam packageStyle rectangle
+
+package "API Core (58 entity)" {
+  package "Identity & Access" as C1 {
+    [Auth / Session] as Auth
+    [Organization / Member / RBAC] as Org
+    [Department / Group] as People
+  }
+  package "Workspace" as C2 {
+    [Project / Role / Permission scheme] as Proj
+    [Board / Column / Rank] as Board
+    [Sprint / Sprint history] as Sprint
+    [Component / Version] as CatalogP
+  }
+  package "Workflow FSM" as C3 {
+    [Workflow / State / Transition / Guard] as Wf
+    [Workflow scheme + transition permission] as WfScheme
+  }
+  package "Issue & Collaboration" as C4 {
+    [Issue aggregate] as Issue
+    [Comment / Attachment / Work log] as Collab
+    [Label / Watcher / Link] as Rel
+    [Custom field values] as CfVal
+  }
+  package "Audit & Async" as C5 {
+    [Activity + state history] as Audit
+    [Outbox] as Ox
+    [Notification + preference + delivery] as Notify
+    [Background jobs] as Job
+  }
+}
+
+package "Phase 2–3 (32 entity) — module riêng, không nhét vào Issue" {
+  [Configuration schemes\npriority / type / field / screen] as Conf
+  [Issue security scheme] as Sec
+  [Saved filter / share / subscription / search] as Search
+  [Hierarchy / planning] as Plan
+  [Dashboard / widget] as Dash
+  [Automation rule / execution] as Auto
+  [API token / Webhook] as Integ
+}
+
+Org --> Proj
+Proj --> Board
+Proj --> Sprint
+Wf --> WfScheme
+WfScheme --> Issue
+Issue --> Collab
+Issue --> Rel
+Issue --> CfVal
+Issue --> Audit
+Issue --> Ox
+Ox --> Notify
+Ox --> Auto
+Ox --> Integ
+Search --> Issue : query permission-aware
+Conf --> Issue : field/screen/priority
+Sec --> Issue : read filter
+Dash --> Search
+
+note as DEP
+  Quy tắc phụ thuộc:
+  1. Context ngoài không import entity nội bộ của Issue trừ qua IssueService.
+  2. Frontend không import TypeORM entity — chỉ DTO shared.
+  3. Phase 2–3 được phép thiếu UI, không được phép kéo schema vào IssueModule.
+  4. Authorization luôn server-side (NFR-SEC-01). UI chỉ ẩn nút.
+end note
+@enduml
+
+@startuml target-folders
+title Cấu trúc thư mục mục tiêu (bảo trì theo chức năng, không theo kỹ thuật phẳng)
+left to right direction
+
+package "repo/" {
+  folder "docs/" as docs {
+    file "SRS_TASK_MANAGER.md"
+    file "TASK_MANAGER_ERD.puml"
+    file "TASK_MANAGER_ARCHITECTURE.puml"
+  }
+  folder "shared/" as sh {
+    folder "src/enums"
+    folder "src/constants"
+    folder "src/dto"
+  }
+  folder "backend/" as be {
+    folder "src/common\n(guards, interceptors, exceptions)" as common
+    folder "src/database/entities/{context}" as ent
+    folder "src/database/migrations" as mig
+    folder "src/modules/identity"
+    folder "src/modules/organization"
+    folder "src/modules/project"
+    folder "src/modules/board"
+    folder "src/modules/sprint"
+    folder "src/modules/workflow"
+    folder "src/modules/issue\n(aggregate + collab only)" as issuemod
+    folder "src/modules/custom-field"
+    folder "src/modules/search"
+    folder "src/modules/configuration"
+    folder "src/modules/security-scheme"
+    folder "src/modules/notification"
+    folder "src/modules/audit"
+    folder "src/modules/outbox"
+    folder "src/modules/job"
+    folder "src/modules/productivity"
+    folder "src/modules/automation"
+    folder "src/modules/integration"
+    folder "src/modules/storage"
+    folder "src/modules/mail"
+    folder "src/worker\n(entry riêng, reuse modules)" as worker
+  }
+  folder "frontend/" as fe {
+    folder "src/app\n(router, layout, providers)" as app
+    folder "src/shared/ui" as sui
+    folder "src/shared/api\n(http client, error map)" as sapi
+    folder "src/features/auth"
+    folder "src/features/work"
+    folder "src/features/project"
+    folder "src/features/board"
+    folder "src/features/issue"
+    folder "src/features/admin-org"
+    folder "src/features/admin-project"
+    folder "src/features/notifications"
+    folder "src/features/search"
+    folder "src/features/reports"
+    folder "src/features/automation"
+    folder "src/features/integrations"
+  }
+}
+
+note bottom of fe
+  Mỗi feature/:
+    api.ts     — gọi endpoint, map ERROR_CODES
+    types.ts   — re-export DTO shared
+    pages/     — màn hình SRS §3.4.2
+    components/
+    hooks/ hoặc store slice
+  Cấm: 1 file vừa render vừa fetch vừa giữ toàn bộ state app.
+end note
+
+note bottom of issuemod
+  Tách ra khỏi IssueModule hiện tại:
+    attachment → issue/collab hoặc module storage-aware
+    issue-search + saved-filter → modules/search
+    issue-security entities → modules/security-scheme
+end note
+@enduml
+
+@startuml frontend-screens
+title Frontend — map nhóm màn hình SRS §3.4.2 → feature folder
+left to right direction
+
+package "Public / Auth" {
+  [Register / Login / Reset] as A1
+}
+package "Personal" {
+  [My work / assigned] as P1
+  [Notifications] as P2
+  [Profile / sessions] as P3
+}
+package "Organization admin" {
+  [Org settings / people] as O1
+  [Roles / dept / group] as O2
+  [Workflow + catalogs] as O3
+}
+package "Project" {
+  [Summary / backlog] as J1
+  [Board / sprint] as J2
+  [Members / schemes] as J3
+  [Components / versions] as J4
+}
+package "Issue detail" {
+  [Fields / activity] as I1
+  [Comment / attach / worklog] as I2
+  [Transition / links] as I3
+}
+package "Reports / Ops" {
+  [Dashboards] as R1
+  [Jobs / audit / outbox] as R2
+  [Tokens / webhooks] as R3
+}
+
+A1 --> P1 : sau session
+P1 --> I1
+J2 --> I1
+P2 --> I1
+J3 --> J2
+O3 --> J3
+
+note as FEAPI
+  Mọi feature chỉ nói chuyện với backend qua src/shared/api.
+  OrgId / projectId lấy từ workspace context, không nhét vào mỗi view.
+  Validation UI không thay server (NFR-UX-01).
+end note
+@enduml
+
+@startuml backend-module-slice
+title Backend — slice chuẩn cho mỗi bounded context
+left to right direction
+
+package "src/modules/<context>/" {
+  [context.module.ts] as M
+  [context.controller.ts] as C
+  [application/*.service.ts] as S
+  [dto/*.ts] as D
+  [policies/*.ts\n(RBAC + tenant checks)] as Pol
+}
+
+[database/entities/<context>/*.entity.ts] as E
+[common/guards] as G
+[modules/outbox] as Ox
+[modules/permission] as Perm
+
+C --> S
+S --> Pol
+S --> E
+S --> Ox : command P0 ghi event cùng TX
+C --> G
+Pol --> Perm
+D ..> shared : class-validator + shared types
+
+note bottom
+  Issue update / transition: expected version + idempotency key (SRS §7.1).
+  Cross-tenant UUID: 403/404 anti-enumeration, không leak object (NFR-SEC-01).
+end note
+@enduml
+
+@startuml migration-phases
+title Lộ trình cấu trúc — không rewrite một phát (khớp phase ERD)
+left to right direction
+
+|Now|
+start
+:Giữ Nest modules hiện có;
+:Frontend prototype 1 file\nchỉ dùng để smoke API;
+|P0 — contract & tách God UI|
+:Wire shared vào backend + frontend\n(bỏ *.local.ts);
+:Tách frontend theo feature folder\n(Vite/React hoặc Next — chọn 1, đừng mix);
+:Tách Search + SavedFilter\nra khỏi IssueModule;
+|P1 — API Core hoàn chỉnh|
+:Bổ sung workflow_scheme,\nresolution, permission scheme đầy đủ;
+:Worker process riêng cho outbox/jobs;
+|P2 — configuration / security / search|
+:modules/configuration + security-scheme;
+:Query AST ổn định, filter share;
+|P3 — productivity / integration|
+:dashboard, automation, token, webhook;
+stop
+
+note right
+  Cấm làm ngay: nhét 74 chức năng vào main.js
+  hoặc biến IssueService thành god service.
+end note
+@enduml

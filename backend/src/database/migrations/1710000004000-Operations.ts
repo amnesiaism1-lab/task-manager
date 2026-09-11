@@ -1,0 +1,12 @@
+import { MigrationInterface, QueryRunner } from 'typeorm';
+
+export class Operations1710000004000 implements MigrationInterface {
+  name = 'Operations1710000004000';
+  async up(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.query(`CREATE TABLE IF NOT EXISTS notification_preferences (org_id uuid NOT NULL REFERENCES organizations(id), member_id uuid NOT NULL REFERENCES organization_members(id), notification_type varchar(120) NOT NULL, channel varchar(32) NOT NULL, enabled boolean NOT NULL DEFAULT true, created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now(), PRIMARY KEY(org_id,member_id,notification_type,channel))`);
+    await queryRunner.query(`CREATE TABLE IF NOT EXISTS notification_deliveries (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), notification_id uuid NOT NULL REFERENCES notifications(id) ON DELETE CASCADE, channel varchar(32) NOT NULL, status varchar(32) NOT NULL DEFAULT 'pending', destination varchar(320), attempts int NOT NULL DEFAULT 0, last_error text, sent_at timestamptz, created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now(), UNIQUE(notification_id,channel))`);
+    await queryRunner.query(`CREATE TABLE IF NOT EXISTS background_jobs (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), org_id uuid NOT NULL REFERENCES organizations(id), requested_by_member_id uuid REFERENCES organization_members(id), job_type varchar(64) NOT NULL, status varchar(32) NOT NULL DEFAULT 'pending', idempotency_key varchar(180) NOT NULL, input_json jsonb NOT NULL DEFAULT '{}', result_json jsonb, progress int NOT NULL DEFAULT 0, attempts int NOT NULL DEFAULT 0, next_run_at timestamptz NOT NULL DEFAULT now(), lease_until timestamptz, last_error text, created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now(), UNIQUE(org_id,idempotency_key))`);
+    await queryRunner.query(`CREATE INDEX IF NOT EXISTS background_jobs_status_idx ON background_jobs(status,next_run_at)`);
+  }
+  async down(queryRunner: QueryRunner): Promise<void> { await queryRunner.query('DROP TABLE IF EXISTS background_jobs'); await queryRunner.query('DROP TABLE IF EXISTS notification_deliveries'); await queryRunner.query('DROP TABLE IF EXISTS notification_preferences'); }
+}

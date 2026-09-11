@@ -1,0 +1,1569 @@
+@startuml
+' Task Manager (Jira-like) — ERD template
+' Focus: Workflow/FSM + RBAC + audit history + event-driven + concurrency (optimistic version)
+' NOTE: issue_types (org-scoped) is declared in Issues package but referenced by
+'       workflow_scheme_mappings in Workflow package — forward reference, same org as project (C-11)
+
+left to right direction
+hide circle
+skinparam linetype ortho
+
+' =========================
+' Identity / Organization
+' =========================
+package "Identity & Org" {
+  entity "organizations" as organizations {
+    * id : UUID <<PK>>
+    --
+    key : VARCHAR <<UQ>>
+    name : VARCHAR
+    plan : VARCHAR
+    status : VARCHAR
+    created_at : TIMESTAMP
+    updated_at : TIMESTAMP
+  }
+
+  entity "users" as users {
+    * id : UUID <<PK>>
+    --
+    email : VARCHAR <<UQ>>
+    password_hash : VARCHAR
+    full_name : VARCHAR
+    avatar_url : VARCHAR
+    status : VARCHAR
+    email_verified_at : TIMESTAMP
+    last_login_at : TIMESTAMP
+    created_at : TIMESTAMP
+    updated_at : TIMESTAMP
+  }
+
+  entity "organization_members" as org_members {
+    * id : UUID <<PK>>
+    --
+    org_id : UUID <<FK organizations.id>>
+    user_id : UUID <<FK users.id>>
+    ' invited | active | suspended
+    status : VARCHAR
+    title : VARCHAR
+    joined_at : TIMESTAMP
+    invited_by_member_id : UUID <<FK organization_members.id>>
+    created_at : TIMESTAMP
+    updated_at : TIMESTAMP
+    ' UQ(org_id, user_id)
+  }
+
+  entity "organization_invitations" as org_invitations {
+    * id : UUID <<PK>>
+    --
+    org_id : UUID <<FK organizations.id>>
+    email : VARCHAR
+    invited_by_member_id : UUID <<FK organization_members.id>>
+    org_role_id : UUID <<FK org_roles.id>>
+    token_hash : VARCHAR <<UQ>>
+    ' pending | accepted | revoked | expired
+    status : VARCHAR
+    expires_at : TIMESTAMP
+    accepted_by_user_id : UUID <<FK users.id>>
+    accepted_at : TIMESTAMP
+    created_at : TIMESTAMP
+    updated_at : TIMESTAMP
+    ' UQ(org_id, email) WHERE status=pending
+    ' C-25: inviter and optional org role must belong to org_id
+    ' Invitation may exist before the invited email has a users row
+  }
+
+  entity "org_roles" as org_roles {
+    * id : UUID <<PK>>
+    --
+    org_id : UUID <<FK organizations.id>>
+    key : VARCHAR
+    name : VARCHAR
+    description : TEXT
+    created_at : TIMESTAMP
+    ' UQ(org_id, key)
+  }
+
+  entity "org_member_roles" as org_member_roles {
+    * org_member_id : UUID <<FK organization_members.id>>
+    * role_id : UUID <<FK org_roles.id>>
+    --
+    granted_at : TIMESTAMP
+    granted_by_member_id : UUID <<FK organization_members.id>>
+    ' C-28: member, role and grantor belong to the same organization
+  }
+
+  entity "org_role_permission_entries" as org_role_permission_entries {
+    * role_id : UUID <<FK org_roles.id>>
+    * permission_key : VARCHAR
+    --
+    ' e.g., MANAGE_ORG, MANAGE_USERS, CREATE_PROJECT
+    created_at : TIMESTAMP
+  }
+
+  entity "departments" as departments {
+    * id : UUID <<PK>>
+    --
+    org_id : UUID <<FK organizations.id>>
+    name : VARCHAR
+    parent_department_id : UUID <<FK departments.id>>
+    created_at : TIMESTAMP
+    updated_at : TIMESTAMP
+    ' UQ(org_id, name)
+  }
+
+  entity "department_members" as department_members {
+    * department_id : UUID <<FK departments.id>>
+    * org_member_id : UUID <<FK organization_members.id>>
+    --
+    role_in_department : VARCHAR
+    joined_at : TIMESTAMP
+    ' C-29: department and member belong to the same organization
+  }
+
+  entity "groups" as groups {
+    * id : UUID <<PK>>
+    --
+    org_id : UUID <<FK organizations.id>>
+    name : VARCHAR
+    description : TEXT
+    created_at : TIMESTAMP
+    updated_at : TIMESTAMP
+    ' UQ(org_id, name)
+  }
+
+  entity "group_members" as group_members {
+    * group_id : UUID <<FK groups.id>>
+    * org_member_id : UUID <<FK organization_members.id>>
+    --
+    added_at : TIMESTAMP
+    added_by_member_id : UUID <<FK organization_members.id>>
+    ' C-30: group, member and added_by belong to the same organization
+  }
+}
+
+' =========================
+' Security / Authentication
+' =========================
+package "Security & Authentication" {
+  entity "auth_sessions" as auth_sessions {
+    * id : UUID <<PK>>
+    --
+    user_id : UUID <<FK users.id>>
+    refresh_token_hash : VARCHAR <<UQ>>
+    ' active | revoked | expired
+    status : VARCHAR
+    ip_address : VARCHAR
+    user_agent : TEXT
+    expires_at : TIMESTAMP
+    last_seen_at : TIMESTAMP
+    revoked_at : TIMESTAMP
+    created_at : TIMESTAMP
+    updated_at : TIMESTAMP
+  }
+
+  entity "password_reset_tokens" as password_reset_tokens {
+    * id : UUID <<PK>>
+    --
+    user_id : UUID <<FK users.id>>
+    token_hash : VARCHAR <<UQ>>
+    expires_at : TIMESTAMP
+    used_at : TIMESTAMP
+    created_at : TIMESTAMP
+    ' Token is single-use and stored hashed; IDX(user_id, expires_at)
+  }
+
+  entity "email_verification_tokens" as email_verification_tokens {
+    * id : UUID <<PK>>
+    --
+    user_id : UUID <<FK users.id>>
+    email : VARCHAR
+    token_hash : VARCHAR <<UQ>>
+    expires_at : TIMESTAMP
+    used_at : TIMESTAMP
+    created_at : TIMESTAMP
+    ' Token is single-use and stored hashed; IDX(user_id, expires_at)
+  }
+}
+
+' =========================
+' Projects / Boards / Sprints
+' =========================
+package "Workspace" {
+  entity "projects" as projects {
+    * id : UUID <<PK>>
+    --
+    org_id : UUID <<FK organizations.id>>
+    key : VARCHAR
+    name : VARCHAR
+    description : TEXT
+    ' private | org | public
+    visibility : VARCHAR
+    permission_scheme_id : UUID <<FK permission_schemes.id>>
+    workflow_scheme_id : UUID <<FK workflow_schemes.id>>
+    issue_type_scheme_id : UUID <<FK issue_type_schemes.id>>
+    priority_scheme_id : UUID <<FK priority_schemes.id>>
+    field_scheme_id : UUID <<FK field_schemes.id>>
+    issue_type_screen_scheme_id : UUID <<FK issue_type_screen_schemes.id>>
+    issue_security_scheme_id : UUID <<FK issue_security_schemes.id>>
+    notification_scheme_id : UUID <<FK notification_schemes.id>>
+    created_by_member_id : UUID <<FK organization_members.id>>
+    next_issue_number : BIGINT
+    created_at : TIMESTAMP
+    updated_at : TIMESTAMP
+    archived_at : TIMESTAMP
+    ' UQ(org_id, key)
+    ' C-01: project-owned selected schemes must belong to this project
+    ' C-35: org-scoped selected schemes must belong to project.org_id
+    ' Core schemes are nullable only during setup; extension schemes require seeded defaults when phase 2 is enabled
+    ' CHECK(next_issue_number >= 1); atomically increment to allocate issue keys
+  }
+
+  entity "project_roles" as project_roles {
+    * id : UUID <<PK>>
+    --
+    project_id : UUID <<FK projects.id>>
+    key : VARCHAR
+    name : VARCHAR
+    description : TEXT
+    created_at : TIMESTAMP
+    ' UQ(project_id, key)
+  }
+
+  entity "project_members" as project_members {
+    * id : UUID <<PK>>
+    --
+    project_id : UUID <<FK projects.id>>
+    org_member_id : UUID <<FK organization_members.id>>
+    ' active | removed
+    status : VARCHAR
+    joined_at : TIMESTAMP
+    created_at : TIMESTAMP
+    ' UQ(project_id, org_member_id)
+    ' INVARIANT: org_member.org_id = project.org_id
+  }
+
+  entity "project_member_roles" as project_member_roles {
+    * project_member_id : UUID <<FK project_members.id>>
+    * project_role_id : UUID <<FK project_roles.id>>
+    --
+    granted_at : TIMESTAMP
+    granted_by_member_id : UUID <<FK organization_members.id>>
+    ' C-31: project member and role belong to the same project; grantor is authorized
+  }
+
+  entity "project_group_roles" as project_group_roles {
+    * group_id : UUID <<FK groups.id>>
+    * project_role_id : UUID <<FK project_roles.id>>
+    --
+    granted_at : TIMESTAMP
+    granted_by_member_id : UUID <<FK organization_members.id>>
+    ' C-02: group.org_id = project_role.project.org_id
+    ' Permission is inherited only by active project members in this group
+  }
+
+  entity "boards" as boards {
+    * id : UUID <<PK>>
+    --
+    project_id : UUID <<FK projects.id>>
+    ' kanban | scrum
+    board_type : VARCHAR
+    name : VARCHAR
+    description : TEXT
+    created_at : TIMESTAMP
+    updated_at : TIMESTAMP
+  }
+
+  entity "board_columns" as board_columns {
+    * id : UUID <<PK>>
+    --
+    board_id : UUID <<FK boards.id>>
+    name : VARCHAR
+    position : INT
+    wip_limit : INT
+    created_at : TIMESTAMP
+    updated_at : TIMESTAMP
+    ' UQ(board_id, position)
+  }
+
+  entity "board_issue_positions" as board_issue_positions {
+    * board_id : UUID <<FK boards.id>>
+    * issue_id : UUID <<FK issues.id>>
+    --
+    rank : VARCHAR
+    updated_at : TIMESTAMP
+    ' A board has its own ordering; issue rank must not be stored globally
+    ' C-18: issue.project_id = board.project_id
+    ' C-19: issue state must be mapped to a column on this board
+    ' UQ(board_id, rank)
+  }
+
+  entity "sprints" as sprints {
+    * id : UUID <<PK>>
+    --
+    project_id : UUID <<FK projects.id>>
+    board_id : UUID <<FK boards.id>>
+    name : VARCHAR
+    goal : TEXT
+    ' planned | active | closed
+    state : VARCHAR
+    start_at : TIMESTAMP
+    end_at : TIMESTAMP
+    closed_at : TIMESTAMP
+    created_at : TIMESTAMP
+    ' INVARIANT: board.project_id = sprints.project_id
+    ' INVARIANT: sprints.board_id should reference scrum board (board_type=scrum)
+    ' UQ(board_id) WHERE state=active
+  }
+
+  entity "project_components" as project_components {
+    * id : UUID <<PK>>
+    --
+    project_id : UUID <<FK projects.id>>
+    name : VARCHAR
+    description : TEXT
+    lead_member_id : UUID <<FK organization_members.id>>
+    created_at : TIMESTAMP
+    updated_at : TIMESTAMP
+    archived_at : TIMESTAMP
+    ' C-34: lead is an active project member or an authorized org admin
+  }
+
+  entity "project_versions" as project_versions {
+    * id : UUID <<PK>>
+    --
+    project_id : UUID <<FK projects.id>>
+    name : VARCHAR
+    description : TEXT
+    release_date : TIMESTAMP
+    ' unreleased | released | archived
+    status : VARCHAR
+    created_at : TIMESTAMP
+    updated_at : TIMESTAMP
+    released_at : TIMESTAMP
+  }
+
+  entity "permission_schemes" as permission_schemes {
+    * id : UUID <<PK>>
+    --
+    project_id : UUID <<FK projects.id>>
+    name : VARCHAR
+    description : TEXT
+    created_at : TIMESTAMP
+  }
+
+  entity "permission_scheme_entries" as permission_scheme_entries {
+    * id : UUID <<PK>>
+    --
+    scheme_id : UUID <<FK permission_schemes.id>>
+    ' e.g., CREATE_ISSUE, BROWSE_PROJECT
+    permission_key : VARCHAR
+    project_role_id : UUID <<FK project_roles.id>>
+    ' C-17: project_role_id must belong to same project as permission_scheme
+    ' UQ(scheme_id, permission_key, project_role_id)
+  }
+}
+
+' =========================
+' Workflow / FSM
+' =========================
+package "Workflow (FSM)" {
+  entity "workflows" as workflows {
+    * id : UUID <<PK>>
+    --
+    org_id : UUID <<FK organizations.id>>
+    key : VARCHAR
+    name : VARCHAR
+    description : TEXT
+    version : INT
+    is_active : BOOLEAN
+    created_at : TIMESTAMP
+    updated_at : TIMESTAMP
+    ' UQ(org_id, key, version); UQ(org_id, key) WHERE is_active=true
+    ' key is the stable logical workflow identity across renamed versions
+  }
+
+  entity "workflow_states" as workflow_states {
+    * id : UUID <<PK>>
+    --
+    workflow_id : UUID <<FK workflows.id>>
+    key : VARCHAR
+    name : VARCHAR
+    ' todo | in_progress | done
+    category : VARCHAR
+    is_initial : BOOLEAN
+    is_terminal : BOOLEAN
+    position : INT
+    created_at : TIMESTAMP
+    ' UQ(workflow_id, key)
+    ' UQ(workflow_id) WHERE is_initial = true
+  }
+
+  entity "workflow_transitions" as workflow_transitions {
+    * id : UUID <<PK>>
+    --
+    workflow_id : UUID <<FK workflows.id>>
+    key : VARCHAR
+    name : VARCHAR
+    from_state_id : UUID <<FK workflow_states.id>>
+    to_state_id : UUID <<FK workflow_states.id>>
+    require_comment : BOOLEAN
+    sort_order : INT
+    created_at : TIMESTAMP
+    ' UQ(workflow_id, key)
+    ' C-16: from_state_id and to_state_id must belong to same workflow_id
+    ' INVARIANT: (workflow_id, from_state_id) -> workflow_states(workflow_id, id)
+    ' INVARIANT: (workflow_id, to_state_id) -> workflow_states(workflow_id, id)
+  }
+
+  entity "workflow_transition_guards" as transition_guards {
+    * id : UUID <<PK>>
+    --
+    transition_id : UUID <<FK workflow_transitions.id>>
+    ' dsl | json_logic | requires_fields | custom
+    guard_type : VARCHAR
+    config_json : JSON
+    created_at : TIMESTAMP
+  }
+
+  entity "workflow_schemes" as workflow_schemes {
+    * id : UUID <<PK>>
+    --
+    project_id : UUID <<FK projects.id>>
+    name : VARCHAR
+    description : TEXT
+    created_at : TIMESTAMP
+    updated_at : TIMESTAMP
+  }
+
+  entity "workflow_scheme_mappings" as workflow_scheme_mappings {
+    * workflow_scheme_id : UUID <<FK workflow_schemes.id>>
+    * issue_type_id : UUID <<FK issue_types.id>>
+    --
+    workflow_id : UUID <<FK workflows.id>>
+    ' C-11: issue_types.org_id = projects.org_id (via scheme.project_id)
+    ' C-12: workflows.org_id = projects.org_id (via scheme.project_id)
+    ' UQ(workflow_scheme_id, issue_type_id)
+  }
+
+  entity "workflow_scheme_transition_permissions" as scheme_transition_permissions {
+    * workflow_scheme_id : UUID <<FK workflow_schemes.id>>
+    * transition_id : UUID <<FK workflow_transitions.id>>
+    * project_role_id : UUID <<FK project_roles.id>>
+    --
+    ' allow | deny
+    effect : VARCHAR
+    ' UQ(workflow_scheme_id, transition_id, project_role_id)
+    ' project_role must belong to same project as workflow_scheme
+    ' C-03: transition must belong to a workflow mapped by workflow_scheme_id
+  }
+
+  entity "board_column_states" as board_column_states {
+    * board_column_id : UUID <<FK board_columns.id>>
+    * workflow_state_id : UUID <<FK workflow_states.id>>
+    --
+    ' maps a column to one or more states (multi-workflow board: S-07)
+    ' states should belong to workflows used in project scheme mappings
+    ' C-04: a workflow state can appear in at most one column of the same board
+  }
+}
+
+' =========================
+' Issues / Content
+' =========================
+package "Issues & Content" {
+  entity "issue_types" as issue_types {
+    * id : UUID <<PK>>
+    --
+    org_id : UUID <<FK organizations.id>>
+    key : VARCHAR
+    name : VARCHAR
+    description : TEXT
+    saved_filter_id : UUID <<FK saved_filters.id>>
+    created_at : TIMESTAMP
+    updated_at : TIMESTAMP
+    archived_at : TIMESTAMP
+    ' UQ(org_id, key)
+  }
+
+  entity "resolutions" as resolutions {
+    * id : UUID <<PK>>
+    --
+    org_id : UUID <<FK organizations.id>>
+    ' Fixed | Wont Do | Duplicate | Cannot Reproduce
+    name : VARCHAR
+    description : TEXT
+    created_at : TIMESTAMP
+    updated_at : TIMESTAMP
+    archived_at : TIMESTAMP
+  }
+
+  entity "issues" as issues {
+    * id : UUID <<PK>>
+    --
+    org_id : UUID <<FK organizations.id>>
+    project_id : UUID <<FK projects.id>>
+    issue_type_id : UUID <<FK issue_types.id>>
+
+    workflow_id : UUID <<FK workflows.id>>
+    state_id : UUID <<FK workflow_states.id>>
+    resolution_id : UUID <<FK resolutions.id>>
+    security_level_id : UUID <<FK issue_security_levels.id>>
+
+    ' e.g., PROJ-123
+    key : VARCHAR
+    summary : VARCHAR
+    description : TEXT
+
+    reporter_member_id : UUID <<FK organization_members.id>>
+    assignee_member_id : UUID <<FK organization_members.id>>
+
+    parent_issue_id : UUID <<FK issues.id>>
+    sprint_id : UUID <<FK sprints.id>>
+    component_id : UUID <<FK project_components.id>>
+    fix_version_id : UUID <<FK project_versions.id>>
+
+    priority_id : UUID <<FK priorities.id>>
+    due_at : TIMESTAMP
+    original_estimate_seconds : INT
+    remaining_estimate_seconds : INT
+    time_spent_seconds : INT
+
+    ' optimistic concurrency
+    version : INT
+
+    created_at : TIMESTAMP
+    updated_at : TIMESTAMP
+    resolved_at : TIMESTAMP
+    archived_at : TIMESTAMP
+    deleted_at : TIMESTAMP
+    ' UQ(project_id, key)
+    ' C-13: issues.org_id = projects.org_id (denormalize tenant)
+    ' COMPOSITE FK: (workflow_id, state_id) -> workflow_states(workflow_id, id)
+    ' INVARIANT: reporter/assignee must be active project members (or an authorized org admin)
+    ' INVARIANT: parent_issue_id must be same project, not self, and must not form a cycle
+    ' INVARIANT: component_id/fix_version_id must belong to same project_id
+    ' INVARIANT: sprint_id must belong to board within same project_id
+    ' INVARIANT: issue type/workflow/priority/security level must satisfy selected project schemes
+    ' INVARIANT: resolution/resolved_at are set only when current state is terminal
+    ' IDX(project_id, state_id)
+  }
+
+  entity "work_logs" as work_logs {
+    * id : UUID <<PK>>
+    --
+    issue_id : UUID <<FK issues.id>>
+    author_member_id : UUID <<FK organization_members.id>>
+    time_spent_seconds : INT
+    started_at : TIMESTAMP
+    comment : TEXT
+    created_at : TIMESTAMP
+    updated_at : TIMESTAMP
+    deleted_at : TIMESTAMP
+    ' C-20: author must be an active project member or an authorized org admin
+    ' CHECK(time_spent_seconds > 0)
+    ' time_spent_seconds on issues is an atomic cache of non-deleted work logs
+  }
+
+  entity "issue_sprint_history" as issue_sprint_history {
+    * id : UUID <<PK>>
+    --
+    issue_id : UUID <<FK issues.id>>
+    sprint_id : UUID <<FK sprints.id>>
+    added_by_member_id : UUID <<FK organization_members.id>>
+    added_at : TIMESTAMP
+    ' C-32: sprint actors belong to the same org as issue and are authorized
+    removed_by_member_id : UUID <<FK organization_members.id>>
+    removed_at : TIMESTAMP
+    ' C-05: issue and sprint belong to the same project
+    ' UQ(issue_id) WHERE removed_at IS NULL
+    ' issues.sprint_id is the current-assignment cache and must match this active row
+  }
+
+  entity "issue_link_types" as issue_link_types {
+    * id : UUID <<PK>>
+    --
+    org_id : UUID <<FK organizations.id>>
+    key : VARCHAR
+    ' blocks
+    outward_label : VARCHAR
+    ' is blocked by
+    inward_label : VARCHAR
+    ' directed | symmetric
+    directionality : VARCHAR
+    created_at : TIMESTAMP
+    updated_at : TIMESTAMP
+    archived_at : TIMESTAMP
+    ' UQ(org_id, key)
+    ' Archived types remain readable but cannot be assigned to new links
+  }
+
+  entity "issue_links" as issue_links {
+    * id : UUID <<PK>>
+    --
+    org_id : UUID <<FK organizations.id>>
+    issue_id : UUID <<FK issues.id>>
+    linked_issue_id : UUID <<FK issues.id>>
+    link_type_id : UUID <<FK issue_link_types.id>>
+    created_by_member_id : UUID <<FK organization_members.id>>
+    created_at : TIMESTAMP
+    ' UQ(issue_id, linked_issue_id, link_type_id)
+    ' C-06: issue_id != linked_issue_id; both issues and link type same org_id
+    ' C-07: for symmetric link types, persist pair in canonical ID order
+    ' C-15: issue_links.org_id = issues.org_id (denormalize tenant)
+  }
+
+  entity "labels" as labels {
+    * id : UUID <<PK>>
+    --
+    org_id : UUID <<FK organizations.id>>
+    name : VARCHAR
+    created_at : TIMESTAMP
+    updated_at : TIMESTAMP
+    archived_at : TIMESTAMP
+    ' UQ(org_id, name)
+    ' Archived labels remain readable but cannot be newly assigned
+  }
+
+  entity "issue_labels" as issue_labels {
+    * issue_id : UUID <<FK issues.id>>
+    * label_id : UUID <<FK labels.id>>
+    --
+    added_by_member_id : UUID <<FK organization_members.id>>
+    added_at : TIMESTAMP
+  }
+
+  entity "issue_watchers" as issue_watchers {
+    * issue_id : UUID <<FK issues.id>>
+    * org_member_id : UUID <<FK organization_members.id>>
+    --
+    added_at : TIMESTAMP
+    ' C-33: watcher belongs to issue org and can browse the project
+  }
+
+  entity "comments" as comments {
+    * id : UUID <<PK>>
+    --
+    org_id : UUID <<FK organizations.id>>
+    issue_id : UUID <<FK issues.id>>
+    author_member_id : UUID <<FK organization_members.id>>
+    parent_comment_id : UUID <<FK comments.id>>
+    body : TEXT
+    ' markdown | plain
+    body_format : VARCHAR
+    created_at : TIMESTAMP
+    updated_at : TIMESTAMP
+    deleted_at : TIMESTAMP
+    ' C-14: comments.org_id = issues.org_id (denormalize tenant)
+    ' INVARIANT: parent_comment_id must be in same issue, not self, and not form a cycle
+  }
+
+  entity "attachments" as attachments {
+    * id : UUID <<PK>>
+    --
+    org_id : UUID <<FK organizations.id>>
+    issue_id : UUID <<FK issues.id, NOT NULL>>
+    comment_id : UUID <<FK comments.id>>
+    uploaded_by_member_id : UUID <<FK organization_members.id>>
+
+    file_name : VARCHAR
+    mime_type : VARCHAR
+    file_size : BIGINT
+
+    ' local | s3 | gcs | azure_blob
+    storage_provider : VARCHAR
+    storage_key : VARCHAR
+    storage_url : VARCHAR
+    checksum : VARCHAR
+
+    created_at : TIMESTAMP
+    deleted_at : TIMESTAMP
+
+    ' comment_id is optional; if set, it identifies the comment where file was posted
+    ' C-08: comment.issue_id = attachment.issue_id and both belong to attachment.org_id
+  }
+}
+
+' =========================
+' Custom fields (dynamic schema)
+' =========================
+package "Custom Fields" {
+  entity "custom_fields" as custom_fields {
+    * id : UUID <<PK>>
+    --
+    org_id : UUID <<FK organizations.id>>
+    key : VARCHAR
+    name : VARCHAR
+    ' text | number | date | select | user | json
+    field_type : VARCHAR
+    created_at : TIMESTAMP
+    updated_at : TIMESTAMP
+    ' UQ(org_id, key)
+  }
+
+  entity "custom_field_contexts" as custom_field_contexts {
+    * id : UUID <<PK>>
+    --
+    custom_field_id : UUID <<FK custom_fields.id>>
+    project_id : UUID <<FK projects.id>>
+    issue_type_id : UUID <<FK issue_types.id>>
+    --
+    is_required : BOOLEAN
+    position : INT
+    ' field configuration for a project + issue type
+    ' C-09: custom field, project and issue type belong to the same org
+    ' UQ(custom_field_id, project_id, issue_type_id)
+  }
+
+  entity "custom_field_options" as custom_field_options {
+    * id : UUID <<PK>>
+    --
+    custom_field_id : UUID <<FK custom_fields.id>>
+    value : VARCHAR
+    label : VARCHAR
+    position : INT
+    created_at : TIMESTAMP
+  }
+
+  entity "issue_custom_field_values" as issue_custom_field_values {
+    * issue_id : UUID <<FK issues.id>>
+    * custom_field_context_id : UUID <<FK custom_field_contexts.id>>
+    --
+    value_json : JSON
+    updated_at : TIMESTAMP
+    ' C-21: issue project and type must match the field context
+    ' C-22: value_json must conform to field_type; select values use options of context custom field
+  }
+}
+
+' =========================
+' Audit / Events / Notifications
+' =========================
+package "Audit & Events" {
+  entity "issue_state_history" as issue_state_history {
+    * id : UUID <<PK>>
+    --
+    org_id : UUID <<FK organizations.id>>
+    issue_id : UUID <<FK issues.id>>
+
+    from_state_id : UUID <<FK workflow_states.id>>
+    to_state_id : UUID <<FK workflow_states.id>>
+    transition_id : UUID <<FK workflow_transitions.id>>
+    transition_comment_id : UUID <<FK comments.id>>
+
+    actor_member_id : UUID <<FK organization_members.id>>
+
+    idempotency_key : VARCHAR
+    reason : VARCHAR
+    metadata_json : JSON
+
+    issue_version_before : INT
+    issue_version_after : INT
+
+    occurred_at : TIMESTAMP
+    ' IDX(issue_id, occurred_at)
+    ' UQ(issue_id, idempotency_key)
+    ' C-10: states/transition belong to issue.workflow; transition_comment belongs to same issue
+    ' C-11: transition_comment_id is required when transition.require_comment = true
+  }
+
+  entity "activity_logs" as activity_logs {
+    * id : UUID <<PK>>
+    --
+    org_id : UUID <<FK organizations.id>>
+    ' member | system
+    actor_type : VARCHAR
+    actor_member_id : UUID <<FK organization_members.id>>
+    project_id : UUID <<FK projects.id>>
+    issue_id : UUID <<FK issues.id>>
+    event_type : VARCHAR
+    payload_json : JSON
+    created_at : TIMESTAMP
+    ' IDX(org_id, created_at)
+    ' C-23: member actor belongs to org; actor_member_id is NULL for system actor
+    ' when issue and project are both set, issue.project_id = project_id
+  }
+
+  entity "outbox_events" as outbox_events {
+    * id : UUID <<PK>>
+    --
+    org_id : UUID <<FK organizations.id>>
+    ' issue | project | sprint | ...
+    aggregate_type : VARCHAR
+    aggregate_id : UUID
+    event_type : VARCHAR
+    payload_json : JSON
+    ' pending | published | failed
+    status : VARCHAR
+    idempotency_key : VARCHAR
+    occurred_at : TIMESTAMP
+    published_at : TIMESTAMP
+    retry_count : INT
+    last_error : TEXT
+    ' IDX(status, occurred_at)
+    ' UQ(org_id, idempotency_key)
+    ' idempotency_key is NOT NULL for command-originated events
+  }
+
+  entity "notifications" as notifications {
+    * id : UUID <<PK>>
+    --
+    org_id : UUID <<FK organizations.id>>
+    recipient_member_id : UUID <<FK organization_members.id>>
+    outbox_event_id : UUID <<FK outbox_events.id>>
+
+    notification_type : VARCHAR
+    title : VARCHAR
+    body : TEXT
+    data_json : JSON
+
+    sent_at : TIMESTAMP
+    read_at : TIMESTAMP
+    created_at : TIMESTAMP
+    ' IDX(recipient_member_id, read_at)
+    ' UQ(outbox_event_id, recipient_member_id, notification_type)
+    ' C-24: recipient and outbox event belong to notification.org_id
+  }
+
+  entity "notification_preferences" as notification_preferences {
+    * org_member_id : UUID <<FK organization_members.id>>
+    * notification_type : VARCHAR
+    * channel : VARCHAR
+    --
+    org_id : UUID <<FK organizations.id>>
+    enabled : BOOLEAN
+    created_at : TIMESTAMP
+    updated_at : TIMESTAMP
+    ' channel: in_app | email; push requires a device endpoint extension
+    ' C-26: member belongs to org_id
+  }
+
+  entity "notification_deliveries" as notification_deliveries {
+    * id : UUID <<PK>>
+    --
+    notification_id : UUID <<FK notifications.id>>
+    ' email; future external channels: push | chat
+    channel : VARCHAR
+    destination : VARCHAR
+    ' pending | sent | failed | cancelled
+    status : VARCHAR
+    attempt_count : INT
+    last_error : TEXT
+    next_attempt_at : TIMESTAMP
+    sent_at : TIMESTAMP
+    created_at : TIMESTAMP
+    updated_at : TIMESTAMP
+    ' UQ(notification_id, channel)
+    ' destination is a snapshot; never store credentials or raw provider secrets
+  }
+
+  entity "background_jobs" as background_jobs {
+    * id : UUID <<PK>>
+    --
+    org_id : UUID <<FK organizations.id>>
+    ' member | system
+    requested_by_type : VARCHAR
+    requested_by_member_id : UUID <<FK organization_members.id>>
+    ' workflow_migration | bulk_issue | export | import | reconciliation
+    job_type : VARCHAR
+    scope_type : VARCHAR
+    scope_id : UUID
+    ' queued | running | succeeded | failed | cancelled
+    status : VARCHAR
+    idempotency_key : VARCHAR
+    input_json : JSON
+    result_json : JSON
+    result_storage_key : VARCHAR
+    progress_current : INT
+    progress_total : INT
+    attempt_count : INT
+    next_attempt_at : TIMESTAMP
+    lease_owner : VARCHAR
+    lease_expires_at : TIMESTAMP
+    cancel_requested_at : TIMESTAMP
+    started_at : TIMESTAMP
+    finished_at : TIMESTAMP
+    last_error : TEXT
+    created_at : TIMESTAMP
+    updated_at : TIMESTAMP
+    ' UQ(org_id, idempotency_key)
+    ' IDX(status, next_attempt_at, lease_expires_at, created_at)
+    ' C-27: member requester belongs to org_id; member id is NULL for system jobs
+    ' scope ownership is validated by job_type
+  }
+}
+
+' =========================
+' Jira-style Configuration Schemes (Phase 2)
+' =========================
+package "Configuration Schemes" {
+  entity "priorities" as priorities {
+    * id : UUID <<PK>>
+    --
+    org_id : UUID <<FK organizations.id>>
+    key : VARCHAR
+    name : VARCHAR
+    description : TEXT
+    rank : INT
+    color : VARCHAR
+    created_at : TIMESTAMP
+    updated_at : TIMESTAMP
+    archived_at : TIMESTAMP
+    ' UQ(org_id, key); UQ(org_id, rank)
+  }
+
+  entity "priority_schemes" as priority_schemes {
+    * id : UUID <<PK>>
+    --
+    org_id : UUID <<FK organizations.id>>
+    name : VARCHAR
+    description : TEXT
+    default_priority_id : UUID <<FK priorities.id>>
+    created_at : TIMESTAMP
+    updated_at : TIMESTAMP
+    ' UQ(org_id, name)
+  }
+
+  entity "priority_scheme_entries" as priority_scheme_entries {
+    * scheme_id : UUID <<FK priority_schemes.id>>
+    * priority_id : UUID <<FK priorities.id>>
+    --
+    position : INT
+    ' UQ(scheme_id, position)
+    ' C-36: scheme/default/entry priorities belong to the same organization
+  }
+
+  entity "issue_type_schemes" as issue_type_schemes {
+    * id : UUID <<PK>>
+    --
+    org_id : UUID <<FK organizations.id>>
+    name : VARCHAR
+    description : TEXT
+    default_issue_type_id : UUID <<FK issue_types.id>>
+    created_at : TIMESTAMP
+    updated_at : TIMESTAMP
+    ' UQ(org_id, name)
+  }
+
+  entity "issue_type_scheme_entries" as issue_type_scheme_entries {
+    * scheme_id : UUID <<FK issue_type_schemes.id>>
+    * issue_type_id : UUID <<FK issue_types.id>>
+    --
+    position : INT
+    ' UQ(scheme_id, position)
+    ' C-37: scheme/default/entry issue types belong to the same organization
+  }
+
+  entity "field_schemes" as field_schemes {
+    * id : UUID <<PK>>
+    --
+    org_id : UUID <<FK organizations.id>>
+    name : VARCHAR
+    description : TEXT
+    created_at : TIMESTAMP
+    updated_at : TIMESTAMP
+    ' UQ(org_id, name)
+  }
+
+  entity "field_scheme_entries" as field_scheme_entries {
+    * id : UUID <<PK>>
+    --
+    scheme_id : UUID <<FK field_schemes.id>>
+    issue_type_id : UUID <<FK issue_types.id>>
+    field_key : VARCHAR
+    custom_field_id : UUID <<FK custom_fields.id>>
+    is_required : BOOLEAN
+    is_hidden : BOOLEAN
+    description_override : TEXT
+    created_at : TIMESTAMP
+    updated_at : TIMESTAMP
+    ' UQ(scheme_id, issue_type_id, field_key)
+    ' C-38: issue type/custom field share org with scheme; required and hidden cannot both be true
+    ' field_key identifies system fields; custom_field_id is set only for custom fields
+  }
+
+  entity "screens" as screens {
+    * id : UUID <<PK>>
+    --
+    org_id : UUID <<FK organizations.id>>
+    name : VARCHAR
+    description : TEXT
+    created_at : TIMESTAMP
+    updated_at : TIMESTAMP
+    ' UQ(org_id, name)
+  }
+
+  entity "screen_fields" as screen_fields {
+    * id : UUID <<PK>>
+    --
+    screen_id : UUID <<FK screens.id>>
+    field_key : VARCHAR
+    custom_field_id : UUID <<FK custom_fields.id>>
+    position : INT
+    ' UQ(screen_id, field_key); UQ(screen_id, position)
+    ' C-39: custom field belongs to screen org; field key resolves from allowlisted field registry
+  }
+
+  entity "screen_schemes" as screen_schemes {
+    * id : UUID <<PK>>
+    --
+    org_id : UUID <<FK organizations.id>>
+    name : VARCHAR
+    description : TEXT
+    default_screen_id : UUID <<FK screens.id>>
+    created_at : TIMESTAMP
+    updated_at : TIMESTAMP
+    ' UQ(org_id, name)
+  }
+
+  entity "screen_scheme_operations" as screen_scheme_operations {
+    * scheme_id : UUID <<FK screen_schemes.id>>
+    * operation : VARCHAR
+    --
+    screen_id : UUID <<FK screens.id>>
+    ' operation: create | view | edit
+    ' C-40: screen/default screen belongs to scheme org; UQ(scheme,operation)
+  }
+
+  entity "issue_type_screen_schemes" as issue_type_screen_schemes {
+    * id : UUID <<PK>>
+    --
+    org_id : UUID <<FK organizations.id>>
+    name : VARCHAR
+    description : TEXT
+    default_screen_scheme_id : UUID <<FK screen_schemes.id>>
+    created_at : TIMESTAMP
+    updated_at : TIMESTAMP
+    ' UQ(org_id, name)
+  }
+
+  entity "issue_type_screen_scheme_entries" as issue_type_screen_scheme_entries {
+    * scheme_id : UUID <<FK issue_type_screen_schemes.id>>
+    * issue_type_id : UUID <<FK issue_types.id>>
+    --
+    screen_scheme_id : UUID <<FK screen_schemes.id>>
+    ' C-41: issue type and screen scheme belong to mapping scheme org
+  }
+}
+
+' =========================
+' Issue Security & Notification Policies (Phase 2)
+' =========================
+package "Security & Notification Policies" {
+  entity "issue_security_schemes" as issue_security_schemes {
+    * id : UUID <<PK>>
+    --
+    org_id : UUID <<FK organizations.id>>
+    name : VARCHAR
+    description : TEXT
+    default_level_id : UUID <<FK issue_security_levels.id>>
+    created_at : TIMESTAMP
+    updated_at : TIMESTAMP
+    ' UQ(org_id, name)
+  }
+
+  entity "issue_security_levels" as issue_security_levels {
+    * id : UUID <<PK>>
+    --
+    scheme_id : UUID <<FK issue_security_schemes.id>>
+    name : VARCHAR
+    description : TEXT
+    position : INT
+    created_at : TIMESTAMP
+    updated_at : TIMESTAMP
+    ' UQ(scheme_id, name); UQ(scheme_id, position)
+  }
+
+  entity "issue_security_grants" as issue_security_grants {
+    * id : UUID <<PK>>
+    --
+    level_id : UUID <<FK issue_security_levels.id>>
+    ' member | group | project_role | reporter | assignee
+    grant_type : VARCHAR
+    org_member_id : UUID <<FK organization_members.id>>
+    group_id : UUID <<FK groups.id>>
+    project_role_key : VARCHAR
+    created_at : TIMESTAMP
+    ' C-42: exactly one typed target when required; target belongs to scheme org
+  }
+
+  entity "notification_schemes" as notification_schemes {
+    * id : UUID <<PK>>
+    --
+    org_id : UUID <<FK organizations.id>>
+    name : VARCHAR
+    description : TEXT
+    created_at : TIMESTAMP
+    updated_at : TIMESTAMP
+    ' UQ(org_id, name)
+  }
+
+  entity "notification_scheme_entries" as notification_scheme_entries {
+    * id : UUID <<PK>>
+    --
+    scheme_id : UUID <<FK notification_schemes.id>>
+    event_type : VARCHAR
+    ' member | group | project_role | reporter | assignee | watchers
+    recipient_type : VARCHAR
+    org_member_id : UUID <<FK organization_members.id>>
+    group_id : UUID <<FK groups.id>>
+    project_role_key : VARCHAR
+    created_at : TIMESTAMP
+    ' C-43: typed recipient target belongs to scheme org; UQ logical recipient rule
+  }
+}
+
+' =========================
+' Search, Planning & Productivity (Phase 2-3)
+' =========================
+package "Search & Productivity" {
+  entity "saved_filters" as saved_filters {
+    * id : UUID <<PK>>
+    --
+    org_id : UUID <<FK organizations.id>>
+    owner_member_id : UUID <<FK organization_members.id>>
+    name : VARCHAR
+    description : TEXT
+    query_language : VARCHAR
+    query_text : TEXT
+    version : INT
+    created_at : TIMESTAMP
+    updated_at : TIMESTAMP
+    archived_at : TIMESTAMP
+    ' UQ(owner_member_id, name) WHERE archived_at IS NULL
+  }
+
+  entity "filter_shares" as filter_shares {
+    * id : UUID <<PK>>
+    --
+    filter_id : UUID <<FK saved_filters.id>>
+    ' organization | project | group | project_role | member
+    grantee_type : VARCHAR
+    project_id : UUID <<FK projects.id>>
+    group_id : UUID <<FK groups.id>>
+    org_member_id : UUID <<FK organization_members.id>>
+    project_role_key : VARCHAR
+    can_edit : BOOLEAN
+    created_at : TIMESTAMP
+    ' C-44: exactly one typed target when required and all targets share filter org
+  }
+
+  entity "filter_subscriptions" as filter_subscriptions {
+    * id : UUID <<PK>>
+    --
+    filter_id : UUID <<FK saved_filters.id>>
+    subscriber_member_id : UUID <<FK organization_members.id>>
+    cron_expression : VARCHAR
+    timezone : VARCHAR
+    is_active : BOOLEAN
+    next_run_at : TIMESTAMP
+    last_run_at : TIMESTAMP
+    created_at : TIMESTAMP
+    updated_at : TIMESTAMP
+    ' UQ(filter_id, subscriber_member_id)
+  }
+
+  entity "issue_hierarchy_levels" as issue_hierarchy_levels {
+    * id : UUID <<PK>>
+    --
+    org_id : UUID <<FK organizations.id>>
+    name : VARCHAR
+    level_rank : INT
+    created_at : TIMESTAMP
+    updated_at : TIMESTAMP
+    ' UQ(org_id, level_rank); e.g. epic=1, standard=0, subtask=-1
+  }
+
+  entity "issue_type_hierarchy_mappings" as issue_type_hierarchy_mappings {
+    * issue_type_id : UUID <<FK issue_types.id>>
+    --
+    hierarchy_level_id : UUID <<FK issue_hierarchy_levels.id>>
+    ' C-45: type and hierarchy level share org; parent must be exactly one allowed level above
+  }
+
+  entity "automation_rules" as automation_rules {
+    * id : UUID <<PK>>
+    --
+    org_id : UUID <<FK organizations.id>>
+    project_id : UUID <<FK projects.id>>
+    name : VARCHAR
+    description : TEXT
+    status : VARCHAR
+    actor_type : VARCHAR
+    actor_member_id : UUID <<FK organization_members.id>>
+    version : INT
+    created_at : TIMESTAMP
+    updated_at : TIMESTAMP
+    ' status: draft | active | paused | archived
+  }
+
+  entity "automation_rule_components" as automation_rule_components {
+    * id : UUID <<PK>>
+    --
+    rule_id : UUID <<FK automation_rules.id>>
+    parent_component_id : UUID <<FK automation_rule_components.id>>
+    ' trigger | condition | branch | action
+    component_type : VARCHAR
+    component_key : VARCHAR
+    position : INT
+    config_json : JSON
+    schema_version : INT
+    ' C-46: one root trigger; acyclic ordered tree; config validated by allowlisted component schema
+  }
+
+  entity "automation_executions" as automation_executions {
+    * id : UUID <<PK>>
+    --
+    rule_id : UUID <<FK automation_rules.id>>
+    outbox_event_id : UUID <<FK outbox_events.id>>
+    idempotency_key : VARCHAR
+    status : VARCHAR
+    input_json : JSON
+    result_json : JSON
+    started_at : TIMESTAMP
+    finished_at : TIMESTAMP
+    last_error : TEXT
+    created_at : TIMESTAMP
+    ' UQ(rule_id, idempotency_key); queued | running | succeeded | failed | cancelled
+  }
+
+  entity "dashboards" as dashboards {
+    * id : UUID <<PK>>
+    --
+    org_id : UUID <<FK organizations.id>>
+    owner_member_id : UUID <<FK organization_members.id>>
+    name : VARCHAR
+    description : TEXT
+    layout_key : VARCHAR
+    created_at : TIMESTAMP
+    updated_at : TIMESTAMP
+    archived_at : TIMESTAMP
+  }
+
+  entity "dashboard_shares" as dashboard_shares {
+    * id : UUID <<PK>>
+    --
+    dashboard_id : UUID <<FK dashboards.id>>
+    grantee_type : VARCHAR
+    project_id : UUID <<FK projects.id>>
+    group_id : UUID <<FK groups.id>>
+    org_member_id : UUID <<FK organization_members.id>>
+    can_edit : BOOLEAN
+    created_at : TIMESTAMP
+    ' organization | project | group | member; C-47 same-org typed target
+  }
+
+  entity "dashboard_widgets" as dashboard_widgets {
+    * id : UUID <<PK>>
+    --
+    dashboard_id : UUID <<FK dashboards.id>>
+    widget_key : VARCHAR
+    saved_filter_id : UUID <<FK saved_filters.id>>
+    position_x : INT
+    position_y : INT
+    width : INT
+    height : INT
+    config_json : JSON
+    schema_version : INT
+    created_at : TIMESTAMP
+    updated_at : TIMESTAMP
+    ' C-47: widget/filter accessible in dashboard org; no secret in config
+  }
+}
+
+' =========================
+' API & Webhooks (Phase 3)
+' =========================
+package "Integration Extensions" {
+  entity "api_tokens" as api_tokens {
+    * id : UUID <<PK>>
+    --
+    org_id : UUID <<FK organizations.id>>
+    org_member_id : UUID <<FK organization_members.id>>
+    name : VARCHAR
+    token_hash : VARCHAR
+    scopes_json : JSON
+    expires_at : TIMESTAMP
+    last_used_at : TIMESTAMP
+    revoked_at : TIMESTAMP
+    created_at : TIMESTAMP
+    ' UQ(token_hash); raw token shown once and never persisted/logged
+  }
+
+  entity "webhook_subscriptions" as webhook_subscriptions {
+    * id : UUID <<PK>>
+    --
+    org_id : UUID <<FK organizations.id>>
+    project_id : UUID <<FK projects.id>>
+    created_by_member_id : UUID <<FK organization_members.id>>
+    name : VARCHAR
+    target_url : VARCHAR
+    secret_hash : VARCHAR
+    event_types_json : JSON
+    saved_filter_id : UUID <<FK saved_filters.id>>
+    status : VARCHAR
+    created_at : TIMESTAMP
+    updated_at : TIMESTAMP
+    ' active | paused | disabled
+  }
+
+  entity "webhook_deliveries" as webhook_deliveries {
+    * id : UUID <<PK>>
+    --
+    subscription_id : UUID <<FK webhook_subscriptions.id>>
+    outbox_event_id : UUID <<FK outbox_events.id>>
+    status : VARCHAR
+    attempt_count : INT
+    next_attempt_at : TIMESTAMP
+    response_status : INT
+    last_error : TEXT
+    delivered_at : TIMESTAMP
+    created_at : TIMESTAMP
+    ' UQ(subscription_id, outbox_event_id); pending | sent | failed | cancelled
+    ' C-48: recheck scope/filter; SSRF-safe URL; signed delivery; no secret in payload/log
+  }
+}
+
+' =========================
+' Relationships
+' =========================
+organizations ||--o{ org_members : has
+users ||--o{ org_members : joins
+org_members |o--o{ org_members : invites
+organizations ||--o{ org_invitations : invitations
+org_members ||--o{ org_invitations : invited_by
+org_roles |o--o{ org_invitations : proposed_role
+users |o--o{ org_invitations : accepted_by
+org_members ||--o{ org_member_roles : is_assigned
+org_members ||--o{ org_member_roles : granted_by
+org_roles ||--o{ org_member_roles : assigned_role
+org_roles ||--o{ org_role_permission_entries : grants
+
+organizations ||--o{ departments : contains
+departments ||--o{ department_members : has
+org_members ||--o{ department_members : in
+
+departments |o--o{ departments : parent
+
+organizations ||--o{ groups : defines
+groups ||--o{ group_members : has
+org_members ||--o{ group_members : in
+org_members ||--o{ group_members : added_by
+
+users ||--o{ auth_sessions : sessions
+users ||--o{ password_reset_tokens : password_resets
+users ||--o{ email_verification_tokens : email_verifications
+
+organizations ||--o{ projects : owns
+org_members ||--o{ projects : creates
+
+projects ||--o{ project_roles : defines
+projects ||--o{ project_members : has
+org_members ||--o{ project_members : joins
+project_members ||--o{ project_member_roles : is_assigned
+org_members ||--o{ project_member_roles : granted_by
+project_roles ||--o{ project_member_roles : assigned_role
+groups ||--o{ project_group_roles : is_assigned
+project_roles ||--o{ project_group_roles : assigned_role
+org_members ||--o{ project_group_roles : granted_by
+projects ||--o{ project_components : has
+org_members ||--o{ project_components : lead
+projects ||--o{ project_versions : has
+projects ||--o{ permission_schemes : has
+permission_schemes ||--o{ permission_scheme_entries : entries
+project_roles ||--o{ permission_scheme_entries : role
+permission_schemes |o--o| projects : selected_by
+
+projects ||--o{ boards : has
+boards ||--o{ board_columns : columns
+boards ||--o{ board_issue_positions : orders
+issues ||--o{ board_issue_positions : positioned_on
+boards ||--o{ sprints : schedules
+projects ||--o{ sprints : owns
+
+organizations ||--o{ issue_types : defines
+organizations ||--o{ resolutions : defines
+organizations ||--o{ workflows : defines
+workflows ||--o{ workflow_states : states
+workflows ||--o{ workflow_transitions : transitions
+workflow_states ||--o{ workflow_transitions : from
+workflow_states ||--o{ workflow_transitions : to
+workflow_transitions ||--o{ transition_guards : guards
+
+projects ||--o{ workflow_schemes : workflow_scheme
+workflow_schemes |o--o| projects : selected_by
+workflow_schemes ||--o{ scheme_transition_permissions : permissions
+workflow_transitions ||--o{ scheme_transition_permissions : transition
+project_roles ||--o{ scheme_transition_permissions : allowed
+workflow_schemes ||--o{ workflow_scheme_mappings : maps
+issue_types ||--o{ workflow_scheme_mappings : for_type
+workflows ||--o{ workflow_scheme_mappings : uses
+
+workflow_states ||--o{ board_column_states : shown
+board_columns ||--o{ board_column_states : groups
+
+organizations ||--o{ issues : contains
+projects ||--o{ issues : has
+issue_types ||--o{ issues : type
+workflows ||--o{ issues : workflow
+workflow_states ||--o{ issues : current_state
+resolutions |o--o{ issues : resolution
+sprints |o--o{ issues : current_sprint
+project_components |o--o{ issues : component
+project_versions |o--o{ issues : fix_version
+org_members ||--o{ issues : reporter
+org_members |o--o{ issues : assignee
+issues |o--o{ issues : parent
+
+organizations ||--o{ issue_links : owns
+organizations ||--o{ issue_link_types : defines
+issue_link_types ||--o{ issue_links : type
+issues ||--o{ issue_links : source
+issues ||--o{ issue_links : target
+org_members ||--o{ issue_links : created_by
+
+issues ||--o{ work_logs : worklog
+org_members ||--o{ work_logs : author
+issues ||--o{ issue_sprint_history : sprint_history
+sprints ||--o{ issue_sprint_history : contains
+org_members ||--o{ issue_sprint_history : added_by
+org_members ||--o{ issue_sprint_history : removed_by
+
+organizations ||--o{ labels : tags
+issues ||--o{ issue_labels : tagged
+labels ||--o{ issue_labels : label
+org_members ||--o{ issue_labels : added_by
+
+issues ||--o{ issue_watchers : watched_by
+org_members ||--o{ issue_watchers : watches
+
+issues ||--o{ comments : comments
+org_members ||--o{ comments : author
+comments |o--o{ comments : parent
+organizations ||--o{ comments : owns
+
+issues ||--o{ attachments : issue
+comments |o--o{ attachments : comment
+org_members ||--o{ attachments : uploaded_by
+organizations ||--o{ attachments : owns
+
+organizations ||--o{ custom_fields : has
+custom_fields ||--o{ custom_field_options : options
+custom_fields ||--o{ custom_field_contexts : configured_field
+projects ||--o{ custom_field_contexts : configures
+issue_types ||--o{ custom_field_contexts : allowed_type
+issues ||--o{ issue_custom_field_values : values
+custom_field_contexts ||--o{ issue_custom_field_values : supplies_context
+
+organizations ||--o{ issue_state_history : owns
+issues ||--o{ issue_state_history : history
+workflow_transitions ||--o{ issue_state_history : via
+workflow_states ||--o{ issue_state_history : from
+workflow_states ||--o{ issue_state_history : to
+org_members ||--o{ issue_state_history : actor
+comments |o--o{ issue_state_history : transition_comment
+
+organizations ||--o{ activity_logs : logs
+org_members |o--o{ activity_logs : actor
+projects |o--o{ activity_logs : project
+issues |o--o{ activity_logs : issue
+
+organizations ||--o{ outbox_events : emits
+outbox_events ||--o{ notifications : creates
+org_members ||--o{ notifications : receives
+organizations ||--o{ notifications : owns
+organizations ||--o{ notification_preferences : preferences
+org_members ||--o{ notification_preferences : configures
+notifications ||--o{ notification_deliveries : deliveries
+organizations ||--o{ background_jobs : jobs
+org_members |o--o{ background_jobs : requests
+
+organizations ||--o{ priorities : defines
+organizations ||--o{ priority_schemes : defines
+priorities ||--o{ priority_scheme_entries : included
+priority_schemes ||--o{ priority_scheme_entries : entries
+priorities |o--o{ priority_schemes : default
+priorities ||--o{ issues : priority
+priority_schemes |o--o{ projects : selected_by
+
+organizations ||--o{ issue_type_schemes : defines
+issue_type_schemes ||--o{ issue_type_scheme_entries : entries
+issue_types ||--o{ issue_type_scheme_entries : included
+issue_types |o--o{ issue_type_schemes : default
+issue_type_schemes |o--o{ projects : selected_by
+
+organizations ||--o{ field_schemes : defines
+field_schemes ||--o{ field_scheme_entries : entries
+issue_types |o--o{ field_scheme_entries : type_override
+custom_fields |o--o{ field_scheme_entries : custom_field
+field_schemes |o--o{ projects : selected_by
+
+organizations ||--o{ screens : defines
+screens ||--o{ screen_fields : fields
+custom_fields |o--o{ screen_fields : custom_field
+organizations ||--o{ screen_schemes : defines
+screens ||--o{ screen_scheme_operations : operation_screen
+screen_schemes ||--o{ screen_scheme_operations : operations
+screens |o--o{ screen_schemes : default
+organizations ||--o{ issue_type_screen_schemes : defines
+screen_schemes |o--o{ issue_type_screen_schemes : default
+issue_type_screen_schemes ||--o{ issue_type_screen_scheme_entries : entries
+issue_types ||--o{ issue_type_screen_scheme_entries : for_type
+screen_schemes ||--o{ issue_type_screen_scheme_entries : uses
+issue_type_screen_schemes |o--o{ projects : selected_by
+
+organizations ||--o{ issue_security_schemes : defines
+issue_security_schemes ||--o{ issue_security_levels : levels
+issue_security_levels |o--o{ issue_security_schemes : default
+issue_security_levels ||--o{ issue_security_grants : grants
+org_members |o--o{ issue_security_grants : member
+groups |o--o{ issue_security_grants : group
+issue_security_schemes |o--o{ projects : selected_by
+issue_security_levels |o--o{ issues : protects
+
+organizations ||--o{ notification_schemes : defines
+notification_schemes ||--o{ notification_scheme_entries : entries
+org_members |o--o{ notification_scheme_entries : member
+groups |o--o{ notification_scheme_entries : group
+notification_schemes |o--o{ projects : selected_by
+
+organizations ||--o{ saved_filters : owns
+org_members ||--o{ saved_filters : creates
+saved_filters ||--o{ filter_shares : shares
+projects |o--o{ filter_shares : project
+groups |o--o{ filter_shares : group
+org_members |o--o{ filter_shares : member
+saved_filters ||--o{ filter_subscriptions : subscriptions
+org_members ||--o{ filter_subscriptions : subscriber
+saved_filters |o--o{ boards : drives
+
+organizations ||--o{ issue_hierarchy_levels : hierarchy
+issue_hierarchy_levels ||--o{ issue_type_hierarchy_mappings : maps
+issue_types ||--o| issue_type_hierarchy_mappings : level
+
+organizations ||--o{ automation_rules : owns
+projects |o--o{ automation_rules : scopes
+org_members |o--o{ automation_rules : actor
+automation_rules ||--o{ automation_rule_components : components
+automation_rule_components |o--o{ automation_rule_components : parent
+automation_rules ||--o{ automation_executions : executions
+outbox_events |o--o{ automation_executions : trigger_event
+
+organizations ||--o{ dashboards : owns
+org_members ||--o{ dashboards : creates
+dashboards ||--o{ dashboard_shares : shares
+projects |o--o{ dashboard_shares : project
+groups |o--o{ dashboard_shares : group
+org_members |o--o{ dashboard_shares : member
+dashboards ||--o{ dashboard_widgets : widgets
+saved_filters |o--o{ dashboard_widgets : data_source
+
+organizations ||--o{ api_tokens : owns
+org_members ||--o{ api_tokens : creates
+organizations ||--o{ webhook_subscriptions : owns
+projects |o--o{ webhook_subscriptions : scope
+org_members ||--o{ webhook_subscriptions : creates
+saved_filters |o--o{ webhook_subscriptions : filters
+webhook_subscriptions ||--o{ webhook_deliveries : deliveries
+outbox_events ||--o{ webhook_deliveries : event
+
+@enduml

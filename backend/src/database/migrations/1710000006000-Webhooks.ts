@@ -1,0 +1,7 @@
+import { MigrationInterface, QueryRunner } from 'typeorm';
+
+export class Webhooks1710000006000 implements MigrationInterface {
+  name = 'Webhooks1710000006000';
+  async up(queryRunner: QueryRunner): Promise<void> { await queryRunner.query(`CREATE TABLE IF NOT EXISTS webhook_subscriptions (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), org_id uuid NOT NULL REFERENCES organizations(id), project_id uuid, created_by_member_id uuid NOT NULL REFERENCES organization_members(id), url varchar(2048) NOT NULL, secret_hash varchar(64) NOT NULL, events jsonb NOT NULL DEFAULT '[]', filter_json jsonb NOT NULL DEFAULT '{}', status varchar(32) NOT NULL DEFAULT 'active', failure_count int NOT NULL DEFAULT 0, created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now())`); await queryRunner.query(`CREATE TABLE IF NOT EXISTS webhook_deliveries (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), subscription_id uuid NOT NULL REFERENCES webhook_subscriptions(id) ON DELETE CASCADE, event_id uuid NOT NULL REFERENCES outbox_events(id) ON DELETE CASCADE, status varchar(32) NOT NULL DEFAULT 'pending', attempts int NOT NULL DEFAULT 0, next_attempt_at timestamptz, response_status int, last_error text, created_at timestamptz NOT NULL DEFAULT now(), UNIQUE(subscription_id,event_id))`); }
+  async down(queryRunner: QueryRunner): Promise<void> { await queryRunner.query('DROP TABLE IF EXISTS webhook_deliveries'); await queryRunner.query('DROP TABLE IF EXISTS webhook_subscriptions'); }
+}
