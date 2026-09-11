@@ -6,22 +6,27 @@
     },
     "backend": {
       "root": "backend",
+      "framework": "nestjs",
       "entrypoint": "src/main.ts",
       "installCommand": "npm install --legacy-peer-deps"
     }
   },
   "rewrites": [
     {
-      "source": "/api(/.*)?",
+      "source": "/api",
       "destination": {
-        "type": "service",
+        "service": "backend"
+      }
+    },
+    {
+      "source": "/api/(.*)",
+      "destination": {
         "service": "backend"
       }
     },
     {
       "source": "/(.*)",
       "destination": {
-        "type": "service",
         "service": "frontend"
       }
     }

@@ -6,11 +6,12 @@ import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
 import { AppModule } from './app.module.js';
 
-async function bootstrap() {
+let cachedServer: any;
+
+async function bootstrapServer() {
   const app = await NestFactory.create(AppModule);
 
   const configService = app.get(ConfigService);
-  const port = process.env.PORT || configService.get<number>('PORT') || configService.get<number>('APP_PORT', 3001);
   const frontendUrl = configService.get<string>('FRONTEND_URL', 'http://localhost:3000');
 
   // Security
@@ -51,8 +52,52 @@ async function bootstrap() {
   const document = SwaggerModule.createDocument(app, swaggerConfig);
   SwaggerModule.setup('api/docs', app, document);
 
-  await app.listen(port, '0.0.0.0');
-  console.log(`🚀 Task Manager API running on port ${port}`);
-  console.log(`📖 Swagger docs at http://localhost:${port}/api/docs`);
+  await app.init();
+  return app;
 }
-bootstrap();
+
+// Handler for Vercel Serverless Function
+export default async function handler(req: any, res: any) {
+  try {
+    if (!cachedServer) {
+      const app = await bootstrapServer();
+      cachedServer = app.getHttpAdapter().getInstance();
+    }
+    // Prevent Express bodyParser from hanging if Vercel already read/parsed req.body
+    if (req.body && typeof req.body === 'object') {
+      req._body = true;
+    }
+    if (req.url && !req.url.startsWith('/api')) {
+      req.url = `/api${req.url.startsWith('/') ? req.url : `/${req.url}`}`;
+    }
+    return cachedServer(req, res);
+  } catch (err: any) {
+    console.error('Unhandled Vercel serverless error:', err);
+    res.statusCode = 500;
+    res.setHeader('Content-Type', 'application/json');
+    res.end(JSON.stringify({
+      statusCode: 500,
+      message: 'Internal Server Error',
+      error: err?.message || String(err),
+    }));
+  }
+}
+
+// CommonJS module compatibility
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = handler;
+  (module.exports as any).default = handler;
+}
+
+// Standalone execution (local dev / container only)
+if (!process.env.VERCEL && !process.env.NOW_REGION) {
+  bootstrapServer().then(async (app) => {
+    const configService = app.get(ConfigService);
+    const port = process.env.PORT || configService.get<number>('PORT') || configService.get<number>('APP_PORT', 3001);
+    await app.listen(port, '0.0.0.0');
+    console.log(`🚀 Task Manager API running on port ${port}`);
+    console.log(`📖 Swagger docs at http://localhost:${port}/api/docs`);
+  }).catch((err) => {
+    console.error('Failed to start standalone server:', err);
+  });
+}
