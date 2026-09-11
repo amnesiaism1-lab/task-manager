@@ -418,3 +418,100 @@ export async function openInviteMemberModal(loadInitialData) {
     }
   });
 }
+
+export function openCreateProjectModal(loadInitialData) {
+  const { org } = store.getState();
+  if (!org) {
+    showToast('Please select an organization first', 'warning');
+    return;
+  }
+
+  const contentHtml = `
+    <form id="form-create-project-modal" class="space-y-4">
+      <div class="grid grid-cols-3 gap-3">
+        <div class="col-span-1">
+          <label for="proj-modal-key" class="block text-xs font-semibold text-text-muted uppercase tracking-wider mb-1.5">Project Key</label>
+          <input id="proj-modal-key" name="key" maxlength="10" class="w-full px-3 py-2 bg-surface-hover/50 border border-border-default rounded-md text-sm text-text-primary focus:outline-none focus:border-brand-primary uppercase font-mono" placeholder="ALPHA" required />
+        </div>
+        <div class="col-span-2">
+          <label for="proj-modal-name" class="block text-xs font-semibold text-text-muted uppercase tracking-wider mb-1.5">Project Name</label>
+          <input id="proj-modal-name" name="name" maxlength="120" class="w-full px-3 py-2 bg-surface-hover/50 border border-border-default rounded-md text-sm text-text-primary focus:outline-none focus:border-brand-primary" placeholder="Alpha Platform Services" required />
+        </div>
+      </div>
+
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label for="proj-modal-type" class="block text-xs font-semibold text-text-muted uppercase tracking-wider mb-1.5">Methodology</label>
+          <select id="proj-modal-type" name="projectType" class="w-full px-3 py-2 bg-surface-hover/50 border border-border-default rounded-md text-sm text-text-primary focus:outline-none focus:border-brand-primary">
+            <option value="scrum" selected>Scrum (Sprints & Backlog)</option>
+            <option value="kanban">Kanban (Continuous Flow)</option>
+          </select>
+        </div>
+        <div>
+          <label for="proj-modal-visibility" class="block text-xs font-semibold text-text-muted uppercase tracking-wider mb-1.5">Visibility</label>
+          <select id="proj-modal-visibility" name="visibility" class="w-full px-3 py-2 bg-surface-hover/50 border border-border-default rounded-md text-sm text-text-primary focus:outline-none focus:border-brand-primary">
+            <option value="org" selected>Organization-wide</option>
+            <option value="private">Private (Restricted)</option>
+            <option value="public">Public</option>
+          </select>
+        </div>
+      </div>
+
+      <div>
+        <label for="proj-modal-desc" class="block text-xs font-semibold text-text-muted uppercase tracking-wider mb-1.5">Description (Optional)</label>
+        <textarea id="proj-modal-desc" name="description" rows="2" class="w-full px-3 py-2 bg-surface-hover/50 border border-border-default rounded-md text-sm text-text-primary focus:outline-none focus:border-brand-primary resize-none" placeholder="Brief project summary..."></textarea>
+      </div>
+
+      <p class="text-xs text-text-muted">A default workflow, agile board, and permission scheme will be automatically attached.</p>
+
+      <div class="flex items-center justify-end gap-3 pt-3 border-t border-border-default">
+        <button type="button" class="button ghost btn-modal-cancel">Cancel</button>
+        <button type="submit" class="button primary">Create Project</button>
+      </div>
+    </form>
+  `;
+
+  openModal({
+    title: 'Create Project',
+    subtitle: 'AGILE WORKSPACE',
+    contentHtml,
+    size: 'medium',
+  });
+
+  const form = document.querySelector('#form-create-project-modal');
+  form?.querySelector('.btn-modal-cancel')?.addEventListener('click', closeModal);
+
+  form?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const formData = new FormData(form);
+    const key = formData.get('key')?.toString().trim().toUpperCase();
+    const name = formData.get('name')?.toString().trim();
+    const projectType = formData.get('projectType')?.toString() || 'scrum';
+    const visibility = formData.get('visibility')?.toString() || 'org';
+    const description = formData.get('description')?.toString().trim() || undefined;
+
+    if (!key || !name) return;
+
+    try {
+      store.setState({ loading: true });
+      const newProj = await request(`/organizations/${org}/projects`, {
+        method: 'POST',
+        body: JSON.stringify({ key, name, projectType, visibility, description }),
+      });
+
+      closeModal();
+      showToast(`Project "${newProj.name}" (${newProj.key}) created!`, 'success');
+      store.setState({ selectedProjectId: newProj.id });
+
+      if (typeof loadInitialData === 'function') {
+        await loadInitialData(org, newProj.id);
+      } else {
+        await loadProjects();
+      }
+    } catch (err) {
+      showToast(err.message, 'error');
+    } finally {
+      store.setState({ loading: false });
+    }
+  });
+}

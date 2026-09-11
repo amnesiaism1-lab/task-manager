@@ -30,6 +30,7 @@ import {
   loadOrganizations,
   loadUserInvitations,
   openCreateOrgModal,
+  openCreateProjectModal,
   openJoinOrgModal,
   openInviteMemberModal,
   openPendingInvitationsModal,
@@ -268,6 +269,10 @@ function bindShellEvents() {
   const projectSwitcher = document.querySelector('#project-switcher');
   projectSwitcher?.addEventListener('change', async (e) => {
     const val = e.target.value;
+    if (val === '__new_project__') {
+      openCreateProjectModal(loadInitialData);
+      return;
+    }
     store.setState({ selectedProjectId: val });
     if (val) {
       await Promise.all([loadBoards(), loadSprints(), loadBacklog(), loadIssues(store.getState().query)]);

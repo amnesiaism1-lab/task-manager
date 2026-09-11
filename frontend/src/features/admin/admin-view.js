@@ -29,6 +29,9 @@ export function renderAdminView(state) {
         <button class="admin-tab-btn ${currentTab === 'groups' ? 'active' : ''}" data-admin-tab="groups">
           🌲 Departments & Groups
         </button>
+        <button class="admin-tab-btn ${currentTab === 'fields' ? 'active' : ''}" data-admin-tab="fields">
+          ✨ Custom Fields
+        </button>
         <button class="admin-tab-btn ${currentTab === 'project' ? 'active' : ''}" data-admin-tab="project">
           📁 Project Settings (${state.selectedProjectId ? 'Active' : 'Select'})
         </button>
@@ -44,6 +47,7 @@ export function renderAdminView(state) {
           currentTab === 'members' ? renderMembersTab(state) :
           currentTab === 'roles' ? renderRolesTab(state) :
           currentTab === 'groups' ? renderGroupsTab(state) :
+          currentTab === 'fields' ? renderCustomFieldsTab(state) :
           currentTab === 'system' ? renderSystemAdminTab(state) :
           renderProjectSettingsTab(project, state)}
       </div>
@@ -257,12 +261,64 @@ function renderGroupsTab(state) {
   `;
 }
 
+function renderCustomFieldsTab(state) {
+  const fields = state.customFields || [];
+  return `
+    <div class="admin-section-card">
+      <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+        <div>
+          <h3>✨ Custom Fields & Schema Attributes</h3>
+          <p class="muted">Define typed custom attributes (Text, Number, Single Select, Multi Select, Date) across issues.</p>
+        </div>
+        <button type="button" class="button primary btn-sm" id="btn-admin-add-custom-field">
+          + Add Custom Field
+        </button>
+      </div>
+
+      <div class="admin-items-table">
+        <div class="table-header-row" style="display: grid; grid-template-columns: 2fr 1.5fr 1fr 2fr auto; gap: 12px; padding: 8px 12px; font-weight: 600; font-size: 11px; text-transform: uppercase; color: var(--text-muted);">
+          <span>Field Name</span>
+          <span>Field Key</span>
+          <span>Data Type</span>
+          <span>Description</span>
+          <span style="text-align: right;">Options</span>
+        </div>
+        ${fields.length ? fields.map(f => `
+          <div class="admin-member-row" style="display: grid; grid-template-columns: 2fr 1.5fr 1fr 2fr auto; gap: 12px; align-items: center; padding: 10px 12px;">
+            <div>
+              <strong>${escapeHtml(f.name)}</strong>
+              ${f.isRequired ? '<span class="badge badge-tag" style="margin-left: 6px;">Required</span>' : ''}
+            </div>
+            <span class="font-mono text-xs text-text-muted">${escapeHtml(f.key || f.id?.slice(0, 8))}</span>
+            <div>
+              <span class="badge badge-primary text-xs uppercase">${escapeHtml(f.fieldType || 'text')}</span>
+            </div>
+            <div class="muted-small">
+              ${escapeHtml(f.description || 'Organization Field')}
+            </div>
+            <div style="text-align: right;">
+              ${f.fieldType === 'select' || f.fieldType === 'multi_select' ? `
+                <button type="button" class="button ghost btn-sm btn-admin-add-option" data-field-id="${f.id}" data-field-name="${escapeHtml(f.name)}">
+                  + Option
+                </button>
+              ` : '<span class="muted-small">—</span>'}
+            </div>
+          </div>
+        `).join('') : '<div class="empty-hint-text">No custom fields defined yet. Click "+ Add Custom Field" to create one.</div>'}
+      </div>
+    </div>
+  `;
+}
+
 function renderProjectSettingsTab(project, state) {
   if (!project) {
     return `
-      <div class="empty-state-view">
+      <div class="empty-state-view" style="text-align: center; padding: 48px 20px;">
         <h3>No project selected</h3>
-        <p class="muted">Choose a project from the top navigation bar to configure its components, versions, and roles.</p>
+        <p class="muted" style="margin-bottom: 16px;">Choose a project from the top navigation bar or create a new project to start managing tasks.</p>
+        <button type="button" class="button primary" id="btn-admin-create-project-trigger">
+          + Create New Project
+        </button>
       </div>
     `;
   }
@@ -273,13 +329,16 @@ function renderProjectSettingsTab(project, state) {
   return `
     <div class="project-settings-container">
       <div class="admin-section-card">
-        <div class="card-header">
+        <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
           <div>
             <h3>Project: ${escapeHtml(project.name)} (${escapeHtml(project.key)})</h3>
             <p class="muted">Lifecycle, visibility, and components for this workspace.</p>
           </div>
-          <div class="header-actions">
-            <button class="button ghost" id="btn-toggle-project-archive">
+          <div class="header-actions" style="display: flex; gap: 8px;">
+            <button type="button" class="button primary btn-sm" id="btn-admin-create-project-trigger">
+              + New Project
+            </button>
+            <button class="button ghost btn-sm" id="btn-toggle-project-archive">
               ${project.archivedAt ? 'Restore Project' : 'Archive Project'}
             </button>
           </div>

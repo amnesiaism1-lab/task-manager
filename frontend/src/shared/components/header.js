@@ -39,6 +39,7 @@ export function renderHeader(state) {
                 ${escapeHtml(p.key)} · ${escapeHtml(p.name)}
               </option>
             `).join('')}
+            <option value="__new_project__">+ Create Project...</option>
           </select>
         </div>
 

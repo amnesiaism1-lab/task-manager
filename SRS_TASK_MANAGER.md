@@ -2860,6 +2860,114 @@ Các Q-OPEN sau **không chặn bắt đầu** thiết kế API, nhưng chặn v
 
 ---
 
+## 16. Ma trận đặc tả CRUD & Vòng đời Toàn diện của Cơ sở Dữ liệu (Database Entity CRUD & Lifecycle Matrix)
+
+Tất cả các bảng/entity trong hệ thống tuân thủ nghiêm ngặt nguyên tắc thiết kế RESTful/DDD, phân quyền theo Multi-tenant Organization context và Project RBAC context, bảo toàn tính toàn vẹn dữ liệu qua Soft Delete và Audit Trail:
+
+### 16.1. Domain: Identity, Multi-Tenancy & Session Security
+
+| STT | Entity / Bảng | Tạo mới (Create) | Đọc / Truy vấn (Read) | Cập nhật (Update) | Xoá / Hủy (Delete Policy) | Event & Tích hợp |
+| :---: | :--- | :--- | :--- | :--- | :--- | :--- |
+| 1 | `users` | Đăng ký tự do hoặc System Admin tạo qua API/Admin panel | Người dùng hiện tại (`/auth/me`), System Admin, hoặc Member directory theo org | Cập nhật họ tên, avatar, mật khẩu (hash bcrypt), status | Soft delete (đánh dấu status = 'suspended' / 'deactivated'), bảo toàn audit logs | `USER_REGISTERED`, `USER_UPDATED`, `PASSWORD_CHANGED` |
+| 2 | `organizations` | Người dùng tạo tổ chức mới (`POST /organizations`) | Thành viên thuộc tổ chức hoặc System Admin | Cập nhật tên, logo, gói cước (plan), status | Soft delete / Đình chỉ (status = 'suspended'), cascade bảo lưu dữ liệu | `ORG_CREATED`, `ORG_UPDATED` |
+| 3 | `organization_members` | Tự động khi tạo org (Owner) hoặc khi accept invitation | Thành viên trong cùng organization | Cập nhật title, status (active/suspended) | Xoá mềm khi rời tổ chức hoặc Admin thu hồi thành viên | `MEMBER_JOINED`, `MEMBER_REMOVED` |
+| 4 | `organization_invitations` | Admin/Owner gửi lời mời kèm email và role (`POST /invitations`) | Admin tổ chức hoặc người dùng được mời (`/invitations/me`) | Thu hồi lời mời (`POST /invitations/decline` hoặc `revoke`) | Trạng thái chuyển thành `accepted`, `revoked` hoặc `expired` (7 ngày) | `INVITATION_SENT`, `INVITATION_ACCEPTED` |
+| 5 | `organization_roles` | Admin tổ chức tạo role tùy chỉnh (`POST /roles`) | Thành viên trong tổ chức | Cập nhật tên role, mô tả, danh sách quyền gán kèm | Xoá (chỉ khi không còn member nào đang được gán role này) | `ROLE_CREATED`, `ROLE_UPDATED` |
+| 6 | `org_member_roles` | Admin gán role cho member | Thành viên trong tổ chức | Thu hồi và gán lại role khác | Xoá bản ghi gán khi thay đổi quyền | `ROLE_GRANTED`, `ROLE_REVOKED` |
+| 7 | `org_role_permissions` | Gán permission key cho org role | Thành viên trong tổ chức | Thêm/bớt permission key | Xoá mapping | `PERMISSIONS_UPDATED` |
+| 8 | `departments` | Admin tạo phòng ban | Thành viên trong tổ chức | Cập nhật tên, mô tả, trưởng phòng | Xoá khi phòng ban trống | `DEPT_CREATED` |
+| 9 | `department_members` | Thêm member vào phòng ban | Thành viên trong tổ chức | N/A | Xoá mapping khi member rời phòng ban | N/A |
+| 10 | `groups` | Admin tạo nhóm cộng sự | Thành viên trong tổ chức | Cập nhật tên nhóm, mô tả | Xoá nhóm | `GROUP_CREATED` |
+| 11 | `group_members` | Thêm member vào nhóm | Thành viên trong tổ chức | N/A | Xoá mapping khi rời nhóm | N/A |
+| 12 | `auth_sessions` | Tự động khi đăng nhập thành công | Chủ sở hữu session hoặc System Admin | Cập nhật `last_active_at` | Xoá / Hủy khi đăng xuất hoặc Force Revoke | `SESSION_REVOKED` |
+| 13 | `api_tokens` (PAT) | Member tự tạo token cá nhân | Member sở hữu token | Cập nhật `last_used_at`, thu hồi (`revoked_at`) | Soft delete (đánh dấu `revoked_at = NOW()`) | `TOKEN_REVOKED` |
+| 14 | `password_reset_tokens` | Tự động khi yêu cầu quên mật khẩu | Hệ thống kiểm tra tính hợp lệ | Đánh dấu `used_at = NOW()` sau khi đổi mật khẩu | Xoá sau khi hết hạn (15 phút) | `PASSWORD_RESET` |
+| 15 | `email_verification_tokens` | Tự động khi đăng ký tài khoản | Hệ thống xác thực | Đánh dấu `verified_at = NOW()` | Xoá sau khi xác minh | `EMAIL_VERIFIED` |
+| 16 | `auth_audit_logs` | Ghi log đăng nhập (thành công/thất bại) | System Admin / Security Compliance | Bất biến (Immutable - không cho phép sửa) | Lưu trữ theo chính sách retention (90 ngày) | N/A |
+
+### 16.2. Domain: Project Management & Workspace Structure
+
+| STT | Entity / Bảng | Tạo mới (Create) | Đọc / Truy vấn (Read) | Cập nhật (Update) | Xoá / Hủy (Delete Policy) | Event & Tích hợp |
+| :---: | :--- | :--- | :--- | :--- | :--- | :--- |
+| 17 | `projects` | Người dùng có quyền `CREATE_PROJECT` qua Modal / API | Thành viên được cấp quyền `BROWSE_PROJECT` | Cập nhật tên, mô tả, project lead, visibility | Lưu trữ (`archived_at`), khôi phục (`restore`), hoặc soft delete | `PROJECT_CREATED`, `PROJECT_ARCHIVED` |
+| 18 | `project_members` | Project Admin thêm member vào dự án | Thành viên dự án | Cập nhật trạng thái (`active`/`inactive`) | Rời dự án hoặc Admin xoá khỏi dự án | `PROJECT_MEMBER_ADDED` |
+| 19 | `project_roles` | Project Admin định nghĩa role nội bộ dự án | Thành viên dự án | Cập nhật tên role, mô tả | Xoá khi không có member nào sử dụng | N/A |
+| 20 | `project_member_roles` | Gán role dự án cho member | Thành viên dự án | Gán lại role | Xoá mapping | `PROJECT_ROLE_ASSIGNED` |
+| 21 | `project_group_roles` | Gán role dự án cho cả nhóm (Group) | Thành viên dự án | Gán lại role | Xoá mapping | N/A |
+| 22 | `project_components` | Tạo component phân hệ trong dự án | Thành viên dự án | Cập nhật tên component, mô tả, component lead | Lưu trữ (`archived_at`) hoặc xoá khi không còn issue liên kết | `COMPONENT_CREATED` |
+| 23 | `project_versions` | Tạo version / release sprint | Thành viên dự án | Cập nhật tên release, ngày phát hành, trạng thái (`released`) | Đánh dấu `released`, `archived` hoặc xoá version rỗng | `VERSION_RELEASED` |
+| 24 | `permission_schemes` | Admin tạo scheme phân quyền | Toàn tổ chức / Dự án áp dụng | Cập nhật tên scheme, mô tả | Xoá khi không còn dự án nào gán scheme này | N/A |
+| 25 | `permission_scheme_entries` | Thêm rule quyền (Role/Group -> Permission) | Admin dự án | Sửa rule | Xoá rule | `PERMISSION_CHANGED` |
+
+### 16.3. Domain: Workflows & State Machine (FSM)
+
+| STT | Entity / Bảng | Tạo mới (Create) | Đọc / Truy vấn (Read) | Cập nhật (Update) | Xoá / Hủy (Delete Policy) | Event & Tích hợp |
+| :---: | :--- | :--- | :--- | :--- | :--- | :--- |
+| 26 | `workflows` | Admin định nghĩa quy trình trạng thái | Các dự án liên kết | Cập nhật tên workflow, mô tả | Xoá khi không còn dự án/issue type nào sử dụng | `WORKFLOW_UPDATED` |
+| 27 | `workflow_states` | Tạo các bước trạng thái (To Do, In Progress, Done...) | Thành viên dự án xem chi tiết issue/board | Cập nhật tên, màu sắc, cờ `isTerminal`, `isInitial` | Xoá khi trạng thái không còn issue nào đang ở đó | N/A |
+| 28 | `workflow_transitions` | Định nghĩa chuyển dịch hợp lệ (FromState -> ToState) | Máy trạng thái nạp khi render nút chuyển dịch | Cập nhật tên nút bấm, sort order, transition key | Xoá bước chuyển dịch | N/A |
+| 29 | `workflow_transition_guards` | Gán điều kiện bảo vệ (Role required, field required) | Guard resolver kiểm tra trước khi chuyển dịch | Cập nhật rule guard | Xoá guard | N/A |
+
+### 16.4. Domain: Issue Management, Relations & Time Tracking
+
+| STT | Entity / Bảng | Tạo mới (Create) | Đọc / Truy vấn (Read) | Cập nhật (Update) | Xoá / Hủy (Delete Policy) | Event & Tích hợp |
+| :---: | :--- | :--- | :--- | :--- | :--- | :--- |
+| 30 | `issues` | Người dùng tạo Issue (Header Create / Inline / Backlog) | Thành viên dự án có quyền xem issue (kiểm tra Security level) | Sửa summary, description, assignee, priority (Optimistic Lock `version`), chuyển trạng thái | Soft delete (`deleted_at = NOW()`), giữ nguyên lịch sử | `ISSUE_CREATED`, `ISSUE_UPDATED`, `ISSUE_TRANSITIONED`, `ISSUE_DELETED` |
+| 31 | `issue_types` | Admin định nghĩa loại công việc (Epic, Story, Bug, Task) | Thành viên dự án | Cập nhật icon, tên loại, cấp phân cấp (hierarchy level) | Xoá khi không còn issue nào thuộc type | N/A |
+| 32 | `comments` | Thêm bình luận vào issue (`POST /comments`) | Thành viên xem issue | Chỉnh sửa nội dung bình luận bởi chính tác giả | Soft delete (`deleted_at = NOW()`), bảo toàn cấu trúc phân nhánh thread | `COMMENT_ADDED`, `COMMENT_DELETED` |
+| 33 | `work_logs` | Ghi log thời gian làm việc (`POST /work-logs`) | Thành viên xem issue và báo cáo tiến độ | Sửa số giờ đã log, ngày bắt đầu (Pessimistic Lock trên issue) | Soft delete (`deleted_at = NOW()`), hoàn lại số giờ trên issue | `WORK_LOGGED` |
+| 34 | `labels` | Tự động tạo khi người dùng nhập label mới | Toàn tổ chức gợi ý autocomplete | Chuẩn hóa chữ thường không dấu | Lưu trữ (`archived_at`) | N/A |
+| 35 | `issue_labels` | Gán nhãn cho issue | Chi tiết issue / Bộ lọc | N/A | Gỡ nhãn khỏi issue | `LABEL_ATTACHED` |
+| 36 | `issue_watchers` | Bấm "Watch" hoặc thêm người theo dõi | Chi tiết issue | N/A | Bấm "Unwatch" hoặc xoá khỏi danh sách theo dõi | `WATCHER_ADDED` |
+| 37 | `issue_link_types` | Admin định nghĩa quan hệ (blocks, relates to, duplicates) | Chi tiết issue | Cập nhật tên hiển thị 2 chiều (inward/outward) | Lưu trữ (`archived_at`) | N/A |
+| 38 | `issue_links` | Tạo liên kết 2 chiều giữa 2 issue | Chi tiết issue | N/A | Xoá liên kết | `ISSUES_LINKED` |
+| 39 | `attachments` | Upload file đính kèm | Download / Xem trước | Cập nhật tên hiển thị | Soft delete (`deleted_at = NOW()`) | `ATTACHMENT_UPLOADED` |
+| 40 | `issue_state_history` | Tự động ghi khi issue chuyển trạng thái | Tab Lịch sử (History) của issue | Bất biến (Immutable) | Bất biến theo thời gian lưu trữ | N/A |
+| 41 | `issue_sprint_history` | Tự động ghi khi gán/rút issue khỏi sprint | Tab Lịch sử / Báo cáo Sprint | Bất biến (Immutable) | Bất biến | N/A |
+| 42 | `issue_security_schemes` | Admin tạo scheme bảo mật issue | Dự án áp dụng | Cập nhật tên scheme | Xoá khi không còn dự án sử dụng | N/A |
+| 43 | `issue_security_levels` | Tạo cấp độ bảo mật (Internal Only, Public...) | Issue Security Guard | Cập nhật tên cấp độ | Xoá khi không có issue nào gán cấp độ này | N/A |
+| 44 | `issue_security_grants` | Cấp quyền xem level bảo mật (Reporter, Assignee, Role) | Issue Security Guard | Sửa đối tượng cấp | Xoá rule | N/A |
+
+### 16.5. Domain: Productivity & Agile Planning (Scrum, Kanban, Dashboards)
+
+| STT | Entity / Bảng | Tạo mới (Create) | Đọc / Truy vấn (Read) | Cập nhật (Update) | Xoá / Hủy (Delete Policy) | Event & Tích hợp |
+| :---: | :--- | :--- | :--- | :--- | :--- | :--- |
+| 45 | `boards` | Tự động khi tạo dự án hoặc tạo thủ công | Thành viên dự án xem bảng Kanban/Scrum | Cập nhật tên bảng, loại bảng, bộ lọc gán | Xoá bảng | `BOARD_UPDATED` |
+| 46 | `board_columns` | Thêm cột vào bảng (To Do, Doing, Review, Done) | Bảng công việc | Cập nhật tên cột, thứ tự (`sort_order`), giới hạn WIP (min/max) | Xoá cột (yêu cầu chuyển mapping trạng thái sang cột khác) | N/A |
+| 47 | `board_column_states` | Gán trạng thái workflow vào cột | Bảng công việc | Đổi mapping cột | Xoá mapping | N/A |
+| 48 | `board_issue_positions` | Tự động khi kéo thả sắp xếp thẻ trên cột | Bảng công việc | Cập nhật vị trí rank | Tự động dọn dẹp khi issue đổi trạng thái/sprint | N/A |
+| 49 | `sprints` | Tạo Sprint trong Backlog (`POST /sprints`) | Backlog, Scrum Board, Sprint Burndown | Sửa tên sprint, ngày bắt đầu/kết thúc, mục tiêu (Goal), trạng thái (`active`, `closed`) | Xoá Sprint (chuyển issue về Backlog) hoặc Đóng Sprint (`Complete`) | `SPRINT_STARTED`, `SPRINT_COMPLETED` |
+| 50 | `dashboards` | Tạo Dashboard cá nhân hoặc toàn org (`POST /dashboards`) | Người tạo hoặc thành viên được chia sẻ | Sửa tên dashboard, bố cục (2 cột, 3 cột) | Xoá Dashboard | `DASHBOARD_CREATED` |
+| 51 | `dashboard_widgets` | Thêm widget (Assigned to Me, Pie chart, Activity) | Dashboard view | Cập nhật cấu hình widget, vị trí | Gỡ widget khỏi dashboard | N/A |
+| 52 | `dashboard_shares` | Chia sẻ dashboard cho Org / Group | Dashboard permissions | Gán quyền xem/sửa | Thu hồi quyền chia sẻ | N/A |
+| 53 | `saved_filters` | Lưu bộ lọc tìm kiếm JQL (`POST /filters`) | Người tạo hoặc thành viên được chia sẻ | Sửa tên bộ lọc, câu truy vấn JQL, độ yêu thích | Xoá bộ lọc | `FILTER_SAVED` |
+| 54 | `filter_shares` | Chia sẻ bộ lọc tìm kiếm | Danh sách bộ lọc chia sẻ | Gán quyền chia sẻ | Thu hồi quyền | N/A |
+| 55 | `filter_subscriptions` | Đăng ký nhận email định kỳ từ bộ lọc | Worker gửi báo cáo | Sửa lịch cron, định dạng | Huỷ đăng ký | N/A |
+
+### 16.6. Domain: Custom Fields Engine
+
+| STT | Entity / Bảng | Tạo mới (Create) | Đọc / Truy vấn (Read) | Cập nhật (Update) | Xoá / Hủy (Delete Policy) | Event & Tích hợp |
+| :---: | :--- | :--- | :--- | :--- | :--- | :--- |
+| 56 | `custom_fields` | Admin tạo trường tùy biến trong Admin Settings | Issue form, Board, Search JQL | Cập nhật tên trường, mô tả, cờ `isRequired` | Xoá trường (cascade xoá values liên quan) | `CUSTOM_FIELD_CREATED` |
+| 57 | `custom_field_contexts` | Gán trường cho dự án / Issue type cụ thể | Issue rendering engine | Sửa context áp dụng | Xoá context | N/A |
+| 58 | `custom_field_options` | Thêm giá trị lựa chọn cho dropdown / tags | Dropdown select trong Issue | Cập nhật label, giá trị, sort order | Xoá lựa chọn | N/A |
+| 59 | `issue_custom_field_values` | Nhập giá trị trường tùy biến trên Issue | Chi tiết Issue, Bộ lọc JQL | Upsert giá trị mới | Xoá giá trị khi làm trống trường | `ISSUE_UPDATED` |
+
+### 16.7. Domain: Audit, Notification & Event-Driven Outbox
+
+| STT | Entity / Bảng | Tạo mới (Create) | Đọc / Truy vấn (Read) | Cập nhật (Update) | Xoá / Hủy (Delete Policy) | Event & Tích hợp |
+| :---: | :--- | :--- | :--- | :--- | :--- | :--- |
+| 60 | `activity_logs` | Tự động khi có hành động trên hệ thống | Activity feed, Dashboard stream | Bất biến (Immutable) | Dọn dẹp theo thời hạn lưu trữ | N/A |
+| 61 | `notifications` | Tự động sinh khi có mention, assign, transition | Hộp thư thông báo (`🔔`) | Đánh dấu đã đọc (`read_at = NOW()`) | Xoá thông báo | `NOTIFICATION_DISPATCHED` |
+| 62 | `notification_preferences` | Thiết lập thông báo cá nhân | Cài đặt người dùng | Bật/tắt các kênh (in-app, email) | Đặt lại mặc định | N/A |
+| 63 | `notification_deliveries` | Worker ghi nhận kết quả gửi email | Quản trị chẩn đoán mail | Cập nhật số lần thử lại (retry count), trạng thái gửi | Dọn dẹp log cũ | N/A |
+| 64 | `outbox_events` | Ghi transaction đồng thời với thay đổi dữ liệu | Outbox Worker định kỳ quét xử lý | Cập nhật trạng thái `processed`, `processed_at` | Dọn dẹp sau 30 ngày | Event-driven architecture |
+| 65 | `webhook_subscriptions` | Admin tạo webhook nhận sự kiện | Quản trị Webhook | Cập nhật URL, Secret, danh sách sự kiện đăng ký, trạng thái | Xoá webhook | `WEBHOOK_CREATED` |
+| 66 | `webhook_deliveries` | Worker ghi log khi dispatch webhook | Nhật ký gửi webhook | Cập nhật mã HTTP phản hồi, số lần thử | Dọn dẹp log | N/A |
+| 67 | `background_jobs` | Hệ thống đẩy tác vụ nền (Index, Batch clean) | Giám sát tác vụ nền | Cập nhật tiến độ (`progress`), trạng thái (`completed`/`failed`) | Dọn dẹp sau khi hoàn thành | N/A |
+
+---
+
 ## Phụ lục A — Checklist đồng bộ với `TASK_MANAGER_ERD.puml`
 
 | Package | Số entity trong ERD | Entity được bao phủ trong §6 |

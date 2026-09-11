@@ -64,10 +64,12 @@ This document establishes the **complete, exhaustive, unconstrained User Accepta
 
 | Test ID | Test Scenario | Preconditions | Input / Steps | Expected Outcome | Severity |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| **UAT-PROJ-001** | Create Project | User has `CREATE_PROJECT` permission | 1. In Admin -> Projects, click "+ Create Project".<br>2. Enter Key (`ALPHA`), Name (`Project Alpha`), Type (`scrum`).<br>3. Submit form. | Project row created with default workflow and board. Issue counter initialized to 0. Key appears in project dropdown. | P0 - Blocker |
-| **UAT-PROJ-002** | Project Role Assignment | Project Admin | 1. In Admin -> Project Members, add Org Member `Bob` as `Developer`. | `project_members` and `project_member_roles` rows created. Bob gains project-scoped permissions (`BROWSE_PROJECT`, `EDIT_ISSUE`). | P1 - Critical |
-| **UAT-PROJ-003** | Create & Assign Project Component | Project created | 1. In Admin -> Components, enter Name `Auth-Service`, Lead `Alice`.<br>2. Save component. | Component saved (`components` entity). Becomes selectable in Issue Create/Edit forms. | P2 - Major |
-| **UAT-PROJ-004** | Create & Release Project Version | Project created | 1. In Admin -> Versions, create `v1.0.0` with Release Date.<br>2. Mark version as `Released`. | Version transitions to released state. Fix version filtering displays all resolved issues under `v1.0.0`. | P2 - Major |
+| **UAT-PROJ-001** | Create Project via Header Project Switcher Modal | Active organization selected | 1. In Header, open `#project-switcher` dropdown.<br>2. Select `+ Create Project...`.<br>3. Fill Key (`PAY`), Name (`Payment Gateway`), Type (`Scrum`), Visibility (`org`).<br>4. Click "Create Project". | Modal submits to `POST /organizations/:orgId/projects`. Project is created, assigned default workflow and Scrum board. `selectedProjectId` updates to `PAY`, UI loads boards and backlog immediately. | P0 - Blocker |
+| **UAT-PROJ-002** | Create Project Key Validation & Uniqueness | Project with key `CLOUD` exists in Org | 1. Open Create Project Modal.<br>2. Enter existing key `CLOUD`.<br>3. Submit form. | Server responds with `409 Conflict` ("Project key already in use"). UI displays clear error toast without closing modal. | P1 - Critical |
+| **UAT-PROJ-003** | Project Role Assignment | Project Admin | 1. In Admin -> Project Members, add Org Member `Bob` as `Developer`. | `project_members` and `project_member_roles` rows created. Bob gains project-scoped permissions (`BROWSE_PROJECT`, `EDIT_ISSUE`). | P1 - Critical |
+| **UAT-PROJ-004** | Create & Assign Project Component | Project created | 1. In Admin -> Components, enter Name `Auth-Service`, Lead `Alice`.<br>2. Save component. | Component saved (`components` entity). Becomes selectable in Issue Create/Edit forms. | P2 - Major |
+| **UAT-PROJ-005** | Create & Release Project Version | Project created | 1. In Admin -> Versions, create `v1.0.0` with Release Date.<br>2. Mark version as `Released`. | Version transitions to released state. Fix version filtering displays all resolved issues under `v1.0.0`. | P2 - Major |
+| **UAT-PROJ-006** | Project Archive & Restore Lifecycle | Project Admin | 1. In Admin -> Project Settings, click "Archive Project".<br>2. Confirm.<br>3. Click "Restore Project". | Archived project has `archived_at` set and is hidden from standard active issue creation. Restoring clears `archived_at`. | P1 - Critical |
 
 ---
 
@@ -132,8 +134,9 @@ This document establishes the **complete, exhaustive, unconstrained User Accepta
 
 | Test ID | Test Scenario | Preconditions | Input / Steps | Expected Outcome | Severity |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| **UAT-CF-001** | Define Custom Field | Admin settings | 1. Create Custom Field `Severity` (Single Select with options `Minor`, `Major`, `Critical`). | `custom_field_definitions` and `custom_field_options` created and bound to project context. | P2 - Major |
-| **UAT-CF-002** | Store & Retrieve Custom Field Value | Issue detail | 1. On issue `CLOUD-1`, set `Severity = Critical`.<br>2. Save and reload issue. | Value stored in `issue_custom_field_values` (`option_id` foreign key) and hydrated accurately on reload. | P2 - Major |
+| **UAT-CF-001** | Define Custom Field in Admin Settings | Admin user in organization | 1. Navigate to Admin -> Custom Fields.<br>2. Click "+ Add Custom Field".<br>3. Fill Name `Client Priority`, Key `client_priority`, Type `Single Select`, Check `Required on issue creation`.<br>4. Submit. | `custom_fields` record created. Field appears in Custom Fields directory table with data type tag and option management actions. | P1 - Critical |
+| **UAT-CF-002** | Add Options to Select Custom Field | Custom field of type `select` exists | 1. Click "+ Option" on `Client Priority`.<br>2. Enter Value `PLATINUM`, Label `Platinum Enterprise`.<br>3. Submit. | `custom_field_options` row created. Option becomes selectable in dropdown menus for this custom field. | P2 - Major |
+| **UAT-CF-003** | Store & Retrieve Custom Field Value on Issue | Issue detail | 1. On issue `CLOUD-1`, set `Severity = Critical`.<br>2. Save and reload issue. | Value stored in `issue_custom_field_values` (`option_id` foreign key) and hydrated accurately on reload. | P2 - Major |
 
 ---
 

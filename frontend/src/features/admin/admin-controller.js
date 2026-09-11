@@ -3,7 +3,7 @@ import { request as appRequest } from '../../shared/api/client.js';
 import { showToast as appShowToast } from '../../shared/components/toast.js';
 import { openModal, closeModal } from '../../shared/components/modal.js';
 import { escapeHtml } from '../../shared/utils/formatters.js';
-import { loadProjects as defaultLoadProjects } from '../project/project-controller.js';
+import { loadProjects as defaultLoadProjects, openCreateProjectModal } from '../project/project-controller.js';
 
 export async function loadAdminData(request = appRequest, store = appStore) {
   const { org, selectedProjectId, token } = store.getState();
@@ -11,13 +11,14 @@ export async function loadAdminData(request = appRequest, store = appStore) {
 
   try {
     store.setState({ loading: true });
-    const [organization, members, invitations, departments, groups, orgRoles] = await Promise.all([
+    const [organization, members, invitations, departments, groups, orgRoles, customFields] = await Promise.all([
       request(`/organizations/${org}`).catch(() => null),
       request(`/organizations/${org}/members`).catch(() => []),
       request(`/organizations/${org}/invitations`).catch(() => []),
       request(`/organizations/${org}/departments`).catch(() => []),
       request(`/organizations/${org}/groups`).catch(() => []),
       request(`/organizations/${org}/roles`).catch(() => []),
+      request(`/organizations/${org}/custom-fields`).catch(() => []),
     ]);
 
     let projectDetail = null;
@@ -76,6 +77,7 @@ export async function loadAdminData(request = appRequest, store = appStore) {
       systemUsers,
       systemOrgs,
       mailOutbox,
+      customFields: customFields || [],
       loading: false,
     });
   } catch (err) {
@@ -95,6 +97,141 @@ export function bindAdminEvents(ctx = {}) {
   document.querySelectorAll('[data-admin-tab]').forEach(btn => {
     btn.addEventListener('click', () => {
       store.setState({ adminTab: btn.dataset.adminTab });
+    });
+  });
+
+  // Trigger create project modal from Admin view
+  document.querySelectorAll('#btn-admin-create-project-trigger').forEach(btn => {
+    btn.addEventListener('click', () => {
+      openCreateProjectModal(reload);
+    });
+  });
+
+  // Admin Add Custom Field Modal
+  document.querySelector('#btn-admin-add-custom-field')?.addEventListener('click', () => {
+    openModal({
+      title: 'Add Custom Field',
+      subtitle: 'EXTENSIBLE SCHEMA ATTRIBUTE',
+      size: 'medium',
+      contentHtml: `
+        <form id="form-create-custom-field" class="space-y-4">
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-semibold text-text-muted uppercase tracking-wider mb-1.5">Field Name</label>
+              <input name="name" class="w-full px-3 py-2 bg-surface-hover/50 border border-border-default rounded-md text-sm text-text-primary focus:outline-none focus:border-brand-primary" placeholder="e.g. Risk Level, Customer Tier" required />
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-text-muted uppercase tracking-wider mb-1.5">Field Key</label>
+              <input name="key" class="w-full px-3 py-2 bg-surface-hover/50 border border-border-default rounded-md text-sm text-text-primary focus:outline-none focus:border-brand-primary font-mono" placeholder="risk_level" required />
+            </div>
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-semibold text-text-muted uppercase tracking-wider mb-1.5">Data Type</label>
+              <select name="fieldType" class="w-full px-3 py-2 bg-surface-hover/50 border border-border-default rounded-md text-sm text-text-primary focus:outline-none focus:border-brand-primary">
+                <option value="text">Text (Single line / String)</option>
+                <option value="number">Number (Float / Integer)</option>
+                <option value="select">Single Select (Dropdown)</option>
+                <option value="multi_select">Multi Select (Tags)</option>
+                <option value="date">Date (ISO Timestamp)</option>
+              </select>
+            </div>
+            <div class="flex items-center pt-6 gap-2">
+              <input type="checkbox" id="cf-is-required" name="isRequired" class="rounded border-border-default text-brand-primary focus:ring-brand-primary" />
+              <label for="cf-is-required" class="text-sm text-text-primary">Required on issue creation</label>
+            </div>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-text-muted uppercase tracking-wider mb-1.5">Description (Optional)</label>
+            <input name="description" class="w-full px-3 py-2 bg-surface-hover/50 border border-border-default rounded-md text-sm text-text-primary focus:outline-none focus:border-brand-primary" placeholder="Instructions or purpose of this field..." />
+          </div>
+          <div class="flex items-center justify-end gap-3 pt-3 border-t border-border-default">
+            <button type="button" class="button ghost btn-modal-cancel">Cancel</button>
+            <button type="submit" class="button primary">Create Custom Field</button>
+          </div>
+        </form>
+      `,
+    });
+
+    document.querySelector('.btn-modal-cancel')?.addEventListener('click', closeModal);
+    document.querySelector('#form-create-custom-field')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const formData = new FormData(e.target);
+      const name = formData.get('name')?.toString().trim();
+      const key = formData.get('key')?.toString().trim().toLowerCase().replace(/\s+/g, '_');
+      const fieldType = formData.get('fieldType')?.toString() || 'text';
+      const description = formData.get('description')?.toString().trim() || undefined;
+      const isRequired = formData.get('isRequired') === 'on';
+      const { org } = store.getState();
+
+      try {
+        store.setState({ loading: true });
+        await request(`/organizations/${org}/custom-fields`, {
+          method: 'POST',
+          body: JSON.stringify({ name, key, fieldType, description, isRequired }),
+        });
+        closeModal();
+        showToast(`Custom field "${name}" created!`, 'success');
+        await reload();
+      } catch (err) {
+        showToast(err.message, 'error');
+      } finally {
+        store.setState({ loading: false });
+      }
+    });
+  });
+
+  // Admin Add Option to Select Custom Field
+  document.querySelectorAll('.btn-admin-add-option').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const fieldId = btn.dataset.fieldId;
+      const fieldName = btn.dataset.fieldName;
+
+      openModal({
+        title: `Add Option: ${escapeHtml(fieldName)}`,
+        subtitle: 'SELECT VALUE CHOICE',
+        size: 'small',
+        contentHtml: `
+          <form id="form-create-cf-option" class="space-y-4">
+            <div>
+              <label class="block text-xs font-semibold text-text-muted uppercase tracking-wider mb-1.5">Option Value</label>
+              <input name="value" class="w-full px-3 py-2 bg-surface-hover/50 border border-border-default rounded-md text-sm text-text-primary focus:outline-none focus:border-brand-primary font-mono" placeholder="e.g. HIGH, CRITICAL, TIER_1" required />
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-text-muted uppercase tracking-wider mb-1.5">Display Label</label>
+              <input name="label" class="w-full px-3 py-2 bg-surface-hover/50 border border-border-default rounded-md text-sm text-text-primary focus:outline-none focus:border-brand-primary" placeholder="e.g. High Priority (P1)" required />
+            </div>
+            <div class="flex items-center justify-end gap-3 pt-3 border-t border-border-default">
+              <button type="button" class="button ghost btn-modal-cancel">Cancel</button>
+              <button type="submit" class="button primary">Add Option</button>
+            </div>
+          </form>
+        `,
+      });
+
+      document.querySelector('.btn-modal-cancel')?.addEventListener('click', closeModal);
+      document.querySelector('#form-create-cf-option')?.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const formData = new FormData(e.target);
+        const value = formData.get('value')?.toString().trim();
+        const label = formData.get('label')?.toString().trim();
+        const { org } = store.getState();
+
+        try {
+          store.setState({ loading: true });
+          await request(`/organizations/${org}/custom-fields/${fieldId}/options`, {
+            method: 'POST',
+            body: JSON.stringify({ value, label }),
+          });
+          closeModal();
+          showToast(`Option "${label}" added to ${fieldName}!`, 'success');
+          await reload();
+        } catch (err) {
+          showToast(err.message, 'error');
+        } finally {
+          store.setState({ loading: false });
+        }
+      });
     });
   });
 
