@@ -8,7 +8,7 @@ function repository() {
 describe('ApiTokenService', () => {
   it('returns a raw token once and persists only its hash', async () => {
     const repo = repository();
-    const service = new ApiTokenService(repo);
+    const service = new ApiTokenService(repo, repository());
     const created = await service.create('org-a', 'member-a', { name: 'CI', scopes: ['read'] });
     expect(created.token).toMatch(/^[a-f0-9]{64}$/);
     expect(repo.save).toHaveBeenCalled();
@@ -34,7 +34,7 @@ describe('ApiTokenService', () => {
     expect(await service.authenticate('token', 'read')).toBeNull();
 
     memberRepo.findOne.mockResolvedValue({ id: 'm-1', status: 'active' });
-    tokenRepo.save.mockImplementation(async (t) => t);
+    tokenRepo.save.mockImplementation(async (t: any) => t);
     const result = await service.authenticate('token', 'read');
     expect(result).not.toBeNull();
   });
