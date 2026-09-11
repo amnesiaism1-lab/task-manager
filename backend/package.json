@@ -8,7 +8,7 @@
     "type": "commonjs",
     "main": "api/index.js",
     "scripts": {
-        "build": "nest build",
+        "build": "nest build && node ../scripts/prepend-resolver.js",
         "deploy": "nest deploy",
         "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
         "start": "node dist/main",

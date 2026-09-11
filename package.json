@@ -15,5 +15,33 @@
     "start:frontend": "npm --prefix frontend run dev",
     "docker:up": "docker compose up -d",
     "docker:down": "docker compose down"
+  },
+  "dependencies": {
+    "@nestjs/common": "^12.0.1",
+    "@nestjs/config": "^12.0.0",
+    "@nestjs/core": "^12.0.1",
+    "@nestjs/event-emitter": "^12.0.0",
+    "@nestjs/jwt": "^12.0.1",
+    "@nestjs/passport": "^12.0.0",
+    "@nestjs/platform-express": "^12.0.1",
+    "@nestjs/schedule": "^12.0.1",
+    "@nestjs/swagger": "^12.0.1",
+    "@nestjs/throttler": "^6.5.0",
+    "@nestjs/typeorm": "^12.0.1",
+    "bcryptjs": "^3.0.3",
+    "class-transformer": "^0.5.1",
+    "class-validator": "^0.15.1",
+    "cookie-parser": "^1.4.7",
+    "helmet": "^8.3.0",
+    "ioredis": "^6.0.0",
+    "nodemailer": "^10.0.1",
+    "passport": "^0.7.0",
+    "passport-jwt": "^4.0.1",
+    "passport-local": "^1.0.0",
+    "pg": "^8.23.0",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.1",
+    "typeorm": "^1.1.1",
+    "uuid": "^14.0.2"
   }
 }
