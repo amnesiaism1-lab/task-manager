@@ -12,6 +12,10 @@ import { PermissionScheme } from '../../database/entities/project/permission-sch
 import { PermissionSchemeEntry } from '../../database/entities/project/permission-scheme-entry.entity';
 import { Project } from '../../database/entities/project/project.entity';
 
+const orgPermCache = new Map<string, { permissions: Set<string>; cachedAt: number }>();
+const projectPermCache = new Map<string, { permissions: Set<string>; cachedAt: number }>();
+const PERM_CACHE_TTL_MS = 60 * 1000;
+
 @Injectable()
 export class PermissionResolverService {
   constructor(
@@ -29,25 +33,48 @@ export class PermissionResolverService {
 
   async hasOrgPermissions(memberId: string, permissions: string[]): Promise<boolean> {
     if (permissions.length === 0) return true;
+    const now = Date.now();
+    const cacheKey = `org:${memberId}`;
+    const cached = orgPermCache.get(cacheKey);
+
+    if (cached && (now - cached.cachedAt) < PERM_CACHE_TTL_MS) {
+      return permissions.every((p) => cached.permissions.has(p));
+    }
+
     const grants = await this.rolePermissions.createQueryBuilder('grant')
       .innerJoin(OrganizationMemberRole, 'memberRole', 'memberRole.role_id = grant.role_id AND memberRole.org_member_id = :memberId', { memberId })
-      .where('grant.permission_key IN (:...permissions)', { permissions })
       .select('grant.permission_key', 'permission')
       .distinct(true)
       .getRawMany<{ permission: string }>();
-    return grants.length === new Set(permissions).size;
+
+    const grantedSet = new Set(grants.map((g) => g.permission));
+    orgPermCache.set(cacheKey, { permissions: grantedSet, cachedAt: now });
+    return permissions.every((p) => grantedSet.has(p));
   }
 
   async hasProjectPermissions(memberId: string, projectId: string, permissions: string[]): Promise<boolean> {
     if (permissions.length === 0) return true;
-    const membership = await this.projectMembers.findOne({ where: { orgMemberId: memberId, projectId, status: 'active' } });
-    if (!membership) return false;
-    const project = await this.projects.findOne({ where: { id: projectId } });
-    if (!project) return false;
-    const scheme = await this.permissionSchemes.findOne({ where: { projectId } });
-    if (!scheme) return false;
-    const directRoles = await this.projectMemberRoles.find({ where: { projectMemberId: membership.id } });
-    const groupMemberships = await this.groupMembers.find({ where: { orgMemberId: memberId } });
+    const now = Date.now();
+    const cacheKey = `proj:${memberId}:${projectId}`;
+    const cached = projectPermCache.get(cacheKey);
+
+    if (cached && (now - cached.cachedAt) < PERM_CACHE_TTL_MS) {
+      return permissions.every((p) => cached.permissions.has(p));
+    }
+
+    const [membership, project, scheme] = await Promise.all([
+      this.projectMembers.findOne({ where: { orgMemberId: memberId, projectId, status: 'active' } }),
+      this.projects.findOne({ where: { id: projectId } }),
+      this.permissionSchemes.findOne({ where: { projectId } }),
+    ]);
+
+    if (!membership || !project || !scheme) return false;
+
+    const [directRoles, groupMemberships] = await Promise.all([
+      this.projectMemberRoles.find({ where: { projectMemberId: membership.id } }),
+      this.groupMembers.find({ where: { orgMemberId: memberId } }),
+    ]);
+
     const groupIds = groupMemberships.map((groupMembership) => groupMembership.groupId);
     const groupRoles = groupIds.length
       ? await this.projectGroupRoles.find({ where: { groupId: In(groupIds) } })
@@ -58,13 +85,16 @@ export class PermissionResolverService {
       validProjectRoles.forEach((role) => projectRoleIds.add(role.id));
     }
     if (projectRoleIds.size === 0) return false;
+
     const grants = await this.permissionEntries.createQueryBuilder('entry')
       .where('entry.scheme_id = :schemeId', { schemeId: scheme.id })
       .andWhere('entry.project_role_id IN (:...roleIds)', { roleIds: [...projectRoleIds] })
-      .andWhere('entry.permission_key IN (:...permissions)', { permissions })
       .select('entry.permission_key', 'permission')
       .distinct(true)
       .getRawMany<{ permission: string }>();
-    return grants.length === new Set(permissions).size;
+
+    const grantedSet = new Set(grants.map((g) => g.permission));
+    projectPermCache.set(cacheKey, { permissions: grantedSet, cachedAt: now });
+    return permissions.every((p) => grantedSet.has(p));
   }
 }

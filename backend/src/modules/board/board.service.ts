@@ -30,8 +30,17 @@ export class BoardService {
   async createBoard(projectId: string, input: CreateBoardDto) { return this.boards.save(this.boards.create({ projectId, boardType: input.boardType, name: input.name.trim(), description: input.description?.trim() ?? null })); }
 
   async list(projectId: string) {
-    const board = await this.boards.find({ where: { projectId }, order: { createdAt: 'ASC' } });
-    return Promise.all(board.map(async (item) => ({ ...item, columns: await this.columns.find({ where: { boardId: item.id }, order: { position: 'ASC' } }) })));
+    const boards = await this.boards.find({ where: { projectId }, order: { createdAt: 'ASC' } });
+    if (boards.length === 0) return [];
+    const boardIds = boards.map((b) => b.id);
+    const columns = await this.columns.find({ where: { boardId: In(boardIds) }, order: { position: 'ASC' } });
+    const columnsByBoard = new Map<string, BoardColumn[]>();
+    columns.forEach((col) => {
+      const list = columnsByBoard.get(col.boardId) || [];
+      list.push(col);
+      columnsByBoard.set(col.boardId, list);
+    });
+    return boards.map((b) => ({ ...b, columns: columnsByBoard.get(b.id) || [] }));
   }
 
   async addColumn(projectId: string, boardId: string, input: CreateColumnDto) {
@@ -84,18 +93,28 @@ export class BoardService {
   }
 
   async getBoardIssues(projectId: string, boardId: string) {
-    const board = await this.boards.findOne({ where: { id: boardId, projectId } });
+    const [board, columns, issues, positions] = await Promise.all([
+      this.boards.findOne({ where: { id: boardId, projectId } }),
+      this.columns.find({ where: { boardId }, order: { position: 'ASC' } }),
+      this.issues.find({ where: { projectId, deletedAt: IsNull() }, order: { createdAt: 'DESC' } }),
+      this.positions.find({ where: { boardId } }),
+    ]);
+
     if (!board) throw new NotFoundException('Board not found');
-    const columns = await this.columns.find({ where: { boardId }, order: { position: 'ASC' } });
-    const mappings = columns.length ? await this.columnStates.find({ where: { boardColumnId: In(columns.map((column) => column.id)) } }) : [];
-    const issues = await this.issues.find({ where: { projectId, deletedAt: IsNull() }, order: { createdAt: 'DESC' } });
-    const positions = await this.positions.find({ where: { boardId } });
+
+    const columnIds = columns.map((column) => column.id);
+    const stateIds = [...new Set(issues.map((issue) => issue.stateId))];
+
+    const [mappings, states] = await Promise.all([
+      columnIds.length ? this.columnStates.find({ where: { boardColumnId: In(columnIds) } }) : Promise.resolve([]),
+      stateIds.length ? this.states.find({ where: { id: In(stateIds) } }) : Promise.resolve([]),
+    ]);
+
     const rankByIssue = Object.fromEntries(positions.map((position) => [position.issueId, position.rank]));
     const columnByState = Object.fromEntries(mappings.map((mapping) => [mapping.workflowStateId, mapping.boardColumnId]));
-    const stateIds = [...new Set(issues.map((issue) => issue.stateId))];
-    const states = stateIds.length ? await this.states.find({ where: { id: In(stateIds) } }) : [];
     const stateById = Object.fromEntries(states.map((state) => [state.id, state]));
     const fallbackColumnId = columns[0]?.id;
+
     return {
       board,
       columns: columns.map((column) => ({

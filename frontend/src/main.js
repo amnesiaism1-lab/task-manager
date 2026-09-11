@@ -88,10 +88,39 @@ export async function loadViewData(view) {
 }
 
 export async function loadInitialData() {
-  if (!store.getState().token) return;
+  const { token } = store.getState();
+  if (!token) return;
 
   try {
     store.setState({ loading: true });
+    
+    // Fast single roundtrip bootstrap (< 200ms)
+    try {
+      const bootstrap = await request('/workspace/bootstrap');
+      if (bootstrap?.user) {
+        const activeOrg = bootstrap.activeOrgId || (bootstrap.organizations[0]?.id || '');
+        const activeProject = bootstrap.activeProjectId || (bootstrap.projects[0]?.id || '');
+
+        store.setState({
+          user: bootstrap.user,
+          organizations: bootstrap.organizations || [],
+          org: activeOrg,
+          projects: bootstrap.projects || [],
+          selectedProjectId: activeProject,
+          members: bootstrap.members || [],
+          issues: bootstrap.initialIssues || [],
+          loading: false,
+        });
+
+        if (activeOrg && activeProject) {
+          Promise.all([loadBoards(), loadSprints(), loadBacklog()]).catch(() => {});
+        }
+        return;
+      }
+    } catch {
+      // Fallback below
+    }
+
     await loadMe();
     await Promise.all([loadOrganizations(), loadUserInvitations()]);
 

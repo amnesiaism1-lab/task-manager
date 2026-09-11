@@ -31,6 +31,7 @@ import { WebhookModule } from './modules/webhook/webhook.module';
 import { DashboardModule } from './modules/productivity/dashboard.module';
 import { AutomationModule } from './modules/automation/automation.module';
 import { AdminModule } from './modules/admin/admin.module';
+import { WorkspaceModule } from './modules/workspace/workspace.module';
 
 @Module({
   imports: [
@@ -68,8 +69,10 @@ import { AdminModule } from './modules/admin/admin.module';
           ssl: isSsl ? { rejectUnauthorized: false } : false,
           extra: {
             ssl: isSsl ? { rejectUnauthorized: false } : false,
-            max: 3,
-            connectionTimeoutMillis: 5000,
+            max: 10,
+            idleTimeoutMillis: 30000,
+            connectionTimeoutMillis: 8000,
+            keepAlive: true,
           },
           autoLoadEntities: true,
           synchronize: false,
@@ -120,6 +123,7 @@ import { AdminModule } from './modules/admin/admin.module';
     DashboardModule,
     AutomationModule,
     AdminModule,
+    WorkspaceModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })

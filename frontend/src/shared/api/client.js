@@ -2,10 +2,24 @@ import { ERROR_CODES } from './error-codes.js';
 
 const knownErrorCodes = new Set(Object.values(ERROR_CODES));
 
+const inFlightRequests = new Map();
+const getResponseCache = new Map();
+const CACHE_TTL = 3000; // 3 seconds micro-cache for identical GETs
+
+export function invalidateApiCache() {
+  getResponseCache.clear();
+}
+
 export function createApiClient(getConnection, onUnauthorized) {
   return async function request(path, options = {}) {
     const connection = getConnection();
     const isFormData = options.body instanceof FormData;
+    const method = (options.method || 'GET').toUpperCase();
+
+    // Mutating methods invalidate cached GET responses
+    if (method !== 'GET') {
+      getResponseCache.clear();
+    }
 
     const headers = {
       ...(connection.token ? { Authorization: `Bearer ${connection.token}` } : {}),
@@ -14,37 +28,63 @@ export function createApiClient(getConnection, onUnauthorized) {
     };
 
     const url = `${connection.api}${path.startsWith('/') ? path : `/${path}`}`;
+    const cacheKey = `${method}:${url}:${connection.token || ''}`;
 
-    let response;
-    try {
-      response = await fetch(url, {
-        credentials: 'include',
-        ...options,
-        headers,
-      });
-    } catch {
-      throw new ApiError(0, `Network error: Could not reach backend server at ${connection.api}.`);
+    // Return cached response for rapid identical GETs
+    if (method === 'GET') {
+      const cached = getResponseCache.get(cacheKey);
+      if (cached && (Date.now() - cached.time) < CACHE_TTL) {
+        return cached.data;
+      }
+      if (inFlightRequests.has(cacheKey)) {
+        return inFlightRequests.get(cacheKey);
+      }
     }
 
-    if (response.status === 401 && onUnauthorized) {
-      onUnauthorized();
+    const fetchPromise = (async () => {
+      let response;
+      try {
+        response = await fetch(url, {
+          credentials: 'include',
+          ...options,
+          headers,
+        });
+      } catch {
+        throw new ApiError(0, `Network error: Could not reach backend server at ${connection.api}.`);
+      } finally {
+        inFlightRequests.delete(cacheKey);
+      }
+
+      if (response.status === 401 && onUnauthorized) {
+        onUnauthorized();
+      }
+
+      if (response.status === 204) return null;
+
+      const text = await response.text();
+      let data;
+      try {
+        data = text ? JSON.parse(text) : null;
+      } catch {
+        data = text;
+      }
+
+      if (!response.ok) {
+        throw new ApiError(response.status, text, data);
+      }
+
+      if (method === 'GET' && data !== undefined) {
+        getResponseCache.set(cacheKey, { data, time: Date.now() });
+      }
+
+      return data;
+    })();
+
+    if (method === 'GET') {
+      inFlightRequests.set(cacheKey, fetchPromise);
     }
 
-    if (response.status === 204) return null;
-
-    const text = await response.text();
-    let data;
-    try {
-      data = text ? JSON.parse(text) : null;
-    } catch {
-      data = text;
-    }
-
-    if (!response.ok) {
-      throw new ApiError(response.status, text, data);
-    }
-
-    return data;
+    return fetchPromise;
   };
 }
 
