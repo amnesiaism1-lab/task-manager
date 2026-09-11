@@ -6,7 +6,8 @@ import { OrgMembershipGuard } from '../../common/guards/org-membership.guard';
 import { IssuePermissionGuard } from '../../common/guards/issue-permission.guard';
 import { CurrentMember } from '../../common/decorators/current-member.decorator';
 import { RequirePermissions } from '../../common/decorators/permissions.decorator';
-import { AttachmentService, UploadedAttachmentFile } from './attachment.service';
+import { AttachmentService } from './attachment.service';
+import type { UploadedAttachmentFile } from './attachment.service';
 import { PaginationDto } from '../../common/dto/pagination.dto';
 
 @Controller('organizations/:orgId/issues/:issueId/attachments')
