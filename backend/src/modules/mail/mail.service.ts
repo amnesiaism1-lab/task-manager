@@ -27,18 +27,21 @@ export class MailService {
   private readonly outbox: OutboxMailRecord[] = [];
 
   constructor(private readonly config: ConfigService) {
-    const host = config.get<string>('MAIL_HOST');
-    const user = config.get<string>('MAIL_USER');
-    const password = config.get<string>('MAIL_PASSWORD');
+    const host = config.get<string>('MAIL_HOST') || config.get<string>('SMTP_HOST');
+    const user = config.get<string>('MAIL_USER') || config.get<string>('SMTP_USER');
+    const password = config.get<string>('MAIL_PASSWORD') || config.get<string>('SMTP_PASS') || config.get<string>('SMTP_PASSWORD');
+    const port = Number(config.get('MAIL_PORT') || config.get('SMTP_PORT') || 587);
+    const secure = config.get('MAIL_SECURE', 'false') === 'true' || config.get('SMTP_SECURE', 'false') === 'true' || port === 465;
+
     this.configured = Boolean(host && user && password);
-    this.from = config.get<string>('MAIL_FROM', user || 'no-reply@taskmanager.dev');
+    this.from = config.get<string>('MAIL_FROM') || config.get<string>('SMTP_FROM') || user || 'no-reply@taskmanager.dev';
     this.frontendUrl = config.get<string>('FRONTEND_URL', 'http://localhost:5173');
 
     this.transporter = this.configured
       ? nodemailer.createTransport({
           host,
-          port: config.get<number>('MAIL_PORT', 587),
-          secure: config.get('MAIL_SECURE', 'false') === 'true',
+          port,
+          secure,
           auth: { user, pass: password },
         })
       : null;

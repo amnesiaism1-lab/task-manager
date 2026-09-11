@@ -48,13 +48,22 @@ import { ORG_PERMISSIONS, PROJECT_PERMISSIONS } from '@task-manager/shared';
 async function runSeed() {
   console.log('--- Starting Task Manager Database Seeder ---');
 
+  const dbUrl = process.env.DATABASE_URL;
+  const dbHost = process.env.DATABASE_HOST || 'localhost';
+  const isSsl = process.env.DATABASE_SSL === 'true' ||
+                (dbUrl && (dbUrl.includes('supabase') || dbUrl.includes('pooler'))) ||
+                dbHost.includes('supabase');
+
   const dataSource = new DataSource({
     type: 'postgres',
-    host: process.env.DATABASE_HOST || 'localhost',
-    port: parseInt(process.env.DATABASE_PORT || '5432', 10),
-    username: process.env.DATABASE_USER || 'dev',
-    password: process.env.DATABASE_PASSWORD || 'dev_password',
-    database: process.env.DATABASE_NAME || 'task_manager',
+    ...(dbUrl ? { url: dbUrl } : {
+      host: dbHost,
+      port: parseInt(process.env.DATABASE_PORT || '5432', 10),
+      username: process.env.DATABASE_USER || 'dev',
+      password: process.env.DATABASE_PASSWORD || 'dev_password',
+      database: process.env.DATABASE_NAME || 'task_manager',
+    }),
+    ssl: isSsl ? { rejectUnauthorized: false } : false,
     entities: [join(__dirname, '../entities/**/*.entity.{ts,js}')],
     synchronize: false,
   });

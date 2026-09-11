@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { join } from 'node:path';
-import { TypeOrmModule } from '@nestjs/typeorm';
+import { TypeOrmModule, TypeOrmModuleOptions } from '@nestjs/typeorm';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { ScheduleModule } from '@nestjs/schedule';
 import { ThrottlerModule } from '@nestjs/throttler';
@@ -43,19 +43,32 @@ import { AdminModule } from './modules/admin/admin.module';
     // Database
     TypeOrmModule.forRootAsync({
       inject: [ConfigService],
-      useFactory: (config: ConfigService) => ({
-        type: 'postgres',
-        host: config.get('DATABASE_HOST', 'localhost'),
-        port: config.get<number>('DATABASE_PORT', 5432),
-        username: config.get('DATABASE_USER', 'dev'),
-        password: config.get('DATABASE_PASSWORD', 'dev_password'),
-        database: config.get('DATABASE_NAME', 'task_manager'),
-        autoLoadEntities: true,
-        synchronize: false,
-        migrationsRun: config.get('RUN_MIGRATIONS', 'false') === 'true',
-        migrations: [join(process.cwd(), 'dist/database/migrations/*.{js,ts}')],
-        logging: config.get('DATABASE_LOGGING') === 'true',
-      }),
+      useFactory: (config: ConfigService) => {
+        const dbUrl = config.get<string>('DATABASE_URL');
+        const dbHost = config.get<string>('DATABASE_HOST', 'localhost');
+        const isSsl = config.get('DATABASE_SSL') === 'true' ||
+                      (dbUrl && (dbUrl.includes('supabase') || dbUrl.includes('pooler') || dbUrl.includes('sslmode=require'))) ||
+                      (dbHost && dbHost.includes('supabase'));
+
+        const baseOptions: TypeOrmModuleOptions = {
+          type: 'postgres',
+          ...(dbUrl ? { url: dbUrl } : {
+            host: dbHost,
+            port: config.get<number>('DATABASE_PORT', 5432),
+            username: config.get<string>('DATABASE_USER', 'dev'),
+            password: config.get<string>('DATABASE_PASSWORD', 'dev_password'),
+            database: config.get<string>('DATABASE_NAME', 'task_manager'),
+          }),
+          ssl: isSsl ? { rejectUnauthorized: false } : false,
+          autoLoadEntities: true,
+          synchronize: false,
+          migrationsRun: config.get('RUN_MIGRATIONS', 'false') === 'true',
+          migrations: [join(process.cwd(), 'dist/database/migrations/*.{js,ts}')],
+          logging: config.get('DATABASE_LOGGING') === 'true',
+        };
+
+        return baseOptions;
+      },
     }),
 
     // Event system

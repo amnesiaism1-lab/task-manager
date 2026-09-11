@@ -2,8 +2,20 @@
  * Central Reactive Store for Task Manager
  */
 
+function getDefaultApiUrl() {
+  const stored = typeof localStorage !== 'undefined' ? localStorage.getItem('tm_api') : null;
+  const isLocal = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+  if (stored) {
+    if (!isLocal && stored.includes('localhost:3001')) {
+      return '/api';
+    }
+    return stored;
+  }
+  return isLocal ? 'http://localhost:3001/api' : '/api';
+}
+
 const initialState = {
-  api: localStorage.getItem('tm_api') || 'http://localhost:3001/api',
+  api: getDefaultApiUrl(),
   token: localStorage.getItem('tm_token') || '',
   user: null,
   authMode: 'login', // 'login' | 'register' | 'forgot' | 'verify' | 'reset' | 'reactivate'

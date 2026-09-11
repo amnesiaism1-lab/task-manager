@@ -16,3 +16,7 @@ uploads/
 *.swo
 .idea/
 .vscode/
+
+# Allow shared package dist for monorepo deployments
+!shared/dist/
+!shared/dist/**
