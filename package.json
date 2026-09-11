@@ -3,6 +3,17 @@
   "version": "1.0.0",
   "private": true,
   "description": "Enterprise multi-tenant Jira alternative with finite-state workflows and agile planning",
+  "workspaces": [
+    "shared",
+    "backend",
+    "frontend"
+  ],
+  "overrides": {
+    "@nestjs/throttler": {
+      "@nestjs/common": "$@nestjs/common",
+      "@nestjs/core": "$@nestjs/core"
+    }
+  },
   "scripts": {
     "build:shared": "npm --prefix shared run build",
     "build:backend": "npm --prefix backend run build",

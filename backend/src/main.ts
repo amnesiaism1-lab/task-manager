@@ -78,6 +78,12 @@ export default async function handler(req: any, res: any) {
   }
 }
 
+// CommonJS module compatibility
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = handler;
+  (module.exports as any).default = handler;
+}
+
 if (!process.env.VERCEL && !process.env.NOW_REGION) {
   bootstrapServer().then(() => {
     const port = process.env.PORT || process.env.APP_PORT || 3001;
