@@ -1,21 +1,22 @@
 import { escapeHtml, initials } from '../utils/formatters.js';
 
 export function renderStatusBadge(stateOrName) {
-  const name = typeof stateOrName === 'string' ? stateOrName : stateOrName?.name || 'Open';
+  const name = typeof stateOrName === 'string' ? stateOrName : (stateOrName?.name || 'Open');
   const category = (typeof stateOrName === 'object' && stateOrName?.category) ? stateOrName.category : getCategoryFromName(name);
 
   return `<span class="badge badge-status status-${category}">${escapeHtml(name)}</span>`;
 }
 
-function getCategoryFromName(name = '') {
-  const lower = name.toLowerCase();
+function getCategoryFromName(name) {
+  const lower = String(name || '').toLowerCase();
   if (lower.includes('done') || lower.includes('closed') || lower.includes('resolved')) return 'done';
   if (lower.includes('progress') || lower.includes('review') || lower.includes('testing')) return 'in_progress';
   return 'todo';
 }
 
 export function renderTypeBadge(typeOrKey) {
-  const key = typeof typeOrKey === 'string' ? typeOrKey.toLowerCase() : (typeOrKey?.key || 'task').toLowerCase();
+  const rawKey = typeof typeOrKey === 'string' ? typeOrKey : (typeOrKey?.key || 'task');
+  const key = String(rawKey || 'task').toLowerCase();
   const name = typeof typeOrKey === 'string' ? typeOrKey : (typeOrKey?.name || 'Task');
 
   let icon = '✓';
@@ -36,7 +37,7 @@ export function renderTypeBadge(typeOrKey) {
 }
 
 export function renderPriorityBadge(priority = 'Medium') {
-  const p = String(priority).toLowerCase();
+  const p = String(priority || 'Medium').toLowerCase();
   let icon = '—';
   let className = 'priority-medium';
 
@@ -54,11 +55,11 @@ export function renderPriorityBadge(priority = 'Medium') {
     className = 'priority-lowest';
   }
 
-  return `<span class="badge badge-priority ${className}" title="Priority: ${escapeHtml(priority)}">${icon}</span>`;
+  return `<span class="badge badge-priority ${className}" title="Priority: ${escapeHtml(priority || 'Medium')}">${icon}</span>`;
 }
 
 export function renderAvatar(userOrName, size = 'sm') {
-  const name = typeof userOrName === 'string' ? userOrName : userOrName?.fullName || 'User';
+  const name = typeof userOrName === 'string' ? userOrName : (userOrName?.fullName || 'User');
   const avatarUrl = typeof userOrName === 'object' ? userOrName?.avatarUrl : null;
   const init = initials(name);
 
