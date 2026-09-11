@@ -8,9 +8,6 @@
         "build": "vite build",
         "preview": "vite preview"
     },
-    "dependencies": {
-        "@task-manager/shared": "file:../shared"
-    },
     "devDependencies": {
         "autoprefixer": "^10.5.5",
         "postcss": "^8.5.28",

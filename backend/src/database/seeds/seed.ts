@@ -43,7 +43,7 @@ import { WorkLog } from '../entities/issue/work-log.entity';
 import { Label } from '../entities/issue/label.entity';
 import { IssueLabel } from '../entities/issue/issue-label.entity';
 
-import { ORG_PERMISSIONS, PROJECT_PERMISSIONS } from '@task-manager/shared';
+import { ORG_PERMISSIONS, PROJECT_PERMISSIONS } from '../../common/constants/permission-keys';
 
 async function runSeed() {
   console.log('--- Starting Task Manager Database Seeder ---');

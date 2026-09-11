@@ -33,7 +33,7 @@ import { LexoRank } from '../../common/utils/lexorank.util';
 import { AddProjectMemberDto, AssignProjectGroupRoleDto, AssignProjectRoleDto, CreateComponentDto, CreateIssueDto, CreateProjectDto, CreateProjectRoleDto, CreateVersionDto, TransitionIssueDto, UpdateComponentDto, UpdateIssueDto, UpdateProjectDto, UpdateVersionDto } from './dto/project.dto';
 import { PaginationDto } from '../../common/dto/pagination.dto';
 import { paginate } from '../../common/utils/pagination.util';
-import { PROJECT_PERMISSIONS } from '@task-manager/shared';
+import { PROJECT_PERMISSIONS } from '../../common/constants/permission-keys';
 
 @Injectable()
 export class ProjectService {

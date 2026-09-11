@@ -1,4 +1,4 @@
-import { ERROR_CODES } from '@task-manager/shared';
+import { ERROR_CODES } from './error-codes.js';
 
 const knownErrorCodes = new Set(Object.values(ERROR_CODES));
 
