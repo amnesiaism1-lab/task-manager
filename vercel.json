@@ -6,7 +6,7 @@
     },
     "backend": {
       "root": "backend",
-      "framework": "nestjs",
+      "framework": "express",
       "entrypoint": "src/main.ts",
       "installCommand": "npm install --legacy-peer-deps"
     }
