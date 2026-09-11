@@ -1,5 +1,5 @@
 import { escapeHtml, formatDate, formatSeconds } from '../../shared/utils/formatters.js';
-import { renderAvatar, renderPriorityBadge, renderStatusBadge, renderTypeBadge } from '../../shared/components/badges.js';
+import { renderStatusBadge, renderTypeBadge } from '../../shared/components/badges.js';
 
 export function renderDashboardView(state) {
   const dashboards = state.dashboards || [];

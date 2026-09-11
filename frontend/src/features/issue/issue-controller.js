@@ -485,7 +485,7 @@ export function openIssueCreateModal(ctx = {}) {
       await Promise.all([
         loadBoardData ? loadBoardData(request, store, selectedBoardId) : Promise.resolve(),
         loadBacklog ? loadBacklog(request, store) : Promise.resolve(),
-        loadIssues ? loadIssues(request, store, store.getState().query) : Promise.resolve(),
+        loadIssuesFn ? loadIssuesFn(request, store, store.getState().query) : Promise.resolve(),
       ]);
     } catch (err) {
       showToast(err.message, 'error');

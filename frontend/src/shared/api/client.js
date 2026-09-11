@@ -10,7 +10,7 @@ export function createApiClient(getConnection, onUnauthorized) {
     const headers = {
       ...(connection.token ? { Authorization: `Bearer ${connection.token}` } : {}),
       ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
-      ...(options.headers || {}),
+      ...options.headers,
     };
 
     const url = `${connection.api}${path.startsWith('/') ? path : `/${path}`}`;
@@ -22,7 +22,7 @@ export function createApiClient(getConnection, onUnauthorized) {
         ...options,
         headers,
       });
-    } catch (err) {
+    } catch {
       throw new ApiError(0, `Network error: Could not reach backend server at ${connection.api}.`);
     }
 

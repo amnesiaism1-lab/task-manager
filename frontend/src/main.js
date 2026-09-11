@@ -1,6 +1,6 @@
 import './styles.css';
 import { store } from './shared/state/store.js';
-import { request, handleUnauthorized } from './shared/api/client.js';
+import { request } from './shared/api/client.js';
 import { showToast } from './shared/components/toast.js';
 import { openModal, closeModal } from './shared/components/modal.js';
 import { renderHeader } from './shared/components/header.js';
@@ -34,7 +34,7 @@ import {
   openPendingInvitationsModal,
   openSettingsModal,
 } from './features/project/project-controller.js';
-import { loadBoards, loadBoardData, bindBoardEvents } from './features/board/board-controller.js';
+import { loadBoards, bindBoardEvents } from './features/board/board-controller.js';
 import { loadSprints, loadBacklog, bindBacklogEvents } from './features/backlog/backlog-controller.js';
 import { loadIssues, openIssueDetailModal, openIssueCreateModal } from './features/issue/issue-controller.js';
 import { loadFilters, bindSearchEvents } from './features/search/search-controller.js';

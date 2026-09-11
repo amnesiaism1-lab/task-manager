@@ -2,7 +2,6 @@ import { openModal, closeModal } from '../../shared/components/modal.js';
 import { store as appStore } from '../../shared/state/store.js';
 import { request as appRequest } from '../../shared/api/client.js';
 import { showToast as appShowToast } from '../../shared/components/toast.js';
-import { escapeHtml } from '../../shared/utils/formatters.js';
 import { loadIssues } from '../issue/issue-controller.js';
 import { loadBoards } from '../board/board-controller.js';
 

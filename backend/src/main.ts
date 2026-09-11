@@ -46,15 +46,17 @@ async function bootstrapServer() {
       }),
     );
 
-    // Swagger
-    const swaggerConfig = new DocumentBuilder()
-      .setTitle('Task Manager API')
-      .setDescription('Jira-like Task Manager — API Documentation')
-      .setVersion('1.0')
-      .addBearerAuth()
-      .build();
-    const document = SwaggerModule.createDocument(app, swaggerConfig);
-    SwaggerModule.setup('api/docs', app, document);
+    // Swagger (local / standalone server only)
+    if (!process.env.VERCEL) {
+      const swaggerConfig = new DocumentBuilder()
+        .setTitle('Task Manager API')
+        .setDescription('Jira-like Task Manager — API Documentation')
+        .setVersion('1.0')
+        .addBearerAuth()
+        .build();
+      const document = SwaggerModule.createDocument(app, swaggerConfig);
+      SwaggerModule.setup('api/docs', app, document);
+    }
 
     await app.init();
     isInitialized = true;

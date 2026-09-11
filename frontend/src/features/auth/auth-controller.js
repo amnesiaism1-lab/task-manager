@@ -10,7 +10,7 @@ export async function loadMe() {
   try {
     const user = await request('/auth/me');
     store.setState({ user });
-  } catch (err) {
+  } catch {
     if (store.getState().token) {
       handleUnauthorized();
     }

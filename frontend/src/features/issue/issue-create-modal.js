@@ -1,7 +1,6 @@
 import { escapeHtml } from '../../shared/utils/formatters.js';
 
 export function renderIssueCreateModal(state) {
-  const currentProject = state.projects.find(p => p.id === state.selectedProjectId);
   const activeMembers = state.members.filter(m => m.status === 'active');
   const sprints = (state.sprints || []).filter(s => s.state !== 'closed');
 

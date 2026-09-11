@@ -1,6 +1,5 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { join } from 'node:path';
 import { TypeOrmModule, TypeOrmModuleOptions } from '@nestjs/typeorm';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { ScheduleModule } from '@nestjs/schedule';
@@ -67,6 +66,8 @@ import { AdminModule } from './modules/admin/admin.module';
           ssl: isSsl ? { rejectUnauthorized: false } : false,
           extra: {
             ssl: isSsl ? { rejectUnauthorized: false } : false,
+            max: 3,
+            connectionTimeoutMillis: 5000,
           },
           autoLoadEntities: true,
           synchronize: false,

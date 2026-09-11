@@ -1,11 +1,9 @@
 import { escapeHtml, formatDate, formatDateTime, formatSeconds, formatRelativeTime } from '../../shared/utils/formatters.js';
-import { renderAvatar, renderPriorityBadge, renderStatusBadge, renderTypeBadge } from '../../shared/components/badges.js';
+import { renderAvatar, renderStatusBadge, renderTypeBadge } from '../../shared/components/badges.js';
 
 export function renderIssueDetailModal(issue, state) {
   const members = state.members || [];
   const issues = state.issues || [];
-  const linkTypes = state.linkTypes || [];
-  const sprints = state.sprints || [];
 
   const transitions = issue.transitions || [];
   const comments = issue.comments?.data || issue.comments || [];
@@ -16,7 +14,6 @@ export function renderIssueDetailModal(issue, state) {
   const links = issue.links || [];
   const watchers = issue.watchers || [];
 
-  const assigneeMember = members.find(m => m.id === issue.assigneeMemberId);
   const reporterMember = members.find(m => m.id === issue.reporterMemberId);
 
   // Time calculations

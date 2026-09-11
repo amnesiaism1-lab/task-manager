@@ -269,7 +269,6 @@ function renderProjectSettingsTab(project, state) {
 
   const components = state.components || [];
   const versions = state.versions || [];
-  const projectRoles = state.projectRoles || [];
 
   return `
     <div class="project-settings-container">

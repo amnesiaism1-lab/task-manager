@@ -1,5 +1,5 @@
 import { escapeHtml, formatSeconds } from '../../shared/utils/formatters.js';
-import { renderAvatar, renderPriorityBadge, renderStatusBadge, renderTypeBadge } from '../../shared/components/badges.js';
+import { renderAvatar, renderPriorityBadge, renderTypeBadge } from '../../shared/components/badges.js';
 
 export function renderBoardView(state) {
   const board = state.boardData?.board;

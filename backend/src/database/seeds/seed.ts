@@ -407,6 +407,10 @@ async function runSeed() {
         }));
 
         // Add some comments and work logs
+        if (i === 0) {
+          await manager.save(IssueLabel, manager.create(IssueLabel, { issueId: iss.id, labelId: labelBackend.id, addedByMemberId: adminMember.id }));
+        }
+
         if (i === 1) {
           await manager.save(Comment, manager.create(Comment, {
             orgId: org.id, issueId: iss.id, authorMemberId: adminMember.id, body: 'Code looks solid. Ensure refresh token cookie has httpOnly and SameSite=Strict flags set.', bodyFormat: 'plain'
