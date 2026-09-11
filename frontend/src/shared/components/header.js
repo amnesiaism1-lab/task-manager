@@ -24,6 +24,7 @@ export function renderHeader(state) {
               </option>
             `).join('')}
             ${!state.organizations.some(o => o.orgId === state.org) && state.org ? `<option value="${escapeHtml(state.org)}" selected>${escapeHtml(orgName)}</option>` : ''}
+            <option value="__invite__">✉️ Invite Member...</option>
             <option value="__new__">+ New Organization</option>
             <option value="__join__">🤝 Join with Code</option>
           </select>

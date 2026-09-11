@@ -31,6 +31,7 @@ import {
   loadUserInvitations,
   openCreateOrgModal,
   openJoinOrgModal,
+  openInviteMemberModal,
   openPendingInvitationsModal,
   openSettingsModal,
 } from './features/project/project-controller.js';
@@ -87,16 +88,23 @@ export async function loadViewData(view) {
   }
 }
 
-export async function loadInitialData() {
-  const { token } = store.getState();
-  if (!token) return;
+export async function loadInitialData(targetOrgId, targetProjectId) {
+  const state = store.getState();
+  if (!state.token) return;
 
   try {
     store.setState({ loading: true });
     
+    const orgToUse = targetOrgId !== undefined ? targetOrgId : state.org;
+    const projectToUse = targetProjectId !== undefined ? targetProjectId : state.selectedProjectId;
+    
     // Fast single roundtrip bootstrap (< 200ms)
     try {
-      const bootstrap = await request('/workspace/bootstrap');
+      const queryParams = new URLSearchParams();
+      if (orgToUse) queryParams.set('orgId', orgToUse);
+      if (projectToUse) queryParams.set('projectId', projectToUse);
+      const queryStr = queryParams.toString() ? `?${queryParams.toString()}` : '';
+      const bootstrap = await request(`/workspace/bootstrap${queryStr}`);
       if (bootstrap?.user) {
         const activeOrg = bootstrap.activeOrgId || (bootstrap.organizations[0]?.id || '');
         const activeProject = bootstrap.activeProjectId || (bootstrap.projects[0]?.id || '');
@@ -109,11 +117,14 @@ export async function loadInitialData() {
           selectedProjectId: activeProject,
           members: bootstrap.members || [],
           issues: bootstrap.initialIssues || [],
+          unreadCount: bootstrap.unreadNotificationsCount || 0,
           loading: false,
         });
 
         if (activeOrg && activeProject) {
-          Promise.all([loadBoards(), loadSprints(), loadBacklog()]).catch(() => {});
+          Promise.all([loadBoards(), loadSprints(), loadBacklog(), loadUserInvitations()]).catch(() => {});
+        } else {
+          loadUserInvitations().catch(() => {});
         }
         return;
       }
@@ -124,8 +135,9 @@ export async function loadInitialData() {
     await loadMe();
     await Promise.all([loadOrganizations(), loadUserInvitations()]);
 
-    const { org } = store.getState();
-    if (org) {
+    const currentOrg = orgToUse || store.getState().org;
+    if (currentOrg) {
+      store.setState({ org: currentOrg });
       await Promise.all([loadProjects(), loadMembers(), loadNotifications()]);
 
       const { selectedProjectId } = store.getState();
@@ -239,8 +251,12 @@ function bindShellEvents() {
       openJoinOrgModal(loadInitialData);
       return;
     }
+    if (val === '__invite__') {
+      openInviteMemberModal(loadInitialData);
+      return;
+    }
     store.setState({ org: val, selectedProjectId: '' });
-    await loadInitialData();
+    await loadInitialData(val, '');
   });
 
   // Header Pending Invitations Badge Button

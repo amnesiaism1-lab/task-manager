@@ -3,17 +3,19 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { OrgMembershipGuard } from '../../common/guards/org-membership.guard';
 import { IssuePermissionGuard } from '../../common/guards/issue-permission.guard';
 import { CurrentMember } from '../../common/decorators/current-member.decorator';
+import { CurrentIssue } from '../../common/decorators/current-issue.decorator';
 import { RequirePermissions } from '../../common/decorators/permissions.decorator';
 import { IssueService } from './issue.service';
 import { AddLabelDto, AddWatcherDto, CreateCommentDto, CreateIssueLinkDto, CreateWorkLogDto } from './dto/issue.dto';
 import { PaginationDto } from '../../common/dto/pagination.dto';
+import { Issue } from '../../database/entities/issue/issue.entity';
 
 @Controller('organizations/:orgId/issues/:issueId')
 @UseGuards(JwtAuthGuard, OrgMembershipGuard, IssuePermissionGuard)
 @RequirePermissions('BROWSE_PROJECT')
 export class IssueController {
   constructor(private readonly issues: IssueService) {}
-  @Get() get(@Param('orgId') orgId: string, @Param('issueId') issueId: string, @CurrentMember('id') memberId: string) { return this.issues.getDetail(orgId, issueId, memberId); }
+  @Get() get(@Param('orgId') orgId: string, @Param('issueId') issueId: string, @CurrentMember('id') memberId: string, @CurrentIssue() issue?: Issue) { return this.issues.getDetail(orgId, issueId, memberId, issue); }
   @Patch() @RequirePermissions('EDIT_ISSUE') update(@Param('orgId') orgId: string, @Param('issueId') issueId: string, @CurrentMember('id') memberId: string, @Body() body: any) { return this.issues.update(orgId, issueId, memberId, body); }
   @Delete() @RequirePermissions('DELETE_ISSUE') delete(@Param('orgId') orgId: string, @Param('issueId') issueId: string, @CurrentMember('id') memberId: string) { return this.issues.delete(orgId, issueId, memberId); }
   @Post('transitions') @RequirePermissions('TRANSITION_ISSUE') transition(@Param('orgId') orgId: string, @Param('issueId') issueId: string, @CurrentMember('id') memberId: string, @Body() body: any) { return this.issues.transition(orgId, issueId, memberId, body); }

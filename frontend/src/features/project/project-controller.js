@@ -334,3 +334,87 @@ export function openPendingInvitationsModal(loadInitialData) {
     });
   });
 }
+
+export async function openInviteMemberModal(loadInitialData) {
+  const { org } = store.getState();
+  if (!org) {
+    showToast('Please select an organization first', 'warning');
+    return;
+  }
+
+  let roles = [];
+  try {
+    roles = (await request(`/organizations/${org}/roles`)) || [];
+  } catch (e) {
+    console.warn('Could not load org roles:', e);
+  }
+
+  const roleOptions = roles.map(r => `<option value="${escapeHtml(r.id)}">${escapeHtml(r.name || r.key)}</option>`).join('');
+
+  const contentHtml = `
+    <form id="form-invite-member-modal" class="space-y-4">
+      <div>
+        <label for="invite-modal-email" class="block text-xs font-semibold text-text-muted uppercase tracking-wider mb-1.5">Collaborator Email</label>
+        <input id="invite-modal-email" name="email" type="email" class="w-full px-3 py-2 bg-surface-hover/50 border border-border-default rounded-md text-sm text-text-primary focus:outline-none focus:border-brand-primary" placeholder="colleague@example.com" required />
+      </div>
+      <div>
+        <label for="invite-modal-role" class="block text-xs font-semibold text-text-muted uppercase tracking-wider mb-1.5">Organization Role (Optional)</label>
+        <select id="invite-modal-role" name="roleId" class="w-full px-3 py-2 bg-surface-hover/50 border border-border-default rounded-md text-sm text-text-primary focus:outline-none focus:border-brand-primary">
+          <option value="">Default Member</option>
+          ${roleOptions}
+        </select>
+      </div>
+      <p class="text-xs text-text-muted">An invitation token will be generated immediately. If the user already has an account, they can accept it from their workspace inbox or join using the code.</p>
+      <div id="invite-token-output" class="hidden p-3 bg-surface-hover/80 border border-border-default rounded-md text-xs font-mono break-all select-all"></div>
+      <div class="flex items-center justify-end gap-3 pt-3 border-t border-border-default">
+        <button type="button" class="button ghost btn-modal-cancel">Cancel</button>
+        <button type="submit" class="button primary" id="btn-submit-invite">Send Invitation</button>
+      </div>
+    </form>
+  `;
+
+  openModal({
+    title: 'Invite Team Member',
+    subtitle: 'WORKSPACE COLLABORATION',
+    contentHtml,
+    size: 'small',
+  });
+
+  const form = document.querySelector('#form-invite-member-modal');
+  form?.querySelector('.btn-modal-cancel')?.addEventListener('click', closeModal);
+
+  form?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const email = form.querySelector('#invite-modal-email')?.value?.trim();
+    const roleId = form.querySelector('#invite-modal-role')?.value || undefined;
+    if (!email) return;
+
+    try {
+      store.setState({ loading: true });
+      const res = await request(`/organizations/${org}/invitations`, {
+        method: 'POST',
+        body: JSON.stringify({ email, roleId }),
+      });
+
+      showToast(`Invitation sent to ${email}!`, 'success');
+      const tokenOut = form.querySelector('#invite-token-output');
+      if (tokenOut && res?.token) {
+        tokenOut.classList.remove('hidden');
+        tokenOut.innerHTML = `<strong>Invitation Token:</strong><br/><code>${escapeHtml(res.token)}</code>`;
+        const submitBtn = form.querySelector('#btn-submit-invite');
+        if (submitBtn) submitBtn.textContent = 'Invited';
+      } else {
+        closeModal();
+      }
+
+      await loadMembers();
+      if (typeof loadInitialData === 'function') {
+        await loadInitialData();
+      }
+    } catch (err) {
+      showToast(err.message, 'error');
+    } finally {
+      store.setState({ loading: false });
+    }
+  });
+}

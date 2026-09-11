@@ -37,6 +37,35 @@ export class IssueService {
     private readonly dataSource: DataSource,
   ) {}
 
+  private stateCache = new Map<string, { val: WorkflowState; exp: number }>();
+  private typeCache = new Map<string, { val: IssueType; exp: number }>();
+  private transCache = new Map<string, { val: WorkflowTransition[]; exp: number }>();
+
+  private async getCachedState(id: string): Promise<WorkflowState | null> {
+    const cached = this.stateCache.get(id);
+    if (cached && cached.exp > Date.now()) return cached.val;
+    const item = await this.states.findOne({ where: { id } });
+    if (item) this.stateCache.set(id, { val: item, exp: Date.now() + 300_000 });
+    return item;
+  }
+
+  private async getCachedType(id: string): Promise<IssueType | null> {
+    const cached = this.typeCache.get(id);
+    if (cached && cached.exp > Date.now()) return cached.val;
+    const item = await this.issueTypes.findOne({ where: { id } });
+    if (item) this.typeCache.set(id, { val: item, exp: Date.now() + 300_000 });
+    return item;
+  }
+
+  private async getCachedTransitions(workflowId: string, fromStateId: string): Promise<WorkflowTransition[]> {
+    const key = `${workflowId}:${fromStateId}`;
+    const cached = this.transCache.get(key);
+    if (cached && cached.exp > Date.now()) return cached.val;
+    const items = await this.transitions.find({ where: { workflowId, fromStateId }, order: { sortOrder: 'ASC' } });
+    this.transCache.set(key, { val: items, exp: Date.now() + 300_000 });
+    return items;
+  }
+
   private async accessibleIssue(orgId: string, issueId: string, memberId: string) {
     const issue = await this.issues.findOne({ where: { id: issueId, orgId, deletedAt: IsNull() } });
     if (!issue) throw new NotFoundException('Issue not found');
@@ -45,16 +74,16 @@ export class IssueService {
     return issue;
   }
 
-  async getDetail(orgId: string, issueId: string, memberId: string) {
-    const issue = await this.accessibleIssue(orgId, issueId, memberId);
+  async getDetail(orgId: string, issueId: string, memberId: string, preloadedIssue?: Issue) {
+    const issue = preloadedIssue || (await this.accessibleIssue(orgId, issueId, memberId));
     const [state, issueType, labels, watchers, links, transitions, history] = await Promise.all([
-      this.states.findOne({ where: { id: issue.stateId } }),
-      this.issueTypes.findOne({ where: { id: issue.issueTypeId } }),
-      this.issueLabels.createQueryBuilder('il').innerJoin(Label, 'label', 'label.id = il.label_id').where('il.issue_id = :issueId', { issueId }).select('label.id', 'id').addSelect('label.name', 'name').getRawMany(),
-      this.watchers.find({ where: { issueId } }),
-      this.links.find({ where: [{ issueId }, { linkedIssueId: issueId }] }),
-      this.transitions.find({ where: { workflowId: issue.workflowId, fromStateId: issue.stateId }, order: { sortOrder: 'ASC' } }),
-      this.history.find({ where: { issueId }, order: { occurredAt: 'DESC' }, take: 50 }),
+      this.getCachedState(issue.stateId),
+      this.getCachedType(issue.issueTypeId),
+      this.issueLabels.createQueryBuilder('il').innerJoin(Label, 'label', 'label.id = il.label_id').where('il.issue_id = :issueId', { issueId: issue.id }).select('label.id', 'id').addSelect('label.name', 'name').getRawMany(),
+      this.watchers.find({ where: { issueId: issue.id } }),
+      this.links.find({ where: [{ issueId: issue.id }, { linkedIssueId: issue.id }] }),
+      this.getCachedTransitions(issue.workflowId, issue.stateId),
+      this.history.find({ where: { issueId: issue.id }, order: { occurredAt: 'DESC' }, take: 50 }),
     ]);
     return { ...issue, state, issueType, labels, watchers, links, transitions, history };
   }
@@ -76,7 +105,7 @@ export class IssueService {
   }
 
   listTransitions(orgId: string, issueId: string, memberId: string) {
-    return this.accessibleIssue(orgId, issueId, memberId).then((issue) => this.transitions.find({ where: { workflowId: issue.workflowId, fromStateId: issue.stateId }, order: { sortOrder: 'ASC' } }));
+    return this.accessibleIssue(orgId, issueId, memberId).then((issue) => this.getCachedTransitions(issue.workflowId, issue.stateId));
   }
 
   async addComment(orgId: string, issueId: string, memberId: string, input: CreateCommentDto) {

@@ -19,6 +19,9 @@ export class IssueAccessService {
     @InjectRepository(IssueSecurityGrant) private readonly grants: Repository<IssueSecurityGrant>,
   ) {}
 
+  private memberCache = new Map<string, { val: ProjectMember | null; exp: number }>();
+  private projectCache = new Map<string, { secSchemeId: string | null; exp: number }>();
+
   async getAccessibleIssue(orgId: string, issueId: string, memberId: string) {
     const issue = await this.issues.findOne({ where: { id: issueId, orgId, deletedAt: IsNull() } });
     if (!issue) throw new NotFoundException('Issue not found');
@@ -26,12 +29,30 @@ export class IssueAccessService {
     return issue;
   }
 
-  async canAccess(issue: Issue, memberId: string) {
-    const membership = await this.members.findOne({ where: { projectId: issue.projectId, orgMemberId: memberId, status: 'active' } });
+  async canAccess(issue: Issue, memberId: string): Promise<boolean> {
+    const memKey = `${issue.projectId}:${memberId}`;
+    let membership: ProjectMember | null = null;
+    const cachedMem = this.memberCache.get(memKey);
+    if (cachedMem && cachedMem.exp > Date.now()) {
+      membership = cachedMem.val;
+    } else {
+      membership = await this.members.findOne({ where: { projectId: issue.projectId, orgMemberId: memberId, status: 'active' } });
+      this.memberCache.set(memKey, { val: membership, exp: Date.now() + 60_000 });
+    }
     if (!membership) return false;
-    const project = await this.projects.findOne({ where: { id: issue.projectId, orgId: issue.orgId } });
-    if (!project?.issueSecuritySchemeId) return true;
-    const scheme = await this.schemes.findOne({ where: { id: project.issueSecuritySchemeId, orgId: issue.orgId } });
+
+    let secSchemeId: string | null = null;
+    const cachedProj = this.projectCache.get(issue.projectId);
+    if (cachedProj && cachedProj.exp > Date.now()) {
+      secSchemeId = cachedProj.secSchemeId;
+    } else {
+      const project = await this.projects.findOne({ where: { id: issue.projectId, orgId: issue.orgId } });
+      secSchemeId = project?.issueSecuritySchemeId || null;
+      this.projectCache.set(issue.projectId, { secSchemeId, exp: Date.now() + 120_000 });
+    }
+
+    if (!secSchemeId) return true;
+    const scheme = await this.schemes.findOne({ where: { id: secSchemeId, orgId: issue.orgId } });
     if (!scheme) return true;
     const levelId = issue.securityLevelId ?? scheme.defaultLevelId;
     if (!levelId) return true;

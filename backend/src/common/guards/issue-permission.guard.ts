@@ -39,7 +39,9 @@ export class IssuePermissionGuard implements CanActivate {
     if (!(await this.permissions.hasProjectPermissions(member.id, issue.projectId, required))) {
       throw new ForbiddenException('Insufficient project permissions');
     }
-    await this.issueAccess.getAccessibleIssue(orgId, issueId, member.id);
+    const canAccess = await this.issueAccess.canAccess(issue, member.id);
+    if (!canAccess) throw new ForbiddenException('Issue security level denied');
+    request.issue = issue;
     return true;
   }
 }
