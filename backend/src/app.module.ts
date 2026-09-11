@@ -6,6 +6,7 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerGuard } from '@nestjs/throttler';
+import * as pg from 'pg';
 
 // Feature modules
 import { AuthModule } from './modules/auth/auth.module';
@@ -56,6 +57,7 @@ import { AdminModule } from './modules/admin/admin.module';
 
         const baseOptions: TypeOrmModuleOptions = {
           type: 'postgres',
+          driver: pg,
           ...(dbUrl ? { url: dbUrl } : {
             host: dbHost,
             port: config.get<number>('DATABASE_PORT', 5432),
