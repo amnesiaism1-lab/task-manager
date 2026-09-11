@@ -8,8 +8,7 @@
       "root": "backend",
       "framework": "nestjs",
       "entrypoint": "src/main.ts",
-      "installCommand": "npm install --legacy-peer-deps",
-      "includeFiles": ["node_modules/**"]
+      "installCommand": "npm install --legacy-peer-deps"
     }
   },
   "rewrites": [
