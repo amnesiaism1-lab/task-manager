@@ -1,3 +1,20 @@
+// Prepend module search paths for Vercel Serverless environment
+const _path = require('path');
+const _fs = require('fs');
+[
+  _path.join(__dirname, 'node_modules'),
+  _path.join(__dirname, '..', 'node_modules'),
+  _path.join(__dirname, '..', 'backend', 'node_modules'),
+  _path.join(process.cwd(), 'node_modules'),
+  _path.join(process.cwd(), 'backend', 'node_modules'),
+  '/var/task/node_modules',
+  '/var/task/backend/node_modules'
+].forEach(p => {
+  if (_fs.existsSync(p) && !module.paths.includes(p)) {
+    module.paths.unshift(p);
+  }
+});
+
 // Static references so Vercel's NFT (Node File Trace) bundler traces all core packages
 require('reflect-metadata');
 require('@nestjs/core');
