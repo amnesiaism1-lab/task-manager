@@ -12,6 +12,12 @@
       "functions": {
         "api/index.ts": {
           "includeFiles": "node_modules/**"
+        },
+        "index.js": {
+          "includeFiles": "node_modules/**"
+        },
+        "main.js": {
+          "includeFiles": "node_modules/**"
         }
       }
     }
