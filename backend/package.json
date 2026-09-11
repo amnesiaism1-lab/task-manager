@@ -6,7 +6,7 @@
     "private": true,
     "license": "UNLICENSED",
     "type": "commonjs",
-    "main": "dist/main.js",
+    "main": "api/index.js",
     "scripts": {
         "build": "nest build",
         "deploy": "nest deploy",

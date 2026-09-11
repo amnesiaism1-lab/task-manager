@@ -10,10 +10,11 @@
       "entrypoint": "api/index.js",
       "installCommand": "npm install --legacy-peer-deps",
       "buildCommand": "npm run build",
-      "includeFiles": [
-        "node_modules/**",
-        "dist/**"
-      ]
+      "functions": {
+        "**/*": {
+          "includeFiles": "node_modules/**"
+        }
+      }
     }
   },
   "rewrites": [
