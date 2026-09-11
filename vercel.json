@@ -8,7 +8,12 @@
       "root": "backend",
       "framework": "express",
       "entrypoint": "src/main.ts",
-      "installCommand": "npm install --legacy-peer-deps"
+      "installCommand": "npm install --legacy-peer-deps",
+      "functions": {
+        "src/main.ts": {
+          "includeFiles": "node_modules/**"
+        }
+      }
     }
   },
   "rewrites": [
