@@ -56,7 +56,7 @@ export class SprintService {
       if (sprint.state === 'closed') throw new ConflictException('Cannot assign to a closed sprint');
       if (issue.sprintId === sprintId) return issue;
       if (issue.sprintId) {
-        await manager.update(IssueSprintHistory, { issueId, sprintId: issue.sprintId, removedAt: null }, { removedAt: new Date(), removedByMemberId: memberId });
+        await manager.update(IssueSprintHistory, { issueId, sprintId: issue.sprintId, removedAt: IsNull() }, { removedAt: new Date(), removedByMemberId: memberId });
       }
       issue.sprintId = sprintId;
       await manager.save(issue);

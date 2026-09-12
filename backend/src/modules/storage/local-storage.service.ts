@@ -4,13 +4,17 @@ import { createReadStream } from 'node:fs';
 import { mkdir, rm, writeFile } from 'node:fs/promises';
 import { isAbsolute, join, relative, resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
+import { tmpdir } from 'node:os';
 
 @Injectable()
 export class LocalStorageService {
   private readonly root: string;
 
   constructor(config: ConfigService) {
-    this.root = resolve(config.get('STORAGE_LOCAL_PATH', './uploads'));
+    const defaultPath = process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME
+      ? join(tmpdir(), 'uploads')
+      : './uploads';
+    this.root = resolve(config.get('STORAGE_LOCAL_PATH', defaultPath));
   }
 
   async put(content: Buffer, extension = '') {
