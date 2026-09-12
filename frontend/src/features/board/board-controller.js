@@ -89,21 +89,27 @@ export function bindBoardEvents(ctx = {}) {
   });
 
   // HTML5 Drag and Drop for Kanban Cards
+  let activeDraggedCard = null;
   const cards = document.querySelectorAll('.board-card');
   const droppableColumns = document.querySelectorAll('[data-droppable-column]');
 
   cards.forEach(card => {
     card.addEventListener('dragstart', (e) => {
       card.classList.add('is-dragging');
-      e.dataTransfer.setData('text/plain', JSON.stringify({
+      activeDraggedCard = {
         issueId: card.dataset.issueId,
         fromColumnId: card.closest('[data-column-id]')?.dataset.columnId,
-      }));
+      };
+      try {
+        e.dataTransfer.setData('text/plain', card.dataset.issueId || '');
+        e.dataTransfer.setData('application/json', JSON.stringify(activeDraggedCard));
+      } catch {}
       e.dataTransfer.effectAllowed = 'move';
     });
 
     card.addEventListener('dragend', () => {
       card.classList.remove('is-dragging');
+      activeDraggedCard = null;
       droppableColumns.forEach(c => c.classList.remove('drag-over'));
     });
   });
@@ -125,17 +131,36 @@ export function bindBoardEvents(ctx = {}) {
       e.preventDefault();
       dropZone.classList.remove('drag-over');
 
-      try {
-        const data = JSON.parse(e.dataTransfer.getData('text/plain'));
-        const { issueId, fromColumnId } = data;
-        const targetColumnId = dropZone.dataset.droppableColumn;
+      let issueId = activeDraggedCard?.issueId;
+      let fromColumnId = activeDraggedCard?.fromColumnId;
 
-        if (!issueId || fromColumnId === targetColumnId) return;
-
-        await handleIssueColumnDrop(issueId, targetColumnId, { request, store, showToast });
-      } catch (err) {
-        console.warn('Drop error:', err);
+      if (!issueId) {
+        try {
+          const raw = e.dataTransfer.getData('application/json') || e.dataTransfer.getData('text/plain');
+          if (raw) {
+            if (raw.trim().startsWith('{')) {
+              const parsed = JSON.parse(raw);
+              issueId = parsed.issueId;
+              fromColumnId = parsed.fromColumnId;
+            } else {
+              issueId = raw.trim();
+            }
+          }
+        } catch {}
       }
+
+      if (!issueId) {
+        const draggingEl = document.querySelector('.board-card.is-dragging');
+        if (draggingEl) {
+          issueId = draggingEl.dataset.issueId;
+          fromColumnId = draggingEl.closest('[data-column-id]')?.dataset.columnId;
+        }
+      }
+
+      const targetColumnId = dropZone.dataset.droppableColumn;
+      if (!issueId || fromColumnId === targetColumnId) return;
+
+      await handleIssueColumnDrop(issueId, targetColumnId, { request, store, showToast });
     });
   });
 }

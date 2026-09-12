@@ -8,25 +8,34 @@ import { loadBoardData as defaultLoadBoardData } from '../board/board-controller
 import { loadSprints as defaultLoadSprints, loadBacklog as defaultLoadBacklog } from '../backlog/backlog-controller.js';
 
 export async function loadIssues(query = '', request = appRequest, store = appStore) {
-  // Support both (query, request, store) or (request, store, query)
+  let actualQuery = '';
+  let actualRequest = appRequest;
+  let actualStore = appStore;
+
   if (typeof query === 'function') {
-    request = query;
-    query = '';
+    actualRequest = query;
+    actualStore = (request && typeof request.getState === 'function') ? request : appStore;
+    actualQuery = typeof store === 'string' ? store : '';
+  } else {
+    actualQuery = typeof query === 'string' ? query : '';
+    actualRequest = (typeof request === 'function') ? request : appRequest;
+    actualStore = (store && typeof store.getState === 'function') ? store : appStore;
   }
-  const { org, selectedProjectId, token } = store.getState();
+
+  const { org, selectedProjectId, token } = actualStore.getState();
   if (!org || !token) return;
 
   try {
     const params = new URLSearchParams({ page: '1', limit: '50' });
     if (selectedProjectId) params.append('projectId', selectedProjectId);
-    if (query && typeof query === 'string') params.append('query', query);
+    if (actualQuery && typeof actualQuery === 'string') params.append('query', actualQuery);
 
     const url = selectedProjectId
       ? `/organizations/${org}/projects/${selectedProjectId}/issues?${params.toString()}`
       : `/organizations/${org}/issues/search?${params.toString()}`;
-    const res = await request(url);
+    const res = await actualRequest(url);
     const issues = Array.isArray(res) ? res : (res?.data || []);
-    store.setState({ issues });
+    actualStore.setState({ issues });
   } catch (err) {
     console.warn('Could not load issues:', err.message);
   }
@@ -90,16 +99,14 @@ export function bindIssueDetailModalEvents(initialIssue, { request, store, showT
     }
   };
 
-  // 1. Status Transition Dropdown
-  const transitionSelect = document.querySelector('#issue-transition-select');
-  transitionSelect?.addEventListener('change', async (e) => {
-    const transitionKey = e.target.value;
+  // Status Transitions Handler (Unified for both quick action buttons and dropdown)
+  const handleTransition = async (transitionKey) => {
     if (!transitionKey) return;
+    const matchingTrans = (currentIssue.transitions || []).find(t => t.key === transitionKey);
+    const transName = matchingTrans?.name || transitionKey;
 
-    const prevValue = transitionSelect.value;
     try {
-      transitionSelect.disabled = true;
-      transitionSelect.classList.add('opacity-50');
+      showToast(`Transitioning: ${transName}...`, 'info', 1000);
       await request(`/organizations/${org}/issues/${currentIssue.id}/transitions`, {
         method: 'POST',
         body: JSON.stringify({
@@ -107,19 +114,37 @@ export function bindIssueDetailModalEvents(initialIssue, { request, store, showT
           version: currentIssue.version,
         }),
       });
-      showToast('Status transitioned successfully', 'success', 2000);
+      showToast(`Status updated: ${transName}`, 'success', 2000);
       await refreshModal();
       if (loadBoardData && store.getState().selectedBoardId) {
         await loadBoardData(store.getState().selectedBoardId, request, store);
       }
-      if (loadIssues) loadIssues(request, store, store.getState().query);
+      if (loadIssues) {
+        await loadIssues(store.getState().query || '', request, store);
+      }
     } catch (err) {
-      showToast(err.message, 'error');
-      transitionSelect.value = prevValue;
-    } finally {
-      transitionSelect.disabled = false;
-      transitionSelect.classList.remove('opacity-50');
+      showToast(`Transition failed: ${err.message}`, 'error');
     }
+  };
+
+  // Bind Quick Transition Pills
+  document.querySelectorAll('.btn-quick-transition').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const key = btn.dataset.transitionKey;
+      btn.disabled = true;
+      btn.classList.add('opacity-50');
+      await handleTransition(key);
+    });
+  });
+
+  // 1. Status Transition Dropdown
+  const transitionSelect = document.querySelector('#issue-transition-select');
+  transitionSelect?.addEventListener('change', async (e) => {
+    const transitionKey = e.target.value;
+    if (!transitionKey) return;
+    transitionSelect.disabled = true;
+    await handleTransition(transitionKey);
+    transitionSelect.disabled = false;
   });
 
   // 2. Summary Inline Edit

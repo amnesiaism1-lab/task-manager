@@ -1151,6 +1151,50 @@ img.avatar, .avatar {
   align-items: center;
   gap: 8px;
 }
+.quick-transitions-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.btn-quick-transition {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid var(--border-default);
+  background: var(--bg-surface-elevated);
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+.btn-quick-transition:hover {
+  background: var(--blue-600);
+  border-color: var(--blue-500);
+  color: #fff;
+  transform: translateY(-1px);
+}
+.btn-quick-transition.pill-primary {
+  background: rgba(59, 130, 246, 0.15);
+  border-color: rgba(59, 130, 246, 0.4);
+  color: #93c5fd;
+}
+.btn-quick-transition.pill-primary:hover {
+  background: var(--blue-600);
+  color: #fff;
+}
+.btn-quick-transition.pill-success {
+  background: rgba(16, 185, 129, 0.15);
+  border-color: rgba(16, 185, 129, 0.4);
+  color: #6ee7b7;
+}
+.btn-quick-transition.pill-success:hover {
+  background: #059669;
+  color: #fff;
+}
 
 .detail-main-layout {
   display: grid;

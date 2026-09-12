@@ -39,8 +39,15 @@ export function renderIssueDetailModal(issue, state) {
             <div class="transition-dropdown-group">
               ${renderStatusBadge(issue.state || issue.status || 'Open')}
               ${transitions.length ? `
+                <div class="quick-transitions-wrap">
+                  ${transitions.slice(0, 3).map(t => `
+                    <button type="button" class="btn-quick-transition action-pill ${t.name.toLowerCase().includes('done') || t.name.toLowerCase().includes('resolve') ? 'pill-success' : 'pill-primary'}" data-transition-key="${escapeHtml(t.key)}" title="Transition issue to ${escapeHtml(t.name)}">
+                      ▶ ${escapeHtml(t.name)}
+                    </button>
+                  `).join('')}
+                </div>
                 <select id="issue-transition-select" class="select-clean transition-select" aria-label="Change status">
-                  <option value="">Move status...</option>
+                  <option value="">More transitions...</option>
                   ${transitions.map(t => `
                     <option value="${escapeHtml(t.key)}">${escapeHtml(t.name)}</option>
                   `).join('')}
