@@ -85,11 +85,16 @@ export class BoardService {
     if (!board) throw new NotFoundException('Board not found');
     const issue = await this.issues.findOne({ where: { id: input.issueId, projectId } });
     if (!issue) throw new NotFoundException('Issue not found in project');
-    const rank = LexoRank.between(input.previousRank ?? null, input.nextRank ?? null);
+    let rank = LexoRank.between(input.previousRank ?? null, input.nextRank ?? null);
+    while (await this.positions.findOne({ where: { boardId, rank } })) {
+      rank = LexoRank.between(rank, input.nextRank ?? null);
+    }
     const existing = await this.positions.findOne({ where: { boardId, issueId: input.issueId } });
-    if (existing) existing.rank = rank;
-    else return this.positions.save(this.positions.create({ boardId, issueId: input.issueId, rank }));
-    return this.positions.save(existing);
+    if (existing) {
+      existing.rank = rank;
+      return this.positions.save(existing);
+    }
+    return this.positions.save(this.positions.create({ boardId, issueId: input.issueId, rank }));
   }
 
   async getBoardIssues(projectId: string, boardId: string) {

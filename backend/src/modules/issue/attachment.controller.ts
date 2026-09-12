@@ -1,6 +1,7 @@
 import { Body, Controller, Delete, Get, Param, Post, Query, Res, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { Response } from 'express';
+import { IsOptional, IsString } from 'class-validator';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { OrgMembershipGuard } from '../../common/guards/org-membership.guard';
 import { IssuePermissionGuard } from '../../common/guards/issue-permission.guard';
@@ -9,6 +10,12 @@ import { RequirePermissions } from '../../common/decorators/permissions.decorato
 import { AttachmentService } from './attachment.service';
 import type { UploadedAttachmentFile } from './attachment.service';
 import { PaginationDto } from '../../common/dto/pagination.dto';
+
+export class UploadAttachmentJsonDto {
+  @IsOptional() @IsString() fileName?: string;
+  @IsOptional() @IsString() mimeType?: string;
+  @IsOptional() @IsString() base64Content?: string;
+}
 
 @Controller('organizations/:orgId/issues/:issueId/attachments')
 @UseGuards(JwtAuthGuard, OrgMembershipGuard, IssuePermissionGuard)
@@ -24,7 +31,7 @@ export class AttachmentController {
     @Param('issueId') issueId: string,
     @CurrentMember('id') memberId: string,
     @UploadedFile() file?: UploadedAttachmentFile,
-    @Body() body?: any,
+    @Body() body?: UploadAttachmentJsonDto,
   ) {
     if (file && file.buffer) {
       return this.attachments.upload(orgId, issueId, memberId, file);
