@@ -52,7 +52,7 @@ async function api(path, options = {}) {
   const url = `${BASE_URL}${path.startsWith('/') ? path : `/${path}`}`;
   const headers = {
     'Content-Type': 'application/json',
-    ...(options.headers || {}),
+    ...options.headers,
   };
   const res = await fetch(url, { ...options, headers });
   let data = null;
@@ -149,7 +149,6 @@ async function runUatSuite() {
   console.log('\n\x1b[33m▶ UAT-02: User Lifecycle, Email Verification & Password Reset (UC-AUTH-02, 05, 06)\x1b[0m');
   const uatUserEmail = `uat_user_${Date.now()}@taskmanager.dev`;
   let uatUserId = '';
-  let uatUserToken = '';
   try {
     const regRes = await api('/auth/register', {
       method: 'POST',

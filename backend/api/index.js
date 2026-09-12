@@ -37,7 +37,7 @@ if (!_Module.__hookInstalled) {
           try {
             const direct = _path.join(basePath, request);
             return _originalResolveFilename.call(this, direct, parent, isMain, options);
-          } catch (_) {}
+          } catch {}
         }
       }
       throw err;

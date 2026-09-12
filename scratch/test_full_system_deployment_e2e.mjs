@@ -51,7 +51,7 @@ function db(sql) {
 
 async function request(path, opts = {}) {
   const url = `${API_BASE}${path.startsWith('/') ? path : `/${path}`}`;
-  const headers = { 'Content-Type': 'application/json', ...(opts.headers || {}) };
+  const headers = { 'Content-Type': 'application/json', ...opts.headers };
   const res = await fetch(url, { ...opts, headers });
   let data = null;
   const text = await res.text();

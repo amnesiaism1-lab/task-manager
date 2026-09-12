@@ -53,8 +53,7 @@ async function runBenchmark() {
     return;
   }
 
-  const token = loginRes.data.data?.token || loginRes.data.token;
-  const user = loginRes.data.data?.user || loginRes.data.user;
+  const token = loginRes.data.accessToken || loginRes.data.data?.token || loginRes.data.token;
   const authHeaders = {
     'Authorization': `Bearer ${token}`,
     'Content-Type': 'application/json'
@@ -64,13 +63,13 @@ async function runBenchmark() {
   const bootstrapRes = await timedFetch(`${BASE_URL}/api/workspace/bootstrap`, { headers: authHeaders });
   console.log(`[WORKSPACE] /api/workspace/bootstrap -> Status: ${bootstrapRes.status}, Latency: ${bootstrapRes.duration}ms`);
 
-  const orgs = bootstrapRes.data?.data?.organizations || [];
+  const orgs = bootstrapRes.data?.organizations || bootstrapRes.data?.data?.organizations || [];
   const currentOrg = orgs[0] || {};
-  const orgId = currentOrg.id;
-  const projects = bootstrapRes.data?.data?.projects || [];
+  const orgId = currentOrg.id || currentOrg.orgId;
+  const projects = bootstrapRes.data?.projects || bootstrapRes.data?.data?.projects || [];
   const currentProject = projects[0] || {};
   const projectId = currentProject.id;
-  const issues = bootstrapRes.data?.data?.issues || [];
+  const issues = bootstrapRes.data?.initialIssues || bootstrapRes.data?.issues || bootstrapRes.data?.data?.issues || [];
   const currentIssue = issues[0] || {};
   const issueId = currentIssue.id;
 
@@ -82,7 +81,8 @@ async function runBenchmark() {
     { module: 'Organizations', name: 'GET /api/organizations', path: `/api/organizations` },
     { module: 'Organizations', name: 'GET /api/organizations/:orgId/members', path: `/api/organizations/${orgId}/members` },
     { module: 'Organizations', name: 'GET /api/organizations/:orgId/invitations', path: `/api/organizations/${orgId}/invitations` },
-    { module: 'Catalog', name: 'GET /api/organizations/:orgId/catalog', path: `/api/organizations/${orgId}/catalog` },
+    { module: 'Catalog', name: 'GET /api/organizations/:orgId/catalog/issue-types', path: `/api/organizations/${orgId}/catalog/issue-types` },
+    { module: 'Catalog', name: 'GET /api/organizations/:orgId/catalog/link-types', path: `/api/organizations/${orgId}/catalog/link-types` },
     { module: 'Workflows', name: 'GET /api/organizations/:orgId/workflows', path: `/api/organizations/${orgId}/workflows` },
     { module: 'Projects', name: 'GET /api/organizations/:orgId/projects', path: `/api/organizations/${orgId}/projects` },
     { module: 'Projects', name: 'GET /api/organizations/:orgId/projects/:projectId', path: `/api/organizations/${orgId}/projects/${projectId}` },
@@ -90,27 +90,25 @@ async function runBenchmark() {
     { module: 'Projects', name: 'GET /api/organizations/:orgId/projects/:projectId/versions', path: `/api/organizations/${orgId}/projects/${projectId}/versions` },
     { module: 'Boards', name: 'GET /api/organizations/:orgId/projects/:projectId/boards', path: `/api/organizations/${orgId}/projects/${projectId}/boards` },
     { module: 'Sprints', name: 'GET /api/organizations/:orgId/projects/:projectId/sprints', path: `/api/organizations/${orgId}/projects/${projectId}/sprints` },
-    { module: 'Issues', name: 'GET /api/organizations/:orgId/issues', path: `/api/organizations/${orgId}/issues?projectId=${projectId}` },
+    { module: 'Issues (Search)', name: 'GET /api/organizations/:orgId/issues/search', path: `/api/organizations/${orgId}/issues/search?projectId=${projectId}` },
     { module: 'Issues (Detail SLA)', name: 'GET /api/organizations/:orgId/issues/:issueId', path: `/api/organizations/${orgId}/issues/${issueId}` },
     { module: 'Issues', name: 'GET /api/organizations/:orgId/issues/:issueId/transitions', path: `/api/organizations/${orgId}/issues/${issueId}/transitions` },
     { module: 'Issues', name: 'GET /api/organizations/:orgId/issues/:issueId/comments', path: `/api/organizations/${orgId}/issues/${issueId}/comments` },
-    { module: 'Issues', name: 'GET /api/organizations/:orgId/issues/:issueId/worklogs', path: `/api/organizations/${orgId}/issues/${issueId}/worklogs` },
+    { module: 'Issues', name: 'GET /api/organizations/:orgId/issues/:issueId/work-logs', path: `/api/organizations/${orgId}/issues/${issueId}/work-logs` },
     { module: 'Issues', name: 'GET /api/organizations/:orgId/issues/:issueId/links', path: `/api/organizations/${orgId}/issues/${issueId}/links` },
     { module: 'Issues', name: 'GET /api/organizations/:orgId/issues/:issueId/watchers', path: `/api/organizations/${orgId}/issues/${issueId}/watchers` },
     { module: 'Issues', name: 'GET /api/organizations/:orgId/issues/:issueId/attachments', path: `/api/organizations/${orgId}/issues/${issueId}/attachments` },
     { module: 'Custom Fields', name: 'GET /api/organizations/:orgId/custom-fields', path: `/api/organizations/${orgId}/custom-fields` },
     { module: 'Saved Filters', name: 'GET /api/organizations/:orgId/filters', path: `/api/organizations/${orgId}/filters` },
-    { module: 'Search & JQL', name: 'GET /api/organizations/:orgId/issues?jql=...', path: `/api/organizations/${orgId}/issues?jql=${encodeURIComponent('priority = high')}` },
-    { module: 'Dashboards', name: 'GET /api/organizations/:orgId/dashboards/summary', path: `/api/organizations/${orgId}/dashboards/summary` },
+    { module: 'Search & JQL', name: 'GET /api/organizations/:orgId/issues/search?q=...', path: `/api/organizations/${orgId}/issues/search?q=${encodeURIComponent('priority = high')}` },
+    { module: 'Dashboards', name: 'GET /api/organizations/:orgId/dashboards', path: `/api/organizations/${orgId}/dashboards` },
     { module: 'Notifications', name: 'GET /api/organizations/:orgId/notifications', path: `/api/organizations/${orgId}/notifications` },
     { module: 'Webhooks', name: 'GET /api/organizations/:orgId/webhooks', path: `/api/organizations/${orgId}/webhooks` },
     { module: 'API Tokens', name: 'GET /api/organizations/:orgId/api-tokens', path: `/api/organizations/${orgId}/api-tokens` },
     { module: 'Audit & Outbox', name: 'GET /api/organizations/:orgId/audit', path: `/api/organizations/${orgId}/audit` },
-    { module: 'Admin Engine', name: 'GET /api/admin/metrics', path: `/api/admin/metrics` },
     { module: 'Admin Engine', name: 'GET /api/admin/users', path: `/api/admin/users` },
     { module: 'Admin Engine', name: 'GET /api/admin/organizations', path: `/api/admin/organizations` },
-    { module: 'Admin Engine', name: 'GET /api/admin/mail-outbox', path: `/api/admin/mail-outbox` },
-    { module: 'Admin Engine', name: 'GET /api/admin/logs', path: `/api/admin/logs` }
+    { module: 'Admin Engine', name: 'GET /api/admin/mail/outbox', path: `/api/admin/mail/outbox` }
   ];
 
   const results = [];
