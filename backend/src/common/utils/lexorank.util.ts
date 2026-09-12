@@ -51,6 +51,9 @@ export class LexoRank {
 
   private static incrementRank(rank: string): string {
     const lastChar = rank.charCodeAt(rank.length - 1);
+    if (lastChar === 90) { // 'Z' -> jump to 'a' to avoid ASCII punctuation [ \ ] ^ _ `
+      return rank.slice(0, -1) + 'a';
+    }
     if (lastChar < this.MAX_CHAR.charCodeAt(0)) {
       return rank.slice(0, -1) + String.fromCharCode(lastChar + 1);
     }

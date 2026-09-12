@@ -67,7 +67,9 @@ async function bootstrapServer() {
 export default async function handler(req: any, res: any) {
   try {
     const expressApp = await bootstrapServer();
-    if (req.body && typeof req.body === 'object') req._body = true;
+    if (req.body && typeof req.body === 'object' && !Buffer.isBuffer(req.body)) {
+      req._body = true;
+    }
     if (req.url && !req.url.startsWith('/api')) {
       req.url = `/api${req.url.startsWith('/') ? req.url : `/${req.url}`}`;
     }

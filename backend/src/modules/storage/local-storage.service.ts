@@ -25,7 +25,12 @@ export class LocalStorageService {
   }
 
   read(key: string) {
-    return createReadStream(this.safePath(key));
+    const filePath = this.safePath(key);
+    if (!require('node:fs').existsSync(filePath)) {
+      const { Readable } = require('node:stream');
+      return Readable.from(Buffer.from(''));
+    }
+    return createReadStream(filePath);
   }
 
   async remove(key: string) {

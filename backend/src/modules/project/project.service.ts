@@ -157,7 +157,11 @@ export class ProjectService {
       const board = await manager.findOne(Board, { where: { projectId }, order: { createdAt: 'ASC' } });
       if (board) {
         const last = await manager.find(BoardIssuePosition, { where: { boardId: board.id }, order: { rank: 'DESC' }, take: 1 });
-        await manager.save(BoardIssuePosition, manager.create(BoardIssuePosition, { boardId: board.id, issueId: issue.id, rank: LexoRank.between(last[0]?.rank ?? null, null) }));
+        let rank = LexoRank.between(last[0]?.rank ?? null, null);
+        while (await manager.exists(BoardIssuePosition, { where: { boardId: board.id, rank } })) {
+          rank = LexoRank.between(rank, null);
+        }
+        await manager.save(BoardIssuePosition, manager.create(BoardIssuePosition, { boardId: board.id, issueId: issue.id, rank }));
       }
       const payload = { issueId: issue.id, issueKey: issue.key, projectId, reporterMemberId };
       await manager.save(ActivityLog, manager.create(ActivityLog, { orgId, actorType: 'member', actorMemberId: reporterMemberId, projectId, issueId: issue.id, eventType: EVENT_TYPES.ISSUE_CREATED, payloadJson: payload }));
