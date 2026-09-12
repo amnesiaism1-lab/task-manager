@@ -283,6 +283,12 @@ Dữ liệu đo lường trực tiếp từ `scratch/api_176_benchmark_results.j
 ### 9.4. Bảng Kiểm Toán Tuân Thủ Bảo Mật & Hàng Đợi Sự Kiện Outbox
 ![Admin Audit & Outbox](file:///c:/Users/Admin/OneDrive/Desktop/Jira/docs/screenshots/admin_audit_outbox.png)
 
+### 9.5. Nút Thao Tác Chuyển Trạng Thái Nhanh 1-Click (Action Pills) Trên Modal Chi Tiết Issue
+![Modal Start Work Button](file:///c:/Users/Admin/OneDrive/Desktop/Jira/docs/screenshots/modal_start_work_button.png)
+
+### 9.6. Cập Nhật Bảng Kanban Ngay Lập Tức Khi Chuyển Trạng Thái Thành Công
+![Board Quick Transition Success](file:///c:/Users/Admin/OneDrive/Desktop/Jira/docs/screenshots/board_quick_transition_success.png)
+
 ---
 
 ## 10. Biên Bản Nghiệm Thu & Xác Nhận Sản Xuất (Production Readiness Sign-Off)
