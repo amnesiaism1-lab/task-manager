@@ -524,6 +524,116 @@ export function bindAdminEvents(ctx = {}) {
     });
   });
 
+  // Create Org Role Modal Trigger
+  document.querySelector('#btn-create-org-role')?.addEventListener('click', () => {
+    openModal({
+      title: 'Create Organization Role',
+      subtitle: 'ACCESS CONTROL & RBAC',
+      size: 'small',
+      contentHtml: `
+        <form id="form-create-org-role" class="space-y-4">
+          <div>
+            <label class="block text-xs font-semibold text-text-muted uppercase tracking-wider mb-1.5">Role Name</label>
+            <input name="name" class="w-full px-3 py-2 bg-surface-hover/50 border border-border-default rounded-md text-sm text-text-primary focus:outline-none focus:border-brand-primary" placeholder="e.g. Lead Engineer, Release Manager" required />
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-text-muted uppercase tracking-wider mb-1.5">Role Key</label>
+            <input name="key" class="w-full px-3 py-2 bg-surface-hover/50 border border-border-default rounded-md text-sm text-text-primary font-mono focus:outline-none focus:border-brand-primary" placeholder="lead_engineer" required />
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-text-muted uppercase tracking-wider mb-1.5">Description (Optional)</label>
+            <textarea name="description" class="w-full px-3 py-2 bg-surface-hover/50 border border-border-default rounded-md text-sm text-text-primary focus:outline-none focus:border-brand-primary" rows="2" placeholder="Responsibilities and scope..."></textarea>
+          </div>
+          <div class="flex items-center justify-end gap-3 pt-3 border-t border-border-default">
+            <button type="button" class="button ghost btn-modal-cancel">Cancel</button>
+            <button type="submit" class="button primary">Create Role</button>
+          </div>
+        </form>
+      `,
+    });
+    document.querySelector('.btn-modal-cancel')?.addEventListener('click', closeModal);
+    document.querySelector('#form-create-org-role')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const body = Object.fromEntries(new FormData(e.target));
+      body.key = body.key?.trim().toLowerCase().replace(/\s+/g, '_');
+      const { org } = store.getState();
+      try {
+        store.setState({ loading: true });
+        await request(`/organizations/${org}/roles`, { method: 'POST', body: JSON.stringify(body) });
+        closeModal();
+        showToast(`Role "${body.name}" created successfully`, 'success');
+        await reload();
+      } catch (err) {
+        showToast(err.message, 'error');
+      } finally {
+        store.setState({ loading: false });
+      }
+    });
+  });
+
+  // Update Project Settings
+  document.querySelector('#form-update-project')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const formData = new FormData(e.target);
+    const body = Object.fromEntries(formData);
+    const { org, selectedProjectId } = store.getState();
+    try {
+      store.setState({ loading: true });
+      await request(`/organizations/${org}/projects/${selectedProjectId}`, {
+        method: 'PATCH',
+        body: JSON.stringify(body),
+      });
+      showToast('Project settings updated', 'success');
+      await reload();
+    } catch (err) {
+      showToast(err.message, 'error');
+    } finally {
+      store.setState({ loading: false });
+    }
+  });
+
+  // Toggle Project Archive
+  document.querySelector('#btn-toggle-project-archive')?.addEventListener('click', async () => {
+    const { org, selectedProjectId, projectDetail } = store.getState();
+    const isArchived = !!projectDetail?.archivedAt;
+    const action = isArchived ? 'restore' : 'archive';
+    if (!confirm(`Are you sure you want to ${action} this project?`)) return;
+    try {
+      store.setState({ loading: true });
+      await request(`/organizations/${org}/projects/${selectedProjectId}/${action}`, {
+        method: 'PATCH',
+      });
+      showToast(`Project ${action}d successfully`, 'success');
+      await loadProjects();
+      await reload();
+    } catch (err) {
+      showToast(err.message, 'error');
+    } finally {
+      store.setState({ loading: false });
+    }
+  });
+
+  // Archive Component
+  document.querySelectorAll('.btn-archive-component').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const componentId = btn.dataset.componentId;
+      const { org, selectedProjectId } = store.getState();
+      if (!confirm('Are you sure you want to archive this component?')) return;
+      try {
+        store.setState({ loading: true });
+        await request(`/organizations/${org}/projects/${selectedProjectId}/components/${componentId}/archive`, {
+          method: 'PATCH',
+        });
+        showToast('Component archived', 'info');
+        await reload();
+      } catch (err) {
+        showToast(err.message, 'error');
+      } finally {
+        store.setState({ loading: false });
+      }
+    });
+  });
+
   // UC-ORG-10: Resend Invitation
   document.querySelectorAll('.btn-resend-invitation').forEach(btn => {
     btn.addEventListener('click', async () => {
