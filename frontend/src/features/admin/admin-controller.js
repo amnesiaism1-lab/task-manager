@@ -11,7 +11,20 @@ export async function loadAdminData(request = appRequest, store = appStore) {
 
   try {
     store.setState({ loading: true });
-    const [organization, members, invitations, departments, groups, orgRoles, customFields] = await Promise.all([
+    const [
+      organization,
+      members,
+      invitations,
+      departments,
+      groups,
+      orgRoles,
+      customFields,
+      workflows,
+      issueTypes,
+      linkTypes,
+      labels,
+      auditRes,
+    ] = await Promise.all([
       request(`/organizations/${org}`).catch(() => null),
       request(`/organizations/${org}/members`).catch(() => []),
       request(`/organizations/${org}/invitations`).catch(() => []),
@@ -19,6 +32,11 @@ export async function loadAdminData(request = appRequest, store = appStore) {
       request(`/organizations/${org}/groups`).catch(() => []),
       request(`/organizations/${org}/roles`).catch(() => []),
       request(`/organizations/${org}/custom-fields`).catch(() => []),
+      request(`/organizations/${org}/workflows`).catch(() => []),
+      request(`/organizations/${org}/catalog/issue-types`).catch(() => []),
+      request(`/organizations/${org}/catalog/link-types`).catch(() => []),
+      request(`/organizations/${org}/catalog/labels`).catch(() => []),
+      request(`/organizations/${org}/audit?limit=25`).catch(() => ({ items: [] })),
     ]);
 
     let projectDetail = null;
@@ -61,6 +79,11 @@ export async function loadAdminData(request = appRequest, store = appStore) {
       }
     }
 
+    let selectedWorkflowDetail = store.getState().selectedWorkflowDetail;
+    if (!selectedWorkflowDetail && Array.isArray(workflows) && workflows.length > 0) {
+      selectedWorkflowDetail = await request(`/organizations/${org}/workflows/${workflows[0].id}`).catch(() => null);
+    }
+
     store.setState({
       organization: organization || store.getState().organization,
       members,
@@ -78,6 +101,12 @@ export async function loadAdminData(request = appRequest, store = appStore) {
       systemOrgs,
       mailOutbox,
       customFields: customFields || [],
+      workflows: workflows || [],
+      issueTypes: issueTypes || [],
+      linkTypes: linkTypes || [],
+      labels: labels || [],
+      auditLogs: auditRes?.items || [],
+      selectedWorkflowDetail,
       loading: false,
     });
   } catch (err) {
@@ -860,6 +889,319 @@ export function bindAdminEvents(ctx = {}) {
       const mailOutbox = await request('/admin/mail/outbox').catch(() => []);
       store.setState({ mailOutbox, loading: false });
       showToast(`Outbox refreshed (${mailOutbox.length} entries)`, 'info');
+    } catch (err) {
+      store.setState({ loading: false });
+      showToast(err.message, 'error');
+    }
+  });
+
+  // ─── Workflows & FSM Event Handlers ────────────────────────────────────────
+
+  // Create Workflow Modal Trigger
+  document.querySelector('#btn-admin-create-workflow')?.addEventListener('click', () => {
+    openModal({
+      title: 'Create Workflow Scheme',
+      subtitle: 'FINITE STATE MACHINE DEFINITION',
+      size: 'medium',
+      contentHtml: `
+        <form id="form-create-workflow" class="space-y-4">
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-semibold text-text-muted uppercase tracking-wider mb-1.5">Workflow Name</label>
+              <input name="name" class="w-full px-3 py-2 bg-surface-hover/50 border border-border-default rounded-md text-sm text-text-primary focus:outline-none focus:border-brand-primary" placeholder="e.g. Bug Triage Workflow, Epic Lifecycle" required />
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-text-muted uppercase tracking-wider mb-1.5">Workflow Key</label>
+              <input name="key" class="w-full px-3 py-2 bg-surface-hover/50 border border-border-default rounded-md text-sm text-text-primary focus:outline-none focus:border-brand-primary font-mono" placeholder="bug_triage_v1" required />
+            </div>
+          </div>
+          <div class="flex items-center justify-end gap-3 pt-3 border-t border-border-default">
+            <button type="button" class="button ghost btn-modal-cancel">Cancel</button>
+            <button type="submit" class="button primary">Create Workflow</button>
+          </div>
+        </form>
+      `,
+    });
+
+    document.querySelector('.btn-modal-cancel')?.addEventListener('click', closeModal);
+    document.querySelector('#form-create-workflow')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const formData = new FormData(e.target);
+      const name = formData.get('name')?.toString().trim();
+      const key = formData.get('key')?.toString().trim().toLowerCase().replace(/\s+/g, '_');
+      const { org } = store.getState();
+
+      try {
+        store.setState({ loading: true });
+        await request(`/organizations/${org}/workflows`, {
+          method: 'POST',
+          body: JSON.stringify({ key, name }),
+        });
+        closeModal();
+        showToast(`Workflow "${name}" created successfully!`, 'success');
+        await reload();
+      } catch (err) {
+        showToast(err.message, 'error');
+      } finally {
+        store.setState({ loading: false });
+      }
+    });
+  });
+
+  // Add Transition Guard Modal Trigger
+  document.querySelector('#btn-admin-add-guard')?.addEventListener('click', () => {
+    const { selectedWorkflowDetail } = store.getState();
+    const transitions = selectedWorkflowDetail?.transitions || [];
+
+    openModal({
+      title: 'Add Transition Guard',
+      subtitle: 'FSM VALIDATION & PREREQUISITE RULE',
+      size: 'medium',
+      contentHtml: `
+        <form id="form-create-guard" class="space-y-4">
+          <div>
+            <label class="block text-xs font-semibold text-text-muted uppercase tracking-wider mb-1.5">Target Transition</label>
+            ${transitions.length ? `
+              <select name="transitionId" class="w-full px-3 py-2 bg-surface-hover/50 border border-border-default rounded-md text-sm text-text-primary focus:outline-none focus:border-brand-primary" required>
+                ${transitions.map(t => `<option value="${t.id}">${escapeHtml(t.name || 'Transition')} (${t.id.slice(0, 8)})</option>`).join('')}
+              </select>
+            ` : `
+              <input name="transitionId" class="w-full px-3 py-2 bg-surface-hover/50 border border-border-default rounded-md text-sm text-text-primary font-mono" placeholder="Transition UUID" required />
+            `}
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-text-muted uppercase tracking-wider mb-1.5">Guard Type</label>
+            <select name="guardType" class="w-full px-3 py-2 bg-surface-hover/50 border border-border-default rounded-md text-sm text-text-primary focus:outline-none focus:border-brand-primary" required>
+              <option value="requires_fields">Requires Fields (e.g. resolution on Done)</option>
+              <option value="json_logic">JSON Logic Expression</option>
+              <option value="dsl">DSL Expression</option>
+              <option value="custom">Custom Policy</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-text-muted uppercase tracking-wider mb-1.5">Configuration JSON</label>
+            <textarea name="configJson" class="w-full px-3 py-2 bg-surface-hover/50 border border-border-default rounded-md text-sm font-mono text-text-primary focus:outline-none focus:border-brand-primary" rows="4" placeholder='{"requiredFields": ["resolution"]}' required>{"requiredFields": ["resolution"]}</textarea>
+          </div>
+          <div class="flex items-center justify-end gap-3 pt-3 border-t border-border-default">
+            <button type="button" class="button ghost btn-modal-cancel">Cancel</button>
+            <button type="submit" class="button primary">Add Guard Rule</button>
+          </div>
+        </form>
+      `,
+    });
+
+    document.querySelector('.btn-modal-cancel')?.addEventListener('click', closeModal);
+    document.querySelector('#form-create-guard')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const formData = new FormData(e.target);
+      const transitionId = formData.get('transitionId')?.toString().trim();
+      const guardType = formData.get('guardType')?.toString().trim();
+      let configJson;
+      try {
+        configJson = JSON.parse(formData.get('configJson')?.toString() || '{}');
+      } catch {
+        showToast('Configuration must be valid JSON', 'error');
+        return;
+      }
+
+      const { org } = store.getState();
+      try {
+        store.setState({ loading: true });
+        await request(`/organizations/${org}/workflows/guards`, {
+          method: 'POST',
+          body: JSON.stringify({ transitionId, guardType, configJson }),
+        });
+        closeModal();
+        showToast('Transition guard added successfully!', 'success');
+        await reload();
+      } catch (err) {
+        showToast(err.message, 'error');
+      } finally {
+        store.setState({ loading: false });
+      }
+    });
+  });
+
+  // Inspect FSM Workflow Detail
+  document.querySelectorAll('.btn-view-workflow-detail').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const wfId = btn.dataset.workflowId;
+      const { org } = store.getState();
+      try {
+        store.setState({ loading: true });
+        const detail = await request(`/organizations/${org}/workflows/${wfId}`);
+        store.setState({ selectedWorkflowDetail: detail, loading: false });
+        showToast(`Loaded details for workflow "${detail?.workflow?.name || wfId}"`, 'info');
+      } catch (err) {
+        store.setState({ loading: false });
+        showToast(err.message, 'error');
+      }
+    });
+  });
+
+  // ─── Issue Types & Catalog Event Handlers ─────────────────────────────────
+
+  // Add Issue Type Modal
+  document.querySelector('#btn-admin-add-issue-type')?.addEventListener('click', () => {
+    openModal({
+      title: 'Add Issue Type',
+      subtitle: 'ORGANIZATIONAL WORK CLASSIFICATION',
+      size: 'small',
+      contentHtml: `
+        <form id="form-create-issue-type" class="space-y-4">
+          <div>
+            <label class="block text-xs font-semibold text-text-muted uppercase tracking-wider mb-1.5">Issue Type Name</label>
+            <input name="name" class="w-full px-3 py-2 bg-surface-hover/50 border border-border-default rounded-md text-sm text-text-primary focus:outline-none focus:border-brand-primary" placeholder="e.g. Investigation, Improvement" required />
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-text-muted uppercase tracking-wider mb-1.5">Type Key</label>
+            <input name="key" class="w-full px-3 py-2 bg-surface-hover/50 border border-border-default rounded-md text-sm text-text-primary focus:outline-none focus:border-brand-primary font-mono" placeholder="investigation" required />
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-text-muted uppercase tracking-wider mb-1.5">Description (Optional)</label>
+            <textarea name="description" class="w-full px-3 py-2 bg-surface-hover/50 border border-border-default rounded-md text-sm text-text-primary focus:outline-none focus:border-brand-primary" rows="2" placeholder="Classification purpose and usage..."></textarea>
+          </div>
+          <div class="flex items-center justify-end gap-3 pt-3 border-t border-border-default">
+            <button type="button" class="button ghost btn-modal-cancel">Cancel</button>
+            <button type="submit" class="button primary">Create Issue Type</button>
+          </div>
+        </form>
+      `,
+    });
+
+    document.querySelector('.btn-modal-cancel')?.addEventListener('click', closeModal);
+    document.querySelector('#form-create-issue-type')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const body = Object.fromEntries(new FormData(e.target));
+      body.key = body.key?.trim().toLowerCase().replace(/\s+/g, '_');
+      const { org } = store.getState();
+      try {
+        store.setState({ loading: true });
+        await request(`/organizations/${org}/catalog/issue-types`, {
+          method: 'POST',
+          body: JSON.stringify(body),
+        });
+        closeModal();
+        showToast(`Issue type "${body.name}" created!`, 'success');
+        await reload();
+      } catch (err) {
+        showToast(err.message, 'error');
+      } finally {
+        store.setState({ loading: false });
+      }
+    });
+  });
+
+  // Add Link Type Modal
+  document.querySelector('#btn-admin-add-link-type')?.addEventListener('click', () => {
+    openModal({
+      title: 'Add Link Type',
+      subtitle: 'GRAPH DEPENDENCY RELATIONSHIP',
+      size: 'medium',
+      contentHtml: `
+        <form id="form-create-link-type" class="space-y-4">
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-semibold text-text-muted uppercase tracking-wider mb-1.5">Link Key</label>
+              <input name="key" class="w-full px-3 py-2 bg-surface-hover/50 border border-border-default rounded-md text-sm text-text-primary font-mono focus:outline-none focus:border-brand-primary" placeholder="e.g. causes, depends_on" required />
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-text-muted uppercase tracking-wider mb-1.5">Directionality</label>
+              <select name="directionality" class="w-full px-3 py-2 bg-surface-hover/50 border border-border-default rounded-md text-sm text-text-primary focus:outline-none focus:border-brand-primary">
+                <option value="directed">Directed (A causes B)</option>
+                <option value="symmetric">Symmetric (A relates to B)</option>
+              </select>
+            </div>
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-semibold text-text-muted uppercase tracking-wider mb-1.5">Outward Description</label>
+              <input name="outwardLabel" class="w-full px-3 py-2 bg-surface-hover/50 border border-border-default rounded-md text-sm text-text-primary focus:outline-none focus:border-brand-primary" placeholder="e.g. causes" required />
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-text-muted uppercase tracking-wider mb-1.5">Inward Description</label>
+              <input name="inwardLabel" class="w-full px-3 py-2 bg-surface-hover/50 border border-border-default rounded-md text-sm text-text-primary focus:outline-none focus:border-brand-primary" placeholder="e.g. is caused by" required />
+            </div>
+          </div>
+          <div class="flex items-center justify-end gap-3 pt-3 border-t border-border-default">
+            <button type="button" class="button ghost btn-modal-cancel">Cancel</button>
+            <button type="submit" class="button primary">Create Link Type</button>
+          </div>
+        </form>
+      `,
+    });
+
+    document.querySelector('.btn-modal-cancel')?.addEventListener('click', closeModal);
+    document.querySelector('#form-create-link-type')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const body = Object.fromEntries(new FormData(e.target));
+      body.key = body.key?.trim().toLowerCase().replace(/\s+/g, '_');
+      const { org } = store.getState();
+      try {
+        store.setState({ loading: true });
+        await request(`/organizations/${org}/catalog/link-types`, {
+          method: 'POST',
+          body: JSON.stringify(body),
+        });
+        closeModal();
+        showToast(`Link type "${body.key}" added!`, 'success');
+        await reload();
+      } catch (err) {
+        showToast(err.message, 'error');
+      } finally {
+        store.setState({ loading: false });
+      }
+    });
+  });
+
+  // Archive Link Type
+  document.querySelectorAll('.btn-archive-link-type').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const linkTypeId = btn.dataset.linkTypeId;
+      const { org } = store.getState();
+      if (!confirm('Archive this link type? Existing issue links will remain archived.')) return;
+      try {
+        store.setState({ loading: true });
+        await request(`/organizations/${org}/catalog/link-types/${linkTypeId}`, { method: 'DELETE' });
+        showToast('Link type archived', 'info');
+        await reload();
+      } catch (err) {
+        showToast(err.message, 'error');
+      } finally {
+        store.setState({ loading: false });
+      }
+    });
+  });
+
+  // Archive Label
+  document.querySelectorAll('.btn-archive-label').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const labelId = btn.dataset.labelId;
+      const { org } = store.getState();
+      try {
+        store.setState({ loading: true });
+        await request(`/organizations/${org}/catalog/labels/${labelId}`, { method: 'DELETE' });
+        showToast('Label archived from catalog', 'info');
+        await reload();
+      } catch (err) {
+        showToast(err.message, 'error');
+      } finally {
+        store.setState({ loading: false });
+      }
+    });
+  });
+
+  // ─── Audit & Outbox Event Handlers ─────────────────────────────────────────
+
+  // Refresh Audit Trail
+  document.querySelector('#btn-admin-refresh-audit')?.addEventListener('click', async () => {
+    const { org } = store.getState();
+    try {
+      store.setState({ loading: true });
+      const auditRes = await request(`/organizations/${org}/audit?limit=25`).catch(() => ({ items: [] }));
+      const mailOutbox = await request('/admin/mail/outbox').catch(() => []);
+      store.setState({ auditLogs: auditRes?.items || [], mailOutbox, loading: false });
+      showToast(`Audit trail refreshed (${(auditRes?.items || []).length} records)`, 'info');
     } catch (err) {
       store.setState({ loading: false });
       showToast(err.message, 'error');

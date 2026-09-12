@@ -1,0 +1,1410 @@
+[
+  {
+    "file": "app.controller.ts",
+    "httpMethod": "GET",
+    "basePath": "",
+    "subPath": "",
+    "fullPath": "/api",
+    "handler": "getHello"
+  },
+  {
+    "file": "admin.controller.ts",
+    "httpMethod": "GET",
+    "basePath": "admin",
+    "subPath": "users",
+    "fullPath": "/api/admin/users",
+    "handler": "listUsers"
+  },
+  {
+    "file": "admin.controller.ts",
+    "httpMethod": "POST",
+    "basePath": "admin",
+    "subPath": "users",
+    "fullPath": "/api/admin/users",
+    "handler": "createUser"
+  },
+  {
+    "file": "admin.controller.ts",
+    "httpMethod": "GET",
+    "basePath": "admin",
+    "subPath": "users/:userId",
+    "fullPath": "/api/admin/users/:userId",
+    "handler": "getUser"
+  },
+  {
+    "file": "admin.controller.ts",
+    "httpMethod": "PATCH",
+    "basePath": "admin",
+    "subPath": "users/:userId",
+    "fullPath": "/api/admin/users/:userId",
+    "handler": "updateUser"
+  },
+  {
+    "file": "admin.controller.ts",
+    "httpMethod": "DELETE",
+    "basePath": "admin",
+    "subPath": "users/:userId",
+    "fullPath": "/api/admin/users/:userId",
+    "handler": "deleteUser"
+  },
+  {
+    "file": "admin.controller.ts",
+    "httpMethod": "PATCH",
+    "basePath": "admin",
+    "subPath": "users/:userId/status",
+    "fullPath": "/api/admin/users/:userId/status",
+    "handler": "updateUserStatus"
+  },
+  {
+    "file": "admin.controller.ts",
+    "httpMethod": "DELETE",
+    "basePath": "admin",
+    "subPath": "users/:userId/sessions",
+    "fullPath": "/api/admin/users/:userId/sessions",
+    "handler": "forceRevokeAllSessions"
+  },
+  {
+    "file": "admin.controller.ts",
+    "httpMethod": "GET",
+    "basePath": "admin",
+    "subPath": "organizations",
+    "fullPath": "/api/admin/organizations",
+    "handler": "listOrganizations"
+  },
+  {
+    "file": "admin.controller.ts",
+    "httpMethod": "GET",
+    "basePath": "admin",
+    "subPath": "organizations/:orgId",
+    "fullPath": "/api/admin/organizations/:orgId",
+    "handler": "getOrganization"
+  },
+  {
+    "file": "admin.controller.ts",
+    "httpMethod": "PATCH",
+    "basePath": "admin",
+    "subPath": "organizations/:orgId",
+    "fullPath": "/api/admin/organizations/:orgId",
+    "handler": "updateOrganization"
+  },
+  {
+    "file": "admin.controller.ts",
+    "httpMethod": "POST",
+    "basePath": "admin",
+    "subPath": "mail/test",
+    "fullPath": "/api/admin/mail/test",
+    "handler": "sendTestMail"
+  },
+  {
+    "file": "admin.controller.ts",
+    "httpMethod": "GET",
+    "basePath": "admin",
+    "subPath": "mail/outbox",
+    "fullPath": "/api/admin/mail/outbox",
+    "handler": "getMailOutbox"
+  },
+  {
+    "file": "audit.controller.ts",
+    "httpMethod": "GET",
+    "basePath": "organizations/:orgId/audit",
+    "subPath": "",
+    "fullPath": "/api/organizations/:orgId/audit",
+    "handler": "handler"
+  },
+  {
+    "file": "api-token.controller.ts",
+    "httpMethod": "GET",
+    "basePath": "organizations/:orgId/api-tokens",
+    "subPath": "",
+    "fullPath": "/api/organizations/:orgId/api-tokens",
+    "handler": "handler"
+  },
+  {
+    "file": "api-token.controller.ts",
+    "httpMethod": "POST",
+    "basePath": "organizations/:orgId/api-tokens",
+    "subPath": "",
+    "fullPath": "/api/organizations/:orgId/api-tokens",
+    "handler": "handler"
+  },
+  {
+    "file": "api-token.controller.ts",
+    "httpMethod": "DELETE",
+    "basePath": "organizations/:orgId/api-tokens",
+    "subPath": ":tokenId",
+    "fullPath": "/api/organizations/:orgId/api-tokens/:tokenId",
+    "handler": "handler"
+  },
+  {
+    "file": "auth.controller.ts",
+    "httpMethod": "POST",
+    "basePath": "auth",
+    "subPath": "register",
+    "fullPath": "/api/auth/register",
+    "handler": "Throttle"
+  },
+  {
+    "file": "auth.controller.ts",
+    "httpMethod": "POST",
+    "basePath": "auth",
+    "subPath": "google",
+    "fullPath": "/api/auth/google",
+    "handler": "googleLogin"
+  },
+  {
+    "file": "auth.controller.ts",
+    "httpMethod": "POST",
+    "basePath": "auth",
+    "subPath": "login",
+    "fullPath": "/api/auth/login",
+    "handler": "login"
+  },
+  {
+    "file": "auth.controller.ts",
+    "httpMethod": "POST",
+    "basePath": "auth",
+    "subPath": "refresh",
+    "fullPath": "/api/auth/refresh",
+    "handler": "refresh"
+  },
+  {
+    "file": "auth.controller.ts",
+    "httpMethod": "POST",
+    "basePath": "auth",
+    "subPath": "logout",
+    "fullPath": "/api/auth/logout",
+    "handler": "handler"
+  },
+  {
+    "file": "auth.controller.ts",
+    "httpMethod": "POST",
+    "basePath": "auth",
+    "subPath": "logout-all",
+    "fullPath": "/api/auth/logout-all",
+    "handler": "handler"
+  },
+  {
+    "file": "auth.controller.ts",
+    "httpMethod": "GET",
+    "basePath": "auth",
+    "subPath": "me",
+    "fullPath": "/api/auth/me",
+    "handler": "handler"
+  },
+  {
+    "file": "auth.controller.ts",
+    "httpMethod": "PATCH",
+    "basePath": "auth",
+    "subPath": "me",
+    "fullPath": "/api/auth/me",
+    "handler": "handler"
+  },
+  {
+    "file": "auth.controller.ts",
+    "httpMethod": "POST",
+    "basePath": "auth",
+    "subPath": "verify-email",
+    "fullPath": "/api/auth/verify-email",
+    "handler": "Throttle"
+  },
+  {
+    "file": "auth.controller.ts",
+    "httpMethod": "POST",
+    "basePath": "auth",
+    "subPath": "request-verification",
+    "fullPath": "/api/auth/request-verification",
+    "handler": "handler"
+  },
+  {
+    "file": "auth.controller.ts",
+    "httpMethod": "POST",
+    "basePath": "auth",
+    "subPath": "forgot-password",
+    "fullPath": "/api/auth/forgot-password",
+    "handler": "handler"
+  },
+  {
+    "file": "auth.controller.ts",
+    "httpMethod": "POST",
+    "basePath": "auth",
+    "subPath": "reset-password",
+    "fullPath": "/api/auth/reset-password",
+    "handler": "handler"
+  },
+  {
+    "file": "auth.controller.ts",
+    "httpMethod": "POST",
+    "basePath": "auth",
+    "subPath": "change-password",
+    "fullPath": "/api/auth/change-password",
+    "handler": "handler"
+  },
+  {
+    "file": "auth.controller.ts",
+    "httpMethod": "GET",
+    "basePath": "auth",
+    "subPath": "sessions",
+    "fullPath": "/api/auth/sessions",
+    "handler": "session"
+  },
+  {
+    "file": "auth.controller.ts",
+    "httpMethod": "DELETE",
+    "basePath": "auth",
+    "subPath": "sessions/:sessionId",
+    "fullPath": "/api/auth/sessions/:sessionId",
+    "handler": "revokeSession"
+  },
+  {
+    "file": "auth.controller.ts",
+    "httpMethod": "POST",
+    "basePath": "auth",
+    "subPath": "me/deactivate",
+    "fullPath": "/api/auth/me/deactivate",
+    "handler": "Throttle"
+  },
+  {
+    "file": "auth.controller.ts",
+    "httpMethod": "POST",
+    "basePath": "auth",
+    "subPath": "reactivate",
+    "fullPath": "/api/auth/reactivate",
+    "handler": "handler"
+  },
+  {
+    "file": "automation.controller.ts",
+    "httpMethod": "GET",
+    "basePath": "organizations/:orgId/automation-rules",
+    "subPath": "",
+    "fullPath": "/api/organizations/:orgId/automation-rules",
+    "handler": "handler"
+  },
+  {
+    "file": "automation.controller.ts",
+    "httpMethod": "POST",
+    "basePath": "organizations/:orgId/automation-rules",
+    "subPath": "",
+    "fullPath": "/api/organizations/:orgId/automation-rules",
+    "handler": "handler"
+  },
+  {
+    "file": "automation.controller.ts",
+    "httpMethod": "POST",
+    "basePath": "organizations/:orgId/automation-rules",
+    "subPath": ":ruleId/activate",
+    "fullPath": "/api/organizations/:orgId/automation-rules/:ruleId/activate",
+    "handler": "handler"
+  },
+  {
+    "file": "automation.controller.ts",
+    "httpMethod": "POST",
+    "basePath": "organizations/:orgId/automation-rules",
+    "subPath": ":ruleId/execute",
+    "fullPath": "/api/organizations/:orgId/automation-rules/:ruleId/execute",
+    "handler": "handler"
+  },
+  {
+    "file": "board.controller.ts",
+    "httpMethod": "GET",
+    "basePath": "organizations/:orgId/projects/:projectId/boards",
+    "subPath": "",
+    "fullPath": "/api/organizations/:orgId/projects/:projectId/boards",
+    "handler": "handler"
+  },
+  {
+    "file": "board.controller.ts",
+    "httpMethod": "POST",
+    "basePath": "organizations/:orgId/projects/:projectId/boards",
+    "subPath": "",
+    "fullPath": "/api/organizations/:orgId/projects/:projectId/boards",
+    "handler": "createBoard"
+  },
+  {
+    "file": "board.controller.ts",
+    "httpMethod": "POST",
+    "basePath": "organizations/:orgId/projects/:projectId/boards",
+    "subPath": ":boardId/columns",
+    "fullPath": "/api/organizations/:orgId/projects/:projectId/boards/:boardId/columns",
+    "handler": "addColumn"
+  },
+  {
+    "file": "board.controller.ts",
+    "httpMethod": "PATCH",
+    "basePath": "organizations/:orgId/projects/:projectId/boards",
+    "subPath": ":boardId/columns/:columnId",
+    "fullPath": "/api/organizations/:orgId/projects/:projectId/boards/:boardId/columns/:columnId",
+    "handler": "updateColumn"
+  },
+  {
+    "file": "board.controller.ts",
+    "httpMethod": "PATCH",
+    "basePath": "organizations/:orgId/projects/:projectId/boards",
+    "subPath": ":boardId/columns/:columnId/states",
+    "fullPath": "/api/organizations/:orgId/projects/:projectId/boards/:boardId/columns/:columnId/states",
+    "handler": "mapStates"
+  },
+  {
+    "file": "board.controller.ts",
+    "httpMethod": "POST",
+    "basePath": "organizations/:orgId/projects/:projectId/boards",
+    "subPath": ":boardId/issues/reorder",
+    "fullPath": "/api/organizations/:orgId/projects/:projectId/boards/:boardId/issues/reorder",
+    "handler": "handler"
+  },
+  {
+    "file": "board.controller.ts",
+    "httpMethod": "GET",
+    "basePath": "organizations/:orgId/projects/:projectId/boards",
+    "subPath": ":boardId",
+    "fullPath": "/api/organizations/:orgId/projects/:projectId/boards/:boardId",
+    "handler": "handler"
+  },
+  {
+    "file": "board.controller.ts",
+    "httpMethod": "GET",
+    "basePath": "organizations/:orgId/projects/:projectId/boards",
+    "subPath": ":boardId/issues",
+    "fullPath": "/api/organizations/:orgId/projects/:projectId/boards/:boardId/issues",
+    "handler": "handler"
+  },
+  {
+    "file": "catalog.controller.ts",
+    "httpMethod": "GET",
+    "basePath": "organizations/:orgId/catalog",
+    "subPath": "issue-types",
+    "fullPath": "/api/organizations/:orgId/catalog/issue-types",
+    "handler": "handler"
+  },
+  {
+    "file": "catalog.controller.ts",
+    "httpMethod": "POST",
+    "basePath": "organizations/:orgId/catalog",
+    "subPath": "issue-types",
+    "fullPath": "/api/organizations/:orgId/catalog/issue-types",
+    "handler": "handler"
+  },
+  {
+    "file": "catalog.controller.ts",
+    "httpMethod": "GET",
+    "basePath": "organizations/:orgId/catalog",
+    "subPath": "labels",
+    "fullPath": "/api/organizations/:orgId/catalog/labels",
+    "handler": "handler"
+  },
+  {
+    "file": "catalog.controller.ts",
+    "httpMethod": "DELETE",
+    "basePath": "organizations/:orgId/catalog",
+    "subPath": "labels/:labelId",
+    "fullPath": "/api/organizations/:orgId/catalog/labels/:labelId",
+    "handler": "handler"
+  },
+  {
+    "file": "catalog.controller.ts",
+    "httpMethod": "GET",
+    "basePath": "organizations/:orgId/catalog",
+    "subPath": "link-types",
+    "fullPath": "/api/organizations/:orgId/catalog/link-types",
+    "handler": "handler"
+  },
+  {
+    "file": "catalog.controller.ts",
+    "httpMethod": "POST",
+    "basePath": "organizations/:orgId/catalog",
+    "subPath": "link-types",
+    "fullPath": "/api/organizations/:orgId/catalog/link-types",
+    "handler": "handler"
+  },
+  {
+    "file": "catalog.controller.ts",
+    "httpMethod": "DELETE",
+    "basePath": "organizations/:orgId/catalog",
+    "subPath": "link-types/:linkTypeId",
+    "fullPath": "/api/organizations/:orgId/catalog/link-types/:linkTypeId",
+    "handler": "handler"
+  },
+  {
+    "file": "custom-field.controller.ts",
+    "httpMethod": "GET",
+    "basePath": "organizations/:orgId/custom-fields",
+    "subPath": "",
+    "fullPath": "/api/organizations/:orgId/custom-fields",
+    "handler": "handler"
+  },
+  {
+    "file": "custom-field.controller.ts",
+    "httpMethod": "POST",
+    "basePath": "organizations/:orgId/custom-fields",
+    "subPath": "",
+    "fullPath": "/api/organizations/:orgId/custom-fields",
+    "handler": "create"
+  },
+  {
+    "file": "custom-field.controller.ts",
+    "httpMethod": "POST",
+    "basePath": "organizations/:orgId/custom-fields",
+    "subPath": ":fieldId/contexts",
+    "fullPath": "/api/organizations/:orgId/custom-fields/:fieldId/contexts",
+    "handler": "context"
+  },
+  {
+    "file": "custom-field.controller.ts",
+    "httpMethod": "POST",
+    "basePath": "organizations/:orgId/custom-fields",
+    "subPath": ":fieldId/options",
+    "fullPath": "/api/organizations/:orgId/custom-fields/:fieldId/options",
+    "handler": "option"
+  },
+  {
+    "file": "custom-field.controller.ts",
+    "httpMethod": "POST",
+    "basePath": "organizations/:orgId/custom-fields",
+    "subPath": "issues/:issueId/value",
+    "fullPath": "/api/organizations/:orgId/custom-fields/issues/:issueId/value",
+    "handler": "setValue"
+  },
+  {
+    "file": "health.module.ts",
+    "httpMethod": "GET",
+    "basePath": "health",
+    "subPath": "",
+    "fullPath": "/api/health",
+    "handler": "getHealth"
+  },
+  {
+    "file": "attachment.controller.ts",
+    "httpMethod": "POST",
+    "basePath": "organizations/:orgId/issues/:issueId/attachments",
+    "subPath": "",
+    "fullPath": "/api/organizations/:orgId/issues/:issueId/attachments",
+    "handler": "UseInterceptors"
+  },
+  {
+    "file": "attachment.controller.ts",
+    "httpMethod": "GET",
+    "basePath": "organizations/:orgId/issues/:issueId/attachments",
+    "subPath": "",
+    "fullPath": "/api/organizations/:orgId/issues/:issueId/attachments",
+    "handler": "list"
+  },
+  {
+    "file": "attachment.controller.ts",
+    "httpMethod": "GET",
+    "basePath": "organizations/:orgId/issues/:issueId/attachments",
+    "subPath": ":attachmentId",
+    "fullPath": "/api/organizations/:orgId/issues/:issueId/attachments/:attachmentId",
+    "handler": "download"
+  },
+  {
+    "file": "attachment.controller.ts",
+    "httpMethod": "DELETE",
+    "basePath": "organizations/:orgId/issues/:issueId/attachments",
+    "subPath": ":attachmentId",
+    "fullPath": "/api/organizations/:orgId/issues/:issueId/attachments/:attachmentId",
+    "handler": "remove"
+  },
+  {
+    "file": "issue.controller.ts",
+    "httpMethod": "GET",
+    "basePath": "organizations/:orgId/issues/:issueId",
+    "subPath": "",
+    "fullPath": "/api/organizations/:orgId/issues/:issueId",
+    "handler": "handler"
+  },
+  {
+    "file": "issue.controller.ts",
+    "httpMethod": "PATCH",
+    "basePath": "organizations/:orgId/issues/:issueId",
+    "subPath": "",
+    "fullPath": "/api/organizations/:orgId/issues/:issueId",
+    "handler": "handler"
+  },
+  {
+    "file": "issue.controller.ts",
+    "httpMethod": "DELETE",
+    "basePath": "organizations/:orgId/issues/:issueId",
+    "subPath": "",
+    "fullPath": "/api/organizations/:orgId/issues/:issueId",
+    "handler": "handler"
+  },
+  {
+    "file": "issue.controller.ts",
+    "httpMethod": "POST",
+    "basePath": "organizations/:orgId/issues/:issueId",
+    "subPath": "transitions",
+    "fullPath": "/api/organizations/:orgId/issues/:issueId/transitions",
+    "handler": "handler"
+  },
+  {
+    "file": "issue.controller.ts",
+    "httpMethod": "GET",
+    "basePath": "organizations/:orgId/issues/:issueId",
+    "subPath": "transitions",
+    "fullPath": "/api/organizations/:orgId/issues/:issueId/transitions",
+    "handler": "handler"
+  },
+  {
+    "file": "issue.controller.ts",
+    "httpMethod": "GET",
+    "basePath": "organizations/:orgId/issues/:issueId",
+    "subPath": "labels",
+    "fullPath": "/api/organizations/:orgId/issues/:issueId/labels",
+    "handler": "handler"
+  },
+  {
+    "file": "issue.controller.ts",
+    "httpMethod": "GET",
+    "basePath": "organizations/:orgId/issues/:issueId",
+    "subPath": "watchers",
+    "fullPath": "/api/organizations/:orgId/issues/:issueId/watchers",
+    "handler": "handler"
+  },
+  {
+    "file": "issue.controller.ts",
+    "httpMethod": "GET",
+    "basePath": "organizations/:orgId/issues/:issueId",
+    "subPath": "links",
+    "fullPath": "/api/organizations/:orgId/issues/:issueId/links",
+    "handler": "handler"
+  },
+  {
+    "file": "issue.controller.ts",
+    "httpMethod": "GET",
+    "basePath": "organizations/:orgId/issues/:issueId",
+    "subPath": "history",
+    "fullPath": "/api/organizations/:orgId/issues/:issueId/history",
+    "handler": "handler"
+  },
+  {
+    "file": "issue.controller.ts",
+    "httpMethod": "POST",
+    "basePath": "organizations/:orgId/issues/:issueId",
+    "subPath": "comments",
+    "fullPath": "/api/organizations/:orgId/issues/:issueId/comments",
+    "handler": "handler"
+  },
+  {
+    "file": "issue.controller.ts",
+    "httpMethod": "GET",
+    "basePath": "organizations/:orgId/issues/:issueId",
+    "subPath": "comments",
+    "fullPath": "/api/organizations/:orgId/issues/:issueId/comments",
+    "handler": "handler"
+  },
+  {
+    "file": "issue.controller.ts",
+    "httpMethod": "DELETE",
+    "basePath": "organizations/:orgId/issues/:issueId",
+    "subPath": "comments/:commentId",
+    "fullPath": "/api/organizations/:orgId/issues/:issueId/comments/:commentId",
+    "handler": "handler"
+  },
+  {
+    "file": "issue.controller.ts",
+    "httpMethod": "POST",
+    "basePath": "organizations/:orgId/issues/:issueId",
+    "subPath": "work-logs",
+    "fullPath": "/api/organizations/:orgId/issues/:issueId/work-logs",
+    "handler": "handler"
+  },
+  {
+    "file": "issue.controller.ts",
+    "httpMethod": "GET",
+    "basePath": "organizations/:orgId/issues/:issueId",
+    "subPath": "work-logs",
+    "fullPath": "/api/organizations/:orgId/issues/:issueId/work-logs",
+    "handler": "handler"
+  },
+  {
+    "file": "issue.controller.ts",
+    "httpMethod": "POST",
+    "basePath": "organizations/:orgId/issues/:issueId",
+    "subPath": "labels",
+    "fullPath": "/api/organizations/:orgId/issues/:issueId/labels",
+    "handler": "handler"
+  },
+  {
+    "file": "issue.controller.ts",
+    "httpMethod": "POST",
+    "basePath": "organizations/:orgId/issues/:issueId",
+    "subPath": "watchers",
+    "fullPath": "/api/organizations/:orgId/issues/:issueId/watchers",
+    "handler": "handler"
+  },
+  {
+    "file": "issue.controller.ts",
+    "httpMethod": "POST",
+    "basePath": "organizations/:orgId/issues/:issueId",
+    "subPath": "links",
+    "fullPath": "/api/organizations/:orgId/issues/:issueId/links",
+    "handler": "handler"
+  },
+  {
+    "file": "job.controller.ts",
+    "httpMethod": "GET",
+    "basePath": "organizations/:orgId/jobs",
+    "subPath": "",
+    "fullPath": "/api/organizations/:orgId/jobs",
+    "handler": "handler"
+  },
+  {
+    "file": "job.controller.ts",
+    "httpMethod": "POST",
+    "basePath": "organizations/:orgId/jobs",
+    "subPath": "",
+    "fullPath": "/api/organizations/:orgId/jobs",
+    "handler": "handler"
+  },
+  {
+    "file": "job.controller.ts",
+    "httpMethod": "GET",
+    "basePath": "organizations/:orgId/jobs",
+    "subPath": ":jobId",
+    "fullPath": "/api/organizations/:orgId/jobs/:jobId",
+    "handler": "handler"
+  },
+  {
+    "file": "job.controller.ts",
+    "httpMethod": "DELETE",
+    "basePath": "organizations/:orgId/jobs",
+    "subPath": ":jobId",
+    "fullPath": "/api/organizations/:orgId/jobs/:jobId",
+    "handler": "handler"
+  },
+  {
+    "file": "notification.controller.ts",
+    "httpMethod": "GET",
+    "basePath": "organizations/:orgId/notifications",
+    "subPath": "",
+    "fullPath": "/api/organizations/:orgId/notifications",
+    "handler": "handler"
+  },
+  {
+    "file": "notification.controller.ts",
+    "httpMethod": "PATCH",
+    "basePath": "organizations/:orgId/notifications",
+    "subPath": ":notificationId/read",
+    "fullPath": "/api/organizations/:orgId/notifications/:notificationId/read",
+    "handler": "handler"
+  },
+  {
+    "file": "notification.controller.ts",
+    "httpMethod": "GET",
+    "basePath": "organizations/:orgId/notifications",
+    "subPath": "preferences",
+    "fullPath": "/api/organizations/:orgId/notifications/preferences",
+    "handler": "handler"
+  },
+  {
+    "file": "notification.controller.ts",
+    "httpMethod": "PUT",
+    "basePath": "organizations/:orgId/notifications",
+    "subPath": "preferences",
+    "fullPath": "/api/organizations/:orgId/notifications/preferences",
+    "handler": "handler"
+  },
+  {
+    "file": "organization.controller.ts",
+    "httpMethod": "POST",
+    "basePath": "organizations",
+    "subPath": "",
+    "fullPath": "/api/organizations",
+    "handler": "create"
+  },
+  {
+    "file": "organization.controller.ts",
+    "httpMethod": "GET",
+    "basePath": "organizations",
+    "subPath": "",
+    "fullPath": "/api/organizations",
+    "handler": "list"
+  },
+  {
+    "file": "organization.controller.ts",
+    "httpMethod": "GET",
+    "basePath": "organizations",
+    "subPath": "invitations/me",
+    "fullPath": "/api/organizations/invitations/me",
+    "handler": "myInvitations"
+  },
+  {
+    "file": "organization.controller.ts",
+    "httpMethod": "POST",
+    "basePath": "organizations",
+    "subPath": "invitations/accept",
+    "fullPath": "/api/organizations/invitations/accept",
+    "handler": "accept"
+  },
+  {
+    "file": "organization.controller.ts",
+    "httpMethod": "POST",
+    "basePath": "organizations",
+    "subPath": "invitations/decline",
+    "fullPath": "/api/organizations/invitations/decline",
+    "handler": "decline"
+  },
+  {
+    "file": "organization.controller.ts",
+    "httpMethod": "GET",
+    "basePath": "organizations",
+    "subPath": ":orgId",
+    "fullPath": "/api/organizations/:orgId",
+    "handler": "get"
+  },
+  {
+    "file": "organization.controller.ts",
+    "httpMethod": "PATCH",
+    "basePath": "organizations",
+    "subPath": ":orgId",
+    "fullPath": "/api/organizations/:orgId",
+    "handler": "update"
+  },
+  {
+    "file": "organization.controller.ts",
+    "httpMethod": "GET",
+    "basePath": "organizations",
+    "subPath": ":orgId/members",
+    "fullPath": "/api/organizations/:orgId/members",
+    "handler": "members"
+  },
+  {
+    "file": "organization.controller.ts",
+    "httpMethod": "GET",
+    "basePath": "organizations",
+    "subPath": ":orgId/roles",
+    "fullPath": "/api/organizations/:orgId/roles",
+    "handler": "roles"
+  },
+  {
+    "file": "organization.controller.ts",
+    "httpMethod": "GET",
+    "basePath": "organizations",
+    "subPath": ":orgId/invitations",
+    "fullPath": "/api/organizations/:orgId/invitations",
+    "handler": "invitations"
+  },
+  {
+    "file": "organization.controller.ts",
+    "httpMethod": "GET",
+    "basePath": "organizations",
+    "subPath": ":orgId/departments",
+    "fullPath": "/api/organizations/:orgId/departments",
+    "handler": "departments"
+  },
+  {
+    "file": "organization.controller.ts",
+    "httpMethod": "GET",
+    "basePath": "organizations",
+    "subPath": ":orgId/departments/:departmentId/members",
+    "fullPath": "/api/organizations/:orgId/departments/:departmentId/members",
+    "handler": "departmentMembers"
+  },
+  {
+    "file": "organization.controller.ts",
+    "httpMethod": "GET",
+    "basePath": "organizations",
+    "subPath": ":orgId/groups",
+    "fullPath": "/api/organizations/:orgId/groups",
+    "handler": "groups"
+  },
+  {
+    "file": "organization.controller.ts",
+    "httpMethod": "GET",
+    "basePath": "organizations",
+    "subPath": ":orgId/groups/:groupId/members",
+    "fullPath": "/api/organizations/:orgId/groups/:groupId/members",
+    "handler": "groupMembers"
+  },
+  {
+    "file": "organization.controller.ts",
+    "httpMethod": "POST",
+    "basePath": "organizations",
+    "subPath": ":orgId/invitations",
+    "fullPath": "/api/organizations/:orgId/invitations",
+    "handler": "invite"
+  },
+  {
+    "file": "organization.controller.ts",
+    "httpMethod": "DELETE",
+    "basePath": "organizations",
+    "subPath": ":orgId/invitations/:invitationId",
+    "fullPath": "/api/organizations/:orgId/invitations/:invitationId",
+    "handler": "revokeInvitation"
+  },
+  {
+    "file": "organization.controller.ts",
+    "httpMethod": "POST",
+    "basePath": "organizations",
+    "subPath": ":orgId/invitations/:invitationId/resend",
+    "fullPath": "/api/organizations/:orgId/invitations/:invitationId/resend",
+    "handler": "resendInvitation"
+  },
+  {
+    "file": "organization.controller.ts",
+    "httpMethod": "DELETE",
+    "basePath": "organizations",
+    "subPath": ":orgId/members/me",
+    "fullPath": "/api/organizations/:orgId/members/me",
+    "handler": "leaveOrganization"
+  },
+  {
+    "file": "organization.controller.ts",
+    "httpMethod": "PATCH",
+    "basePath": "organizations",
+    "subPath": ":orgId/members/:memberId/status",
+    "fullPath": "/api/organizations/:orgId/members/:memberId/status",
+    "handler": "updateStatus"
+  },
+  {
+    "file": "organization.controller.ts",
+    "httpMethod": "POST",
+    "basePath": "organizations",
+    "subPath": ":orgId/departments",
+    "fullPath": "/api/organizations/:orgId/departments",
+    "handler": "createDepartment"
+  },
+  {
+    "file": "organization.controller.ts",
+    "httpMethod": "POST",
+    "basePath": "organizations",
+    "subPath": ":orgId/departments/:departmentId/members",
+    "fullPath": "/api/organizations/:orgId/departments/:departmentId/members",
+    "handler": "addDepartmentMember"
+  },
+  {
+    "file": "organization.controller.ts",
+    "httpMethod": "PATCH",
+    "basePath": "organizations",
+    "subPath": ":orgId/departments/:departmentId",
+    "fullPath": "/api/organizations/:orgId/departments/:departmentId",
+    "handler": "updateDepartment"
+  },
+  {
+    "file": "organization.controller.ts",
+    "httpMethod": "DELETE",
+    "basePath": "organizations",
+    "subPath": ":orgId/departments/:departmentId/members/:memberId",
+    "fullPath": "/api/organizations/:orgId/departments/:departmentId/members/:memberId",
+    "handler": "removeDepartmentMember"
+  },
+  {
+    "file": "organization.controller.ts",
+    "httpMethod": "POST",
+    "basePath": "organizations",
+    "subPath": ":orgId/groups",
+    "fullPath": "/api/organizations/:orgId/groups",
+    "handler": "createGroup"
+  },
+  {
+    "file": "organization.controller.ts",
+    "httpMethod": "POST",
+    "basePath": "organizations",
+    "subPath": ":orgId/groups/:groupId/members",
+    "fullPath": "/api/organizations/:orgId/groups/:groupId/members",
+    "handler": "addGroupMember"
+  },
+  {
+    "file": "organization.controller.ts",
+    "httpMethod": "PATCH",
+    "basePath": "organizations",
+    "subPath": ":orgId/groups/:groupId",
+    "fullPath": "/api/organizations/:orgId/groups/:groupId",
+    "handler": "updateGroup"
+  },
+  {
+    "file": "organization.controller.ts",
+    "httpMethod": "DELETE",
+    "basePath": "organizations",
+    "subPath": ":orgId/groups/:groupId/members/:memberId",
+    "fullPath": "/api/organizations/:orgId/groups/:groupId/members/:memberId",
+    "handler": "removeGroupMember"
+  },
+  {
+    "file": "organization.controller.ts",
+    "httpMethod": "POST",
+    "basePath": "organizations",
+    "subPath": ":orgId/roles",
+    "fullPath": "/api/organizations/:orgId/roles",
+    "handler": "createRole"
+  },
+  {
+    "file": "organization.controller.ts",
+    "httpMethod": "POST",
+    "basePath": "organizations",
+    "subPath": ":orgId/roles/assign",
+    "fullPath": "/api/organizations/:orgId/roles/assign",
+    "handler": "assignRole"
+  },
+  {
+    "file": "organization.controller.ts",
+    "httpMethod": "POST",
+    "basePath": "organizations",
+    "subPath": ":orgId/roles/:roleId/permissions",
+    "fullPath": "/api/organizations/:orgId/roles/:roleId/permissions",
+    "handler": "setRolePermissions"
+  },
+  {
+    "file": "organization.controller.ts",
+    "httpMethod": "GET",
+    "basePath": "organizations",
+    "subPath": ":orgId/roles/:roleId/permissions",
+    "fullPath": "/api/organizations/:orgId/roles/:roleId/permissions",
+    "handler": "rolePermissions"
+  },
+  {
+    "file": "dashboard.controller.ts",
+    "httpMethod": "GET",
+    "basePath": "organizations/:orgId/dashboards",
+    "subPath": "",
+    "fullPath": "/api/organizations/:orgId/dashboards",
+    "handler": "handler"
+  },
+  {
+    "file": "dashboard.controller.ts",
+    "httpMethod": "POST",
+    "basePath": "organizations/:orgId/dashboards",
+    "subPath": "",
+    "fullPath": "/api/organizations/:orgId/dashboards",
+    "handler": "handler"
+  },
+  {
+    "file": "dashboard.controller.ts",
+    "httpMethod": "GET",
+    "basePath": "organizations/:orgId/dashboards",
+    "subPath": ":dashboardId/widgets",
+    "fullPath": "/api/organizations/:orgId/dashboards/:dashboardId/widgets",
+    "handler": "handler"
+  },
+  {
+    "file": "dashboard.controller.ts",
+    "httpMethod": "POST",
+    "basePath": "organizations/:orgId/dashboards",
+    "subPath": ":dashboardId/widgets",
+    "fullPath": "/api/organizations/:orgId/dashboards/:dashboardId/widgets",
+    "handler": "handler"
+  },
+  {
+    "file": "dashboard.controller.ts",
+    "httpMethod": "POST",
+    "basePath": "organizations/:orgId/dashboards",
+    "subPath": ":dashboardId/shares",
+    "fullPath": "/api/organizations/:orgId/dashboards/:dashboardId/shares",
+    "handler": "handler"
+  },
+  {
+    "file": "project.controller.ts",
+    "httpMethod": "POST",
+    "basePath": "organizations/:orgId/projects",
+    "subPath": "",
+    "fullPath": "/api/organizations/:orgId/projects",
+    "handler": "create"
+  },
+  {
+    "file": "project.controller.ts",
+    "httpMethod": "GET",
+    "basePath": "organizations/:orgId/projects",
+    "subPath": "",
+    "fullPath": "/api/organizations/:orgId/projects",
+    "handler": "handler"
+  },
+  {
+    "file": "project.controller.ts",
+    "httpMethod": "GET",
+    "basePath": "organizations/:orgId/projects",
+    "subPath": ":projectId",
+    "fullPath": "/api/organizations/:orgId/projects/:projectId",
+    "handler": "get"
+  },
+  {
+    "file": "project.controller.ts",
+    "httpMethod": "GET",
+    "basePath": "organizations/:orgId/projects",
+    "subPath": ":projectId/workflow",
+    "fullPath": "/api/organizations/:orgId/projects/:projectId/workflow",
+    "handler": "workflow"
+  },
+  {
+    "file": "project.controller.ts",
+    "httpMethod": "PATCH",
+    "basePath": "organizations/:orgId/projects",
+    "subPath": ":projectId/archive",
+    "fullPath": "/api/organizations/:orgId/projects/:projectId/archive",
+    "handler": "archive"
+  },
+  {
+    "file": "project.controller.ts",
+    "httpMethod": "PATCH",
+    "basePath": "organizations/:orgId/projects",
+    "subPath": ":projectId",
+    "fullPath": "/api/organizations/:orgId/projects/:projectId",
+    "handler": "update"
+  },
+  {
+    "file": "project.controller.ts",
+    "httpMethod": "PATCH",
+    "basePath": "organizations/:orgId/projects",
+    "subPath": ":projectId/restore",
+    "fullPath": "/api/organizations/:orgId/projects/:projectId/restore",
+    "handler": "restore"
+  },
+  {
+    "file": "project.controller.ts",
+    "httpMethod": "GET",
+    "basePath": "organizations/:orgId/projects",
+    "subPath": ":projectId/members",
+    "fullPath": "/api/organizations/:orgId/projects/:projectId/members",
+    "handler": "members"
+  },
+  {
+    "file": "project.controller.ts",
+    "httpMethod": "POST",
+    "basePath": "organizations/:orgId/projects",
+    "subPath": ":projectId/members",
+    "fullPath": "/api/organizations/:orgId/projects/:projectId/members",
+    "handler": "addMember"
+  },
+  {
+    "file": "project.controller.ts",
+    "httpMethod": "PATCH",
+    "basePath": "organizations/:orgId/projects",
+    "subPath": ":projectId/members/:projectMemberId/status",
+    "fullPath": "/api/organizations/:orgId/projects/:projectId/members/:projectMemberId/status",
+    "handler": "updateMemberStatus"
+  },
+  {
+    "file": "project.controller.ts",
+    "httpMethod": "GET",
+    "basePath": "organizations/:orgId/projects",
+    "subPath": ":projectId/roles",
+    "fullPath": "/api/organizations/:orgId/projects/:projectId/roles",
+    "handler": "roles"
+  },
+  {
+    "file": "project.controller.ts",
+    "httpMethod": "POST",
+    "basePath": "organizations/:orgId/projects",
+    "subPath": ":projectId/roles",
+    "fullPath": "/api/organizations/:orgId/projects/:projectId/roles",
+    "handler": "createRole"
+  },
+  {
+    "file": "project.controller.ts",
+    "httpMethod": "POST",
+    "basePath": "organizations/:orgId/projects",
+    "subPath": ":projectId/roles/direct",
+    "fullPath": "/api/organizations/:orgId/projects/:projectId/roles/direct",
+    "handler": "assignDirectRole"
+  },
+  {
+    "file": "project.controller.ts",
+    "httpMethod": "POST",
+    "basePath": "organizations/:orgId/projects",
+    "subPath": ":projectId/roles/group",
+    "fullPath": "/api/organizations/:orgId/projects/:projectId/roles/group",
+    "handler": "assignGroupRole"
+  },
+  {
+    "file": "project.controller.ts",
+    "httpMethod": "GET",
+    "basePath": "organizations/:orgId/projects",
+    "subPath": ":projectId/permissions/effective/:projectMemberId",
+    "fullPath": "/api/organizations/:orgId/projects/:projectId/permissions/effective/:projectMemberId",
+    "handler": "effectivePermissions"
+  },
+  {
+    "file": "project.controller.ts",
+    "httpMethod": "GET",
+    "basePath": "organizations/:orgId/projects",
+    "subPath": ":projectId/permission-scheme",
+    "fullPath": "/api/organizations/:orgId/projects/:projectId/permission-scheme",
+    "handler": "permissionScheme"
+  },
+  {
+    "file": "project.controller.ts",
+    "httpMethod": "PATCH",
+    "basePath": "organizations/:orgId/projects",
+    "subPath": ":projectId/permission-scheme",
+    "fullPath": "/api/organizations/:orgId/projects/:projectId/permission-scheme",
+    "handler": "setPermissionScheme"
+  },
+  {
+    "file": "project.controller.ts",
+    "httpMethod": "GET",
+    "basePath": "organizations/:orgId/projects",
+    "subPath": ":projectId/components",
+    "fullPath": "/api/organizations/:orgId/projects/:projectId/components",
+    "handler": "components"
+  },
+  {
+    "file": "project.controller.ts",
+    "httpMethod": "POST",
+    "basePath": "organizations/:orgId/projects",
+    "subPath": ":projectId/components",
+    "fullPath": "/api/organizations/:orgId/projects/:projectId/components",
+    "handler": "createComponent"
+  },
+  {
+    "file": "project.controller.ts",
+    "httpMethod": "PATCH",
+    "basePath": "organizations/:orgId/projects",
+    "subPath": ":projectId/components/:componentId",
+    "fullPath": "/api/organizations/:orgId/projects/:projectId/components/:componentId",
+    "handler": "updateComponent"
+  },
+  {
+    "file": "project.controller.ts",
+    "httpMethod": "PATCH",
+    "basePath": "organizations/:orgId/projects",
+    "subPath": ":projectId/components/:componentId/archive",
+    "fullPath": "/api/organizations/:orgId/projects/:projectId/components/:componentId/archive",
+    "handler": "archiveComponent"
+  },
+  {
+    "file": "project.controller.ts",
+    "httpMethod": "GET",
+    "basePath": "organizations/:orgId/projects",
+    "subPath": ":projectId/versions",
+    "fullPath": "/api/organizations/:orgId/projects/:projectId/versions",
+    "handler": "versions"
+  },
+  {
+    "file": "project.controller.ts",
+    "httpMethod": "POST",
+    "basePath": "organizations/:orgId/projects",
+    "subPath": ":projectId/versions",
+    "fullPath": "/api/organizations/:orgId/projects/:projectId/versions",
+    "handler": "createVersion"
+  },
+  {
+    "file": "project.controller.ts",
+    "httpMethod": "PATCH",
+    "basePath": "organizations/:orgId/projects",
+    "subPath": ":projectId/versions/:versionId",
+    "fullPath": "/api/organizations/:orgId/projects/:projectId/versions/:versionId",
+    "handler": "updateVersion"
+  },
+  {
+    "file": "project.controller.ts",
+    "httpMethod": "PATCH",
+    "basePath": "organizations/:orgId/projects",
+    "subPath": ":projectId/versions/:versionId/release",
+    "fullPath": "/api/organizations/:orgId/projects/:projectId/versions/:versionId/release",
+    "handler": "releaseVersion"
+  },
+  {
+    "file": "project.controller.ts",
+    "httpMethod": "PATCH",
+    "basePath": "organizations/:orgId/projects",
+    "subPath": ":projectId/versions/:versionId/archive",
+    "fullPath": "/api/organizations/:orgId/projects/:projectId/versions/:versionId/archive",
+    "handler": "archiveVersion"
+  },
+  {
+    "file": "project.controller.ts",
+    "httpMethod": "POST",
+    "basePath": "organizations/:orgId/projects",
+    "subPath": ":projectId/issues",
+    "fullPath": "/api/organizations/:orgId/projects/:projectId/issues",
+    "handler": "createIssue"
+  },
+  {
+    "file": "project.controller.ts",
+    "httpMethod": "GET",
+    "basePath": "organizations/:orgId/projects",
+    "subPath": ":projectId/issues",
+    "fullPath": "/api/organizations/:orgId/projects/:projectId/issues",
+    "handler": "listIssues"
+  },
+  {
+    "file": "project.controller.ts",
+    "httpMethod": "GET",
+    "basePath": "organizations/:orgId/projects",
+    "subPath": ":projectId/backlog",
+    "fullPath": "/api/organizations/:orgId/projects/:projectId/backlog",
+    "handler": "backlog"
+  },
+  {
+    "file": "project.controller.ts",
+    "httpMethod": "PATCH",
+    "basePath": "organizations/:orgId/projects",
+    "subPath": ":projectId/issues/:issueId",
+    "fullPath": "/api/organizations/:orgId/projects/:projectId/issues/:issueId",
+    "handler": "updateIssue"
+  },
+  {
+    "file": "project.controller.ts",
+    "httpMethod": "POST",
+    "basePath": "organizations/:orgId/projects",
+    "subPath": ":projectId/issues/:issueId/transition",
+    "fullPath": "/api/organizations/:orgId/projects/:projectId/issues/:issueId/transition",
+    "handler": "transition"
+  },
+  {
+    "file": "project.controller.ts",
+    "httpMethod": "DELETE",
+    "basePath": "organizations/:orgId/projects",
+    "subPath": ":projectId/issues/:issueId",
+    "fullPath": "/api/organizations/:orgId/projects/:projectId/issues/:issueId",
+    "handler": "deleteIssue"
+  },
+  {
+    "file": "issue-search.controller.ts",
+    "httpMethod": "GET",
+    "basePath": "organizations/:orgId/issues",
+    "subPath": "search",
+    "fullPath": "/api/organizations/:orgId/issues/search",
+    "handler": "handler"
+  },
+  {
+    "file": "saved-filter.controller.ts",
+    "httpMethod": "GET",
+    "basePath": "organizations/:orgId/filters",
+    "subPath": "",
+    "fullPath": "/api/organizations/:orgId/filters",
+    "handler": "handler"
+  },
+  {
+    "file": "saved-filter.controller.ts",
+    "httpMethod": "POST",
+    "basePath": "organizations/:orgId/filters",
+    "subPath": "",
+    "fullPath": "/api/organizations/:orgId/filters",
+    "handler": "handler"
+  },
+  {
+    "file": "saved-filter.controller.ts",
+    "httpMethod": "GET",
+    "basePath": "organizations/:orgId/filters",
+    "subPath": ":filterId",
+    "fullPath": "/api/organizations/:orgId/filters/:filterId",
+    "handler": "handler"
+  },
+  {
+    "file": "saved-filter.controller.ts",
+    "httpMethod": "POST",
+    "basePath": "organizations/:orgId/filters",
+    "subPath": ":filterId/shares",
+    "fullPath": "/api/organizations/:orgId/filters/:filterId/shares",
+    "handler": "handler"
+  },
+  {
+    "file": "saved-filter.controller.ts",
+    "httpMethod": "POST",
+    "basePath": "organizations/:orgId/filters",
+    "subPath": ":filterId/subscriptions",
+    "fullPath": "/api/organizations/:orgId/filters/:filterId/subscriptions",
+    "handler": "handler"
+  },
+  {
+    "file": "sprint.controller.ts",
+    "httpMethod": "POST",
+    "basePath": "organizations/:orgId/projects/:projectId",
+    "subPath": "boards/:boardId/sprints",
+    "fullPath": "/api/organizations/:orgId/projects/:projectId/boards/:boardId/sprints",
+    "handler": "create"
+  },
+  {
+    "file": "sprint.controller.ts",
+    "httpMethod": "GET",
+    "basePath": "organizations/:orgId/projects/:projectId",
+    "subPath": "sprints",
+    "fullPath": "/api/organizations/:orgId/projects/:projectId/sprints",
+    "handler": "list"
+  },
+  {
+    "file": "sprint.controller.ts",
+    "httpMethod": "PATCH",
+    "basePath": "organizations/:orgId/projects/:projectId",
+    "subPath": "sprints/:sprintId/start",
+    "fullPath": "/api/organizations/:orgId/projects/:projectId/sprints/:sprintId/start",
+    "handler": "start"
+  },
+  {
+    "file": "sprint.controller.ts",
+    "httpMethod": "PATCH",
+    "basePath": "organizations/:orgId/projects/:projectId",
+    "subPath": "sprints/:sprintId/close",
+    "fullPath": "/api/organizations/:orgId/projects/:projectId/sprints/:sprintId/close",
+    "handler": "close"
+  },
+  {
+    "file": "sprint.controller.ts",
+    "httpMethod": "POST",
+    "basePath": "organizations/:orgId/projects/:projectId",
+    "subPath": "sprints/:sprintId/issues",
+    "fullPath": "/api/organizations/:orgId/projects/:projectId/sprints/:sprintId/issues",
+    "handler": "assign"
+  },
+  {
+    "file": "webhook.controller.ts",
+    "httpMethod": "GET",
+    "basePath": "organizations/:orgId/webhooks",
+    "subPath": "",
+    "fullPath": "/api/organizations/:orgId/webhooks",
+    "handler": "handler"
+  },
+  {
+    "file": "webhook.controller.ts",
+    "httpMethod": "POST",
+    "basePath": "organizations/:orgId/webhooks",
+    "subPath": "",
+    "fullPath": "/api/organizations/:orgId/webhooks",
+    "handler": "handler"
+  },
+  {
+    "file": "webhook.controller.ts",
+    "httpMethod": "PATCH",
+    "basePath": "organizations/:orgId/webhooks",
+    "subPath": ":webhookId/pause",
+    "fullPath": "/api/organizations/:orgId/webhooks/:webhookId/pause",
+    "handler": "handler"
+  },
+  {
+    "file": "webhook.controller.ts",
+    "httpMethod": "DELETE",
+    "basePath": "organizations/:orgId/webhooks",
+    "subPath": ":webhookId",
+    "fullPath": "/api/organizations/:orgId/webhooks/:webhookId",
+    "handler": "handler"
+  },
+  {
+    "file": "workflow.controller.ts",
+    "httpMethod": "GET",
+    "basePath": "organizations/:orgId/workflows",
+    "subPath": "",
+    "fullPath": "/api/organizations/:orgId/workflows",
+    "handler": "handler"
+  },
+  {
+    "file": "workflow.controller.ts",
+    "httpMethod": "GET",
+    "basePath": "organizations/:orgId/workflows",
+    "subPath": ":workflowId",
+    "fullPath": "/api/organizations/:orgId/workflows/:workflowId",
+    "handler": "handler"
+  },
+  {
+    "file": "workflow.controller.ts",
+    "httpMethod": "POST",
+    "basePath": "organizations/:orgId/workflows",
+    "subPath": "",
+    "fullPath": "/api/organizations/:orgId/workflows",
+    "handler": "create"
+  },
+  {
+    "file": "workflow.controller.ts",
+    "httpMethod": "POST",
+    "basePath": "organizations/:orgId/workflows",
+    "subPath": "guards",
+    "fullPath": "/api/organizations/:orgId/workflows/guards",
+    "handler": "addGuard"
+  },
+  {
+    "file": "workspace.controller.ts",
+    "httpMethod": "GET",
+    "basePath": "workspace",
+    "subPath": "bootstrap",
+    "fullPath": "/api/workspace/bootstrap",
+    "handler": "getBootstrap"
+  }
+]

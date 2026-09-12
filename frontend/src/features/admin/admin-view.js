@@ -32,6 +32,15 @@ export function renderAdminView(state) {
         <button class="admin-tab-btn ${currentTab === 'fields' ? 'active' : ''}" data-admin-tab="fields">
           ✨ Custom Fields
         </button>
+        <button class="admin-tab-btn ${currentTab === 'workflows' ? 'active' : ''}" data-admin-tab="workflows">
+          🔄 Workflows & FSM (${state.workflows?.length || 0})
+        </button>
+        <button class="admin-tab-btn ${currentTab === 'catalog' ? 'active' : ''}" data-admin-tab="catalog">
+          📋 Issue Types & Catalog
+        </button>
+        <button class="admin-tab-btn ${currentTab === 'audit' ? 'active' : ''}" data-admin-tab="audit">
+          📜 Audit & Outbox
+        </button>
         <button class="admin-tab-btn ${currentTab === 'project' ? 'active' : ''}" data-admin-tab="project">
           📁 Project Settings (${state.selectedProjectId ? 'Active' : 'Select'})
         </button>
@@ -48,6 +57,9 @@ export function renderAdminView(state) {
           currentTab === 'roles' ? renderRolesTab(state) :
           currentTab === 'groups' ? renderGroupsTab(state) :
           currentTab === 'fields' ? renderCustomFieldsTab(state) :
+          currentTab === 'workflows' ? renderWorkflowsTab(state) :
+          currentTab === 'catalog' ? renderCatalogTab(state) :
+          currentTab === 'audit' ? renderAuditTab(state) :
           currentTab === 'system' ? renderSystemAdminTab(state) :
           renderProjectSettingsTab(project, state)}
       </div>
@@ -625,6 +637,365 @@ function renderSystemAdminTab(state) {
             <div class="empty-hint-text">No organizations found.</div>
           `}
         </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderWorkflowsTab(state) {
+  const workflows = state.workflows || [];
+  const selectedWf = state.selectedWorkflowDetail || (workflows.length > 0 ? workflows[0] : null);
+  const states = selectedWf?.states || state.workflowStates || [];
+  const transitions = selectedWf?.transitions || state.workflowTransitions || [];
+
+  return `
+    <div class="admin-section-card" style="margin-bottom: 1.5rem;">
+      <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+        <div>
+          <h3>🔄 Workflow Schemes & Finite State Machine (FSM)</h3>
+          <p class="muted">Manage lifecycle states, directional transitions, and rule guards that govern issue progression.</p>
+        </div>
+        <div class="header-action-badge" style="display: flex; gap: 8px;">
+          <button type="button" class="button primary btn-sm" id="btn-admin-create-workflow">
+            ➕ Create Workflow
+          </button>
+          <button type="button" class="button ghost btn-sm" id="btn-admin-add-guard">
+            🛡️ Add Transition Guard
+          </button>
+        </div>
+      </div>
+
+      <div class="admin-items-table" style="margin-top: 1rem;">
+        <div class="table-header-row" style="display: grid; grid-template-columns: 2fr 1.5fr 1fr 1fr 1.5fr; gap: 12px; font-weight: 600; font-size: 0.82rem; color: var(--text-muted); padding: 8px 12px; border-bottom: 1px solid var(--border-color);">
+          <span>Workflow Name</span>
+          <span>Workflow Key</span>
+          <span>Version</span>
+          <span>Status</span>
+          <span style="text-align: right;">Actions</span>
+        </div>
+
+        ${workflows.length ? workflows.map(w => `
+          <div class="admin-member-row" style="display: grid; grid-template-columns: 2fr 1.5fr 1fr 1fr 1.5fr; gap: 12px; align-items: center; padding: 10px 12px; font-size: 0.85rem; border-bottom: 1px solid var(--border-color, rgba(255,255,255,0.05));">
+            <div>
+              <strong>${escapeHtml(w.name)}</strong>
+            </div>
+            <div>
+              <code style="font-family: var(--font-mono); font-size: 0.8rem; background: rgba(255,255,255,0.06); padding: 2px 6px; border-radius: 4px;">${escapeHtml(w.key)}</code>
+            </div>
+            <div>
+              <span class="badge badge-purple" style="font-size: 0.72rem;">v${w.version || 1}</span>
+            </div>
+            <div>
+              <span class="badge ${w.isActive ? 'badge-primary' : 'badge-danger'}" style="font-size: 0.72rem;">
+                ${w.isActive ? '✓ ACTIVE' : 'INACTIVE'}
+              </span>
+            </div>
+            <div style="text-align: right;">
+              <button type="button" class="button ghost btn-sm btn-view-workflow-detail" data-workflow-id="${w.id}">
+                🔍 Inspect FSM
+              </button>
+            </div>
+          </div>
+        `).join('') : `
+          <div class="empty-hint-text" style="padding: 1.5rem; text-align: center; color: var(--text-muted);">
+            No custom workflows created yet. Default standard agile workflow is active.
+          </div>
+        `}
+      </div>
+    </div>
+
+    <!-- Active Workflow FSM States & Transitions Grid -->
+    <div class="admin-grid-2">
+      <!-- FSM States -->
+      <div class="admin-section-card">
+        <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+          <div>
+            <h4>🏷️ Workflow States (${states.length})</h4>
+            <p class="muted-small">Configured execution columns and issue categories.</p>
+          </div>
+        </div>
+        <div class="admin-items-table">
+          ${states.length ? states.map(s => {
+            const cat = (s.category || 'todo').toLowerCase();
+            const badgeClass = cat === 'done' ? 'badge-primary' : (cat === 'in_progress' ? 'badge-purple' : 'badge-warning');
+            return `
+              <div class="admin-member-row" style="display: flex; justify-content: space-between; align-items: center; padding: 10px 12px;">
+                <div>
+                  <strong>${escapeHtml(s.name)}</strong>
+                  <div class="member-meta" style="margin-top: 2px;">
+                    <span class="muted-small">Position: #${s.position ?? 0}</span>
+                    ${s.isInitial ? '<span class="badge-tag tag-verified" style="margin-left: 6px;">Initial</span>' : ''}
+                    ${s.isTerminal ? '<span class="badge-tag" style="margin-left: 6px; background: rgba(147, 51, 234, 0.2); color: #c084fc;">Terminal</span>' : ''}
+                  </div>
+                </div>
+                <div>
+                  <span class="badge ${badgeClass}" style="font-size: 0.72rem; text-transform: uppercase;">
+                    ${escapeHtml(s.category || 'TODO')}
+                  </span>
+                </div>
+              </div>
+            `;
+          }).join('') : `
+            <div class="empty-hint-text" style="padding: 1.5rem; text-align: center; color: var(--text-muted);">
+              Standard States: Backlog (TODO) ➔ In Progress (IN_PROGRESS) ➔ Review (IN_PROGRESS) ➔ Done (DONE)
+            </div>
+          `}
+        </div>
+      </div>
+
+      <!-- FSM Transitions & Guards -->
+      <div class="admin-section-card">
+        <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+          <div>
+            <h4>🔀 Permitted Transitions (${transitions.length})</h4>
+            <p class="muted-small">Directional state jumps with validation guards.</p>
+          </div>
+        </div>
+        <div class="admin-items-table">
+          ${transitions.length ? transitions.map(t => {
+            const fromName = states.find(st => st.id === t.fromStateId)?.name || 'Any State';
+            const toName = states.find(st => st.id === t.toStateId)?.name || (t.toStateId ? t.toStateId.slice(0, 8) : 'Target');
+            return `
+              <div class="admin-member-row" style="display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; font-size: 0.85rem;">
+                <div>
+                  <strong>${escapeHtml(t.name || 'Transition')}</strong>
+                  <div style="font-size: 0.78rem; color: var(--text-secondary); margin-top: 2px; display: flex; align-items: center; gap: 6px;">
+                    <span>${escapeHtml(fromName)}</span>
+                    <span style="color: var(--blue-400);">➔</span>
+                    <span>${escapeHtml(toName)}</span>
+                  </div>
+                </div>
+                <div>
+                  <span class="badge badge-purple" style="font-size: 0.72rem;" title="Transition Guard">
+                    🛡️ Guarded
+                  </span>
+                </div>
+              </div>
+            `;
+          }).join('') : `
+            <div class="empty-hint-text" style="padding: 1.5rem; text-align: center; color: var(--text-muted);">
+              Standard Transitions: Start Progress, Request Review, Approve & Complete, Reopen.
+            </div>
+          `}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderCatalogTab(state) {
+  const issueTypes = state.issueTypes || [];
+  const linkTypes = state.linkTypes || [];
+  const labels = state.labels || [];
+
+  return `
+    <div class="admin-grid-2" style="margin-bottom: 1.5rem;">
+      <!-- Issue Types Catalog -->
+      <div class="admin-section-card">
+        <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+          <div>
+            <h3>📋 Issue Types Catalog</h3>
+            <p class="muted">Hierarchy levels and work item classifications.</p>
+          </div>
+          <button type="button" class="button primary btn-sm" id="btn-admin-add-issue-type">
+            ➕ Add Issue Type
+          </button>
+        </div>
+
+        <div class="admin-items-table" style="margin-top: 0.75rem;">
+          <div class="table-header-row" style="display: grid; grid-template-columns: 2fr 1.5fr 2fr; gap: 10px; font-weight: 600; font-size: 0.8rem; color: var(--text-muted); padding: 8px 12px; border-bottom: 1px solid var(--border-color);">
+            <span>Type Name</span>
+            <span>Key</span>
+            <span>Description</span>
+          </div>
+
+          ${issueTypes.length ? issueTypes.map(it => `
+            <div class="admin-member-row" style="display: grid; grid-template-columns: 2fr 1.5fr 2fr; gap: 10px; align-items: center; padding: 10px 12px; font-size: 0.85rem;">
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <span style="font-size: 1.1rem;">${it.key === 'bug' ? '🐞' : it.key === 'epic' ? '⚡' : it.key === 'subtask' ? '☑️' : '📌'}</span>
+                <strong>${escapeHtml(it.name)}</strong>
+              </div>
+              <div>
+                <code style="font-family: var(--font-mono); font-size: 0.78rem; background: rgba(255,255,255,0.06); padding: 2px 6px; border-radius: 4px;">${escapeHtml(it.key)}</code>
+              </div>
+              <div class="muted-small" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                ${escapeHtml(it.description || 'Standard work item type')}
+              </div>
+            </div>
+          `).join('') : `
+            <div class="empty-hint-text" style="padding: 1rem; text-align: center; color: var(--text-muted);">
+              Standard Types: Story, Bug, Task, Epic, Subtask
+            </div>
+          `}
+        </div>
+      </div>
+
+      <!-- Link Types Catalog -->
+      <div class="admin-section-card">
+        <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+          <div>
+            <h3>🔗 Issue Link Types</h3>
+            <p class="muted">Semantic dependency and relationship graphs.</p>
+          </div>
+          <button type="button" class="button primary btn-sm" id="btn-admin-add-link-type">
+            ➕ Add Link Type
+          </button>
+        </div>
+
+        <div class="admin-items-table" style="margin-top: 0.75rem;">
+          <div class="table-header-row" style="display: grid; grid-template-columns: 1.5fr 2fr 2fr 1fr auto; gap: 10px; font-weight: 600; font-size: 0.8rem; color: var(--text-muted); padding: 8px 12px; border-bottom: 1px solid var(--border-color);">
+            <span>Key</span>
+            <span>Outward Label</span>
+            <span>Inward Label</span>
+            <span>Direction</span>
+            <span style="text-align: right;">Action</span>
+          </div>
+
+          ${linkTypes.length ? linkTypes.map(lt => `
+            <div class="admin-member-row" style="display: grid; grid-template-columns: 1.5fr 2fr 2fr 1fr auto; gap: 10px; align-items: center; padding: 10px 12px; font-size: 0.85rem;">
+              <div>
+                <code>${escapeHtml(lt.key)}</code>
+              </div>
+              <div>
+                <span class="badge badge-primary" style="font-size: 0.72rem;">${escapeHtml(lt.outwardLabel)}</span>
+              </div>
+              <div>
+                <span class="badge badge-purple" style="font-size: 0.72rem;">${escapeHtml(lt.inwardLabel)}</span>
+              </div>
+              <div class="muted-small">
+                ${escapeHtml(lt.directionality || 'directed')}
+              </div>
+              <div style="text-align: right;">
+                <button type="button" class="icon-button btn-archive-link-type" data-link-type-id="${lt.id}" title="Archive Link Type">×</button>
+              </div>
+            </div>
+          `).join('') : `
+            <div class="empty-hint-text" style="padding: 1rem; text-align: center; color: var(--text-muted);">
+              Standard Links: Blocks / Is Blocked By, Relates To, Clones / Is Cloned By
+            </div>
+          `}
+        </div>
+      </div>
+    </div>
+
+    <!-- Labels Taxonomy Card -->
+    <div class="admin-section-card">
+      <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+        <div>
+          <h3>🏷️ Taxonomy & Labels Catalog</h3>
+          <p class="muted">Cross-cutting tags used across issues, boards, and JQL queries.</p>
+        </div>
+        <span class="badge badge-primary">${labels.length} Active Labels</span>
+      </div>
+
+      <div style="padding: 1rem 0; display: flex; flex-wrap: wrap; gap: 8px;">
+        ${labels.length ? labels.map(lbl => `
+          <div class="label-chip" style="display: flex; align-items: center; gap: 6px; padding: 4px 10px; font-size: 0.82rem; background: var(--bg-surface-elevated); border: 1px solid var(--border-default); border-radius: 6px;">
+            <span>🏷️ ${escapeHtml(lbl.name)}</span>
+            <button type="button" class="icon-button btn-archive-label" data-label-id="${lbl.id}" style="width: 18px; height: 18px; font-size: 12px; opacity: 0.7; cursor: pointer;" title="Archive Label">×</button>
+          </div>
+        `).join('') : `
+          <div class="empty-hint-text" style="color: var(--text-muted); font-size: 0.85rem;">
+            No global labels registered yet. Labels created on issues will appear here automatically.
+          </div>
+        `}
+      </div>
+    </div>
+  `;
+}
+
+function renderAuditTab(state) {
+  const auditLogs = state.auditLogs || [];
+  const outbox = state.mailOutbox || [];
+
+  return `
+    <div class="admin-section-card" style="margin-bottom: 2rem;">
+      <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+        <div>
+          <h3>📜 Audit Trail & Security Compliance Logs</h3>
+          <p class="muted">Immutable event ledger documenting organizational mutations, membership changes, and issue transitions.</p>
+        </div>
+        <div class="header-action-badge" style="display: flex; gap: 8px;">
+          <button type="button" class="button ghost btn-sm" id="btn-admin-refresh-audit">
+            🔄 Refresh Audit Trail
+          </button>
+          <span class="badge badge-primary">${auditLogs.length} Events Loaded</span>
+        </div>
+      </div>
+
+      <div class="admin-items-table" style="margin-top: 1rem;">
+        <div class="table-header-row" style="display: grid; grid-template-columns: 150px 140px 160px 140px 1fr; gap: 12px; font-weight: 600; font-size: 0.82rem; color: var(--text-muted); padding: 8px 12px; border-bottom: 1px solid var(--border-color);">
+          <span>Timestamp</span>
+          <span>Actor</span>
+          <span>Action</span>
+          <span>Entity Type</span>
+          <span>Details / Payload</span>
+        </div>
+
+        ${auditLogs.length ? auditLogs.map(log => `
+          <div class="admin-member-row" style="display: grid; grid-template-columns: 150px 140px 160px 140px 1fr; gap: 12px; align-items: center; padding: 10px 12px; font-size: 0.85rem; border-bottom: 1px solid var(--border-color, rgba(255,255,255,0.05));">
+            <span class="muted-small">${formatDate(log.createdAt || log.timestamp)}</span>
+            <strong>${escapeHtml(log.actorName || (log.actorId ? log.actorId.slice(0, 8) : 'System'))}</strong>
+            <div>
+              <span class="badge badge-primary btn-sm" style="font-size: 0.72rem; text-transform: uppercase;">
+                ${escapeHtml(log.action || log.eventType || 'MUTATE')}
+              </span>
+            </div>
+            <div>
+              <code style="font-size: 0.76rem;">${escapeHtml(log.entityType || 'record')}</code>
+            </div>
+            <div class="muted-small" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--font-mono); font-size: 0.75rem;">
+              ${escapeHtml(typeof log.payload === 'object' ? JSON.stringify(log.payload) : (log.details || log.entityId || ''))}
+            </div>
+          </div>
+        `).join('') : `
+          <div class="empty-hint-text" style="padding: 1.5rem; text-align: center; color: var(--text-muted);">
+            No audit records captured yet for this organization.
+          </div>
+        `}
+      </div>
+    </div>
+
+    <!-- Outbox Dispatches -->
+    <div class="admin-section-card">
+      <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+        <div>
+          <h3>📬 Transactional Outbox & Webhook Events</h3>
+          <p class="muted">Reliable event dispatch buffer for notifications, webhooks, and SMTP deliveries.</p>
+        </div>
+        <span class="badge badge-purple">${outbox.length} Dispatched</span>
+      </div>
+
+      <div class="admin-items-table" style="margin-top: 1rem;">
+        <div class="table-header-row" style="display: grid; grid-template-columns: 150px 180px 140px 1fr 100px; gap: 12px; font-weight: 600; font-size: 0.82rem; color: var(--text-muted); padding: 8px 12px; border-bottom: 1px solid var(--border-color);">
+          <span>Timestamp</span>
+          <span>Target / Recipient</span>
+          <span>Category</span>
+          <span>Subject / Event</span>
+          <span style="text-align: right;">Status</span>
+        </div>
+
+        ${outbox.length ? outbox.map(m => `
+          <div class="admin-member-row" style="display: grid; grid-template-columns: 150px 180px 140px 1fr 100px; gap: 12px; align-items: center; padding: 10px 12px; font-size: 0.85rem; border-bottom: 1px solid var(--border-color, rgba(255,255,255,0.05));">
+            <span class="muted-small">${formatDate(m.timestamp)}</span>
+            <strong style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(m.to || 'internal')}</strong>
+            <div>
+              <span class="badge ${m.category === 'verification' ? 'badge-primary' : m.category === 'invitation' ? 'badge-purple' : 'badge-warning'}" style="font-size: 0.72rem; text-transform: uppercase;">
+                ${escapeHtml(m.category || 'EVENT')}
+              </span>
+            </div>
+            <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-secondary);">${escapeHtml(m.subject || 'Event Dispatch')}</span>
+            <div style="text-align: right;">
+              <span class="badge ${m.sent !== false ? 'badge-primary' : 'badge-danger'}" style="font-size: 0.72rem;">
+                ${m.sent !== false ? '✓ SENT' : 'QUEUED'}
+              </span>
+            </div>
+          </div>
+        `).join('') : `
+          <div class="empty-hint-text" style="padding: 1.5rem; text-align: center; color: var(--text-muted);">
+            No recent outbox event dispatches buffered.
+          </div>
+        `}
       </div>
     </div>
   `;
