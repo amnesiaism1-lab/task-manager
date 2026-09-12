@@ -256,6 +256,13 @@ export function renderIssueDetailModal(issue, state) {
             </div>
 
             <div class="detail-attribute-row">
+              <span class="attr-label">Story Points</span>
+              <div class="attr-value">
+                <input type="number" step="1" id="detail-story-points-input" class="input-clean" placeholder="Pts (e.g. 5)" value="${issue.storyPoints !== null && issue.storyPoints !== undefined ? issue.storyPoints : ''}" />
+              </div>
+            </div>
+
+            <div class="detail-attribute-row">
               <span class="attr-label">Watchers</span>
               <div class="attr-value">
                 <button class="button ghost btn-sm" id="btn-toggle-watch">
@@ -277,6 +284,20 @@ export function renderIssueDetailModal(issue, state) {
               </div>
             </div>
 
+            ${issue.component ? `
+              <div class="detail-attribute-row">
+                <span class="attr-label">Component</span>
+                <span class="attr-value text-xs text-indigo-400 font-medium">${escapeHtml(issue.component.name || issue.component)}</span>
+              </div>
+            ` : ''}
+
+            ${issue.fixVersion ? `
+              <div class="detail-attribute-row">
+                <span class="attr-label">Fix Version</span>
+                <span class="attr-value text-xs text-emerald-400 font-medium">${escapeHtml(issue.fixVersion.name || issue.fixVersion)}</span>
+              </div>
+            ` : ''}
+
             <div class="detail-attribute-row labels-row">
               <span class="attr-label">Labels</span>
               <div class="attr-value">
@@ -288,6 +309,22 @@ export function renderIssueDetailModal(issue, state) {
                 </form>
               </div>
             </div>
+
+            ${(state.customFields || []).length > 0 ? `
+              <div class="pt-3 mt-3 border-t border-slate-800/80">
+                <div class="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">Custom Fields</div>
+                ${(state.customFields || []).map(cf => {
+                  const valObj = (issue.customFieldValues || []).find(v => v.customFieldId === cf.id);
+                  const displayVal = valObj ? (valObj.stringValue || valObj.numberValue || valObj.option?.label || valObj.dateValue || 'Not set') : 'Not set';
+                  return `
+                    <div class="detail-attribute-row py-1">
+                      <span class="attr-label text-slate-400 text-xs">${escapeHtml(cf.name)}</span>
+                      <span class="attr-value text-xs text-slate-300 font-medium">${escapeHtml(String(displayVal))}</span>
+                    </div>
+                  `;
+                }).join('')}
+              </div>
+            ` : ''}
 
             <div class="detail-attribute-row pt-4 mt-4 border-t border-slate-800">
               <button type="button" id="btn-delete-issue" class="w-full flex items-center justify-center gap-2 px-3 py-2 text-xs font-semibold text-rose-400 hover:text-rose-200 bg-rose-950/30 hover:bg-rose-900/50 border border-rose-800/50 rounded transition-colors" title="Soft-delete this issue from project">

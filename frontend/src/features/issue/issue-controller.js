@@ -254,6 +254,26 @@ export function bindIssueDetailModalEvents(initialIssue, { request, store, showT
     }
   });
 
+  // 8b. Story Points Input
+  document.querySelector('#detail-story-points-input')?.addEventListener('change', async (e) => {
+    const pts = parseFloat(e.target.value);
+    const storyPoints = isNaN(pts) ? null : pts;
+    try {
+      await request(`/organizations/${org}/issues/${currentIssue.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          storyPoints,
+          version: currentIssue.version,
+        }),
+      });
+      showToast('Story points updated', 'info');
+      await refreshModal();
+      if (loadBacklog) loadBacklog(request, store);
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  });
+
   // 9. Comments Form
   document.querySelector('#form-add-comment')?.addEventListener('submit', async (e) => {
     e.preventDefault();
