@@ -246,6 +246,71 @@ export function bindIssueDetailModalEvents(initialIssue, { request, store, showT
     }
   });
 
+  // 6b. Component Select
+  document.querySelector('#detail-component-select')?.addEventListener('change', async (e) => {
+    const componentId = e.target.value || null;
+    try {
+      await request(`/organizations/${org}/issues/${currentIssue.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          componentId,
+          version: currentIssue.version,
+        }),
+      });
+      showToast('Component updated', 'success');
+      await refreshModal();
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  });
+
+  // 6c. Fix Version Select
+  document.querySelector('#detail-fix-version-select')?.addEventListener('change', async (e) => {
+    const fixVersionId = e.target.value || null;
+    try {
+      await request(`/organizations/${org}/issues/${currentIssue.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          fixVersionId,
+          version: currentIssue.version,
+        }),
+      });
+      showToast('Fix version updated', 'success');
+      await refreshModal();
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  });
+
+  // 6d. Custom Fields Interactive Inputs
+  document.querySelectorAll('.custom-field-input').forEach(input => {
+    const saveField = async () => {
+      const contextId = input.dataset.contextId;
+      const fieldType = input.dataset.fieldType;
+      let value = input.value;
+      if (fieldType === 'NUMBER') {
+        const num = parseFloat(value);
+        value = isNaN(num) ? null : num;
+      } else if (value === '') {
+        value = null;
+      }
+      try {
+        await request(`/organizations/${org}/custom-fields/issues/${currentIssue.id}/value`, {
+          method: 'POST',
+          body: JSON.stringify({ contextId, value }),
+        });
+        showToast('Field saved', 'info', 1000);
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    };
+    if (input.tagName === 'SELECT') {
+      input.addEventListener('change', saveField);
+    } else {
+      input.addEventListener('blur', saveField);
+    }
+  });
+
   // 7. Due Date
   document.querySelector('#detail-due-date')?.addEventListener('change', async (e) => {
     const dueAt = e.target.value || null;
@@ -472,6 +537,34 @@ export function bindIssueDetailModalEvents(initialIssue, { request, store, showT
       showToast(err.message, 'error');
     }
   });
+
+  // 17b. Delete Issue Link
+  document.querySelectorAll('.btn-delete-link').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const linkId = btn.dataset.linkId;
+      if (!confirm('Remove this issue link?')) return;
+      try {
+        await request(`/organizations/${org}/issues/${currentIssue.id}/links/${linkId}`, {
+          method: 'DELETE',
+        });
+        showToast('Link removed', 'info');
+        await refreshModal();
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    });
+  });
+
+  // 17c. Open Linked Issue
+  document.querySelectorAll('[data-open-issue]').forEach(el => {
+    el.addEventListener('click', async () => {
+      const targetId = el.dataset.openIssue;
+      if (targetId && targetId !== currentIssue.id) {
+        await openIssueDetailModal(targetId, { request, store, showToast, loadBoardData, loadSprints, loadBacklog, loadIssues });
+      }
+    });
+  });
 }
 
 export function openIssueCreateModal(ctx = {}) {
@@ -504,6 +597,8 @@ export function openIssueCreateModal(ctx = {}) {
     const description = formData.get('description');
     const assigneeMemberId = formData.get('assigneeMemberId') || undefined;
     const sprintId = formData.get('sprintId') || undefined;
+    const componentId = formData.get('componentId') || undefined;
+    const fixVersionId = formData.get('fixVersionId') || undefined;
     const dueAt = formData.get('dueAt') || undefined;
     const priority = formData.get('priority') || 'Medium';
     const estimateHours = parseFloat(formData.get('estimateHours'));
@@ -522,6 +617,8 @@ export function openIssueCreateModal(ctx = {}) {
           description,
           assigneeMemberId,
           sprintId,
+          componentId,
+          fixVersionId,
           dueAt,
           priority,
           originalEstimateSeconds,

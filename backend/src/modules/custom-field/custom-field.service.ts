@@ -6,6 +6,9 @@ import { CustomFieldContext } from '../../database/entities/custom-field/custom-
 import { CustomFieldOption } from '../../database/entities/custom-field/custom-field-option.entity';
 import { IssueCustomFieldValue } from '../../database/entities/custom-field/issue-custom-field-value.entity';
 import { Issue } from '../../database/entities/issue/issue.entity';
+import { ActivityLog } from '../../database/entities/audit/activity-log.entity';
+import { OutboxEvent } from '../../database/entities/audit/outbox-event.entity';
+import { EVENT_TYPES } from '../../common/constants/event-types';
 import { IssueAccessService } from '../issue/issue-access.service';
 import { PermissionResolverService } from '../permission/permission-resolver.service';
 import { CreateContextDto, CreateCustomFieldDto, CreateOptionDto, SetValueDto } from './dto/custom-field.dto';
@@ -18,6 +21,8 @@ export class CustomFieldService {
     @InjectRepository(CustomFieldOption) private readonly options: Repository<CustomFieldOption>,
     @InjectRepository(IssueCustomFieldValue) private readonly values: Repository<IssueCustomFieldValue>,
     @InjectRepository(Issue) private readonly issues: Repository<Issue>,
+    @InjectRepository(ActivityLog) private readonly activityLogs: Repository<ActivityLog>,
+    @InjectRepository(OutboxEvent) private readonly outboxEvents: Repository<OutboxEvent>,
     private readonly issueAccess: IssueAccessService,
     private readonly permissions: PermissionResolverService,
   ) {}
@@ -36,6 +41,22 @@ export class CustomFieldService {
     return this.contexts.save(context);
   }
 
+  async getContextsForProject(orgId: string, projectId: string) {
+    const contexts = await this.contexts.find({ where: { projectId }, order: { position: 'ASC' } });
+    return Promise.all(contexts.map(async (ctx) => {
+      const field = await this.fields.findOne({ where: { id: ctx.customFieldId, orgId } });
+      let options: CustomFieldOption[] = [];
+      if (field?.fieldType === 'select') {
+        options = await this.options.find({ where: { customFieldId: field.id }, order: { position: 'ASC' } });
+      }
+      return {
+        ...ctx,
+        field,
+        options,
+      };
+    }));
+  }
+
   async createOption(orgId: string, fieldId: string, input: CreateOptionDto) {
     const field = await this.fields.findOne({ where: { id: fieldId, orgId, fieldType: 'select' } });
     if (!field) throw new NotFoundException('Select custom field not found');
@@ -49,7 +70,20 @@ export class CustomFieldService {
     if (!context || context.projectId !== issue.projectId || context.issueTypeId !== issue.issueTypeId) throw new ConflictException('Custom field context does not match issue');
     const field = await this.fields.findOneByOrFail({ id: context.customFieldId, orgId });
     this.validateValue(field, input.value);
-    return this.values.save(this.values.create({ issueId, customFieldContextId: input.contextId, valueJson: input.value }));
+    const existing = await this.values.findOne({ where: { issueId, customFieldContextId: input.contextId } });
+    let saved: IssueCustomFieldValue;
+    if (existing) {
+      existing.valueJson = input.value;
+      saved = await this.values.save(existing);
+    } else {
+      saved = await this.values.save(this.values.create({ issueId, customFieldContextId: input.contextId, valueJson: input.value }));
+    }
+
+    const payload = { issueId, customFieldId: field.id, customFieldName: field.name, value: input.value, memberId };
+    await this.activityLogs.save(this.activityLogs.create({ orgId, actorType: 'member', actorMemberId: memberId, projectId: issue.projectId, issueId, eventType: EVENT_TYPES.ISSUE_UPDATED, payloadJson: payload }));
+    await this.outboxEvents.save(this.outboxEvents.create({ orgId, aggregateType: 'issue', aggregateId: issueId, eventType: EVENT_TYPES.ISSUE_UPDATED, payloadJson: payload, status: 'pending', idempotencyKey: `cf-updated:${issueId}:${input.contextId}:${Date.now()}`, publishedAt: null, retryCount: 0, lastError: null }));
+
+    return saved;
   }
 
   private validateValue(field: CustomField, value: unknown) {

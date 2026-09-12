@@ -195,10 +195,26 @@ export function bindAdminEvents(ctx = {}) {
 
       try {
         store.setState({ loading: true });
-        await request(`/organizations/${org}/custom-fields`, {
+        const createdField = await request(`/organizations/${org}/custom-fields`, {
           method: 'POST',
           body: JSON.stringify({ name, key, fieldType, description, isRequired }),
         });
+        if (createdField?.id && store.getState().selectedProjectId && store.getState().issueTypes?.length > 0) {
+          try {
+            for (const it of store.getState().issueTypes) {
+              await request(`/organizations/${org}/custom-fields/${createdField.id}/contexts`, {
+                method: 'POST',
+                body: JSON.stringify({
+                  projectId: store.getState().selectedProjectId,
+                  issueTypeId: it.id,
+                  isRequired,
+                }),
+              });
+            }
+          } catch (ctxErr) {
+            console.warn('Could not auto-create field context:', ctxErr);
+          }
+        }
         closeModal();
         showToast(`Custom field "${name}" created!`, 'success');
         await reload();

@@ -1,0 +1,1031 @@
+[
+  {
+    "file": "backend/src/app.controller.ts",
+    "name": "app.controller.ts",
+    "basePrefix": "",
+    "endpoints": [
+      {
+        "method": "GET",
+        "fullPath": "/",
+        "signature": "@Get() getHello(): string {"
+      }
+    ]
+  },
+  {
+    "file": "backend/src/modules/admin/admin.controller.ts",
+    "name": "admin.controller.ts",
+    "basePrefix": "admin",
+    "endpoints": [
+      {
+        "method": "GET",
+        "fullPath": "/admin/users",
+        "signature": "@Get('users') listUsers(@Query() query: ListUsersQueryDto) {"
+      },
+      {
+        "method": "POST",
+        "fullPath": "/admin/users",
+        "signature": "@Post('users') createUser( @Req() request: AuthenticatedRequest, @Body() body: AdminCreateUserDto, ) { return this.admin.createUser(request.user.id, body);"
+      },
+      {
+        "method": "GET",
+        "fullPath": "/admin/users/:userId",
+        "signature": "@Get('users/:userId') getUser(@Param('userId') userId: string) {"
+      },
+      {
+        "method": "PATCH",
+        "fullPath": "/admin/users/:userId",
+        "signature": "@Patch('users/:userId') updateUser( @Req() request: AuthenticatedRequest, @Param('userId') userId: string, @Body() body: AdminUpdateUserDto, ) {"
+      },
+      {
+        "method": "DELETE",
+        "fullPath": "/admin/users/:userId",
+        "signature": "@Delete('users/:userId') deleteUser( @Req() request: AuthenticatedRequest, @Param('userId') userId: string, ) { return this.admin.deleteUser(request.user.id, userId);"
+      },
+      {
+        "method": "PATCH",
+        "fullPath": "/admin/users/:userId/status",
+        "signature": "@Patch('users/:userId/status') updateUserStatus( @Req() request: AuthenticatedRequest, @Param('userId') userId: string, @Body() body: AdminUpdateUserStatusDto, ) {"
+      },
+      {
+        "method": "DELETE",
+        "fullPath": "/admin/users/:userId/sessions",
+        "signature": "@Delete('users/:userId/sessions') forceRevokeAllSessions( @Req() request: AuthenticatedRequest, @Param('userId') userId: string, ) { return this.admin.forceRevokeAllSessions(request.user.id, userId);"
+      },
+      {
+        "method": "GET",
+        "fullPath": "/admin/organizations",
+        "signature": "@Get('organizations') listOrganizations( @Query('page') page?: string, @Query('limit') limit?: string, ) { return this.admin.listOrganizations("
+      },
+      {
+        "method": "GET",
+        "fullPath": "/admin/organizations/:orgId",
+        "signature": "@Get('organizations/:orgId') getOrganization(@Param('orgId') orgId: string) {"
+      },
+      {
+        "method": "PATCH",
+        "fullPath": "/admin/organizations/:orgId",
+        "signature": "@Patch('organizations/:orgId') updateOrganization( @Param('orgId') orgId: string, @Body() body: AdminUpdateOrganizationDto, ) { return this.admin.updateOrganization(orgId, body);"
+      },
+      {
+        "method": "POST",
+        "fullPath": "/admin/mail/test",
+        "signature": "@Post('mail/test') sendTestMail( @Req() request: AuthenticatedRequest, @Body() body: AdminTestMailDto, ) { return this.admin.sendTestMail(request.user.id, body);"
+      },
+      {
+        "method": "GET",
+        "fullPath": "/admin/mail/outbox",
+        "signature": "@Get('mail/outbox') getMailOutbox() {"
+      }
+    ]
+  },
+  {
+    "file": "backend/src/modules/audit/audit.controller.ts",
+    "name": "audit.controller.ts",
+    "basePrefix": "organizations/:orgId/audit",
+    "endpoints": [
+      {
+        "method": "GET",
+        "fullPath": "/organizations/:orgId/audit",
+        "signature": "@Get() search(@Param('orgId') orgId: string, @CurrentMember('id') _memberId: string, @Query() query: PaginationDto & { projectId?: string; issueId?: string; eventType?: string; actorMemberId?: string }) { return this.audit.search(orgId, query); }"
+      }
+    ]
+  },
+  {
+    "file": "backend/src/modules/auth/api-token.controller.ts",
+    "name": "api-token.controller.ts",
+    "basePrefix": "organizations/:orgId/api-tokens",
+    "endpoints": [
+      {
+        "method": "GET",
+        "fullPath": "/organizations/:orgId/api-tokens",
+        "signature": "@Get() list(@Param('orgId') orgId: string, @CurrentMember('id') memberId: string) { return this.tokens.list(orgId, memberId); }"
+      },
+      {
+        "method": "POST",
+        "fullPath": "/organizations/:orgId/api-tokens",
+        "signature": "@Post() create(@Param('orgId') orgId: string, @CurrentMember('id') memberId: string, @Body() body: { name: string; scopes: string[]; expiresAt?: string }) { return this.tokens.create(orgId, memberId, body); }"
+      },
+      {
+        "method": "DELETE",
+        "fullPath": "/organizations/:orgId/api-tokens/:tokenId",
+        "signature": "@Delete(':tokenId') revoke(@Param('orgId') orgId: string, @Param('tokenId') tokenId: string, @CurrentMember('id') memberId: string) { return this.tokens.revoke(orgId, memberId, tokenId); }"
+      }
+    ]
+  },
+  {
+    "file": "backend/src/modules/auth/auth.controller.ts",
+    "name": "auth.controller.ts",
+    "basePrefix": "auth",
+    "endpoints": [
+      {
+        "method": "POST",
+        "fullPath": "/auth/register",
+        "signature": "@Post('register') register(@Body() body: RegisterDto) { return this.auth.register(body); }"
+      },
+      {
+        "method": "POST",
+        "fullPath": "/auth/google",
+        "signature": "@Post('google') google(@Body() body: GoogleLoginDto, @Ip() ip: string, @Headers('user-agent') userAgent?: string) {"
+      },
+      {
+        "method": "POST",
+        "fullPath": "/auth/login",
+        "signature": "@Post('login') login(@Body() body: LoginDto, @Ip() ip: string, @Headers('user-agent') userAgent?: string) {"
+      },
+      {
+        "method": "POST",
+        "fullPath": "/auth/refresh",
+        "signature": "@Post('refresh') refresh(@Body() body: RefreshDto, @Ip() ip: string, @Headers('user-agent') userAgent?: string) {"
+      },
+      {
+        "method": "POST",
+        "fullPath": "/auth/logout",
+        "signature": "@Post('logout') async logout(@Req() request: AuthenticatedRequest) { await this.auth.logout(request.user.sessionId); return { success: true }; }"
+      },
+      {
+        "method": "POST",
+        "fullPath": "/auth/logout-all",
+        "signature": "@Post('logout-all') async logoutAll(@Req() request: AuthenticatedRequest) { await this.auth.logoutAll(request.user.id); return { success: true }; }"
+      },
+      {
+        "method": "GET",
+        "fullPath": "/auth/me",
+        "signature": "@Get('me') me(@Req() request: AuthenticatedRequest) { return this.auth.getProfile(request.user.id); }"
+      },
+      {
+        "method": "PATCH",
+        "fullPath": "/auth/me",
+        "signature": "@Patch('me') updateProfile(@Req() request: AuthenticatedRequest, @Body() body: UpdateProfileDto) { return this.auth.updateProfile(request.user.id, body); }"
+      },
+      {
+        "method": "POST",
+        "fullPath": "/auth/verify-email",
+        "signature": "@Post('verify-email') verifyEmail(@Body() body: VerifyEmailDto) { return this.auth.verifyEmailWithToken(body.userId, body.token); }"
+      },
+      {
+        "method": "POST",
+        "fullPath": "/auth/request-verification",
+        "signature": "@Post('request-verification') requestVerification(@Body() body: RequestVerificationDto) { return this.auth.requestEmailVerification(body.email); }"
+      },
+      {
+        "method": "POST",
+        "fullPath": "/auth/forgot-password",
+        "signature": "@Post('forgot-password') forgotPassword(@Body() body: ForgotPasswordDto) { return this.auth.requestPasswordReset(body.email); }"
+      },
+      {
+        "method": "POST",
+        "fullPath": "/auth/reset-password",
+        "signature": "@Post('reset-password') resetPassword(@Body() body: ResetPasswordDto) { return this.auth.resetPassword(body.userId, body.token, body.password); }"
+      },
+      {
+        "method": "POST",
+        "fullPath": "/auth/change-password",
+        "signature": "@Post('change-password') changePassword(@Req() request: AuthenticatedRequest, @Body() body: ChangePasswordDto) { return this.auth.changePassword(request.user.id, body.currentPassword, body.newPassword); }"
+      },
+      {
+        "method": "GET",
+        "fullPath": "/auth/sessions",
+        "signature": "@Get('sessions') sessions(@Req() request: AuthenticatedRequest) { return this.auth.listSessions(request.user.id, request.user.sessionId); }"
+      },
+      {
+        "method": "DELETE",
+        "fullPath": "/auth/sessions/:sessionId",
+        "signature": "@Delete('sessions/:sessionId') revokeSession(@Req() request: AuthenticatedRequest, @Param('sessionId') sessionId: string) {"
+      },
+      {
+        "method": "POST",
+        "fullPath": "/auth/me/deactivate",
+        "signature": "@Post('me/deactivate') deactivate(@Req() request: AuthenticatedRequest, @Body() body: AccountPasswordDto) { return this.auth.deactivate(request.user.id, body.password); }"
+      },
+      {
+        "method": "POST",
+        "fullPath": "/auth/reactivate",
+        "signature": "@Post('reactivate') reactivate(@Body() body: LoginDto) { return this.auth.reactivate(body.email, body.password); }"
+      }
+    ]
+  },
+  {
+    "file": "backend/src/modules/automation/automation.controller.ts",
+    "name": "automation.controller.ts",
+    "basePrefix": "organizations/:orgId/automation-rules",
+    "endpoints": [
+      {
+        "method": "GET",
+        "fullPath": "/organizations/:orgId/automation-rules",
+        "signature": "@Get() list(@Param('orgId') orgId: string, @CurrentMember('id') memberId: string) { return this.automation.list(orgId, memberId); }"
+      },
+      {
+        "method": "POST",
+        "fullPath": "/organizations/:orgId/automation-rules",
+        "signature": "@Post() @UseGuards(OrgPermissionGuard) @RequirePermissions('MANAGE_AUTOMATION') create(@Param('orgId') orgId: string, @CurrentMember('id') memberId: string, @Body() body: Parameters<AutomationService['create']>[2]) { return this.automation.create(orgId, memberId, body); }"
+      },
+      {
+        "method": "POST",
+        "fullPath": "/organizations/:orgId/automation-rules/:ruleId/activate",
+        "signature": "@Post(':ruleId/activate') @UseGuards(OrgPermissionGuard) @RequirePermissions('MANAGE_AUTOMATION') activate(@Param('orgId') orgId: string, @Param('ruleId') id: string, @CurrentMember('id') memberId: string) { return this.automation.activate(orgId, memberId, id); }"
+      },
+      {
+        "method": "POST",
+        "fullPath": "/organizations/:orgId/automation-rules/:ruleId/execute",
+        "signature": "@Post(':ruleId/execute') @UseGuards(OrgPermissionGuard) @RequirePermissions('MANAGE_AUTOMATION') execute(@Param('orgId') orgId: string, @Param('ruleId') id: string, @CurrentMember('id') memberId: string, @Body() body: { idempotencyKey: string }) { return this.automation.execute(orgId, memberId, id, body.idempotencyKey); }"
+      }
+    ]
+  },
+  {
+    "file": "backend/src/modules/board/board.controller.ts",
+    "name": "board.controller.ts",
+    "basePrefix": "organizations/:orgId/projects/:projectId/boards",
+    "endpoints": [
+      {
+        "method": "GET",
+        "fullPath": "/organizations/:orgId/projects/:projectId/boards",
+        "signature": "@Get() list(@Param('projectId') projectId: string) { return this.boards.list(projectId); }"
+      },
+      {
+        "method": "POST",
+        "fullPath": "/organizations/:orgId/projects/:projectId/boards",
+        "signature": "@Post() @UseGuards(ProjectPermissionGuard) @RequirePermissions('MANAGE_BOARD') createBoard(@Param('projectId') projectId: string, @Body() body: CreateBoardDto) { return this.boards.createBoard(projectId, body); }"
+      },
+      {
+        "method": "POST",
+        "fullPath": "/organizations/:orgId/projects/:projectId/boards/:boardId/columns",
+        "signature": "@Post(':boardId/columns') @UseGuards(ProjectPermissionGuard) @RequirePermissions('MANAGE_BOARD') addColumn(@Param('projectId') projectId: string, @Param('boardId') boardId: string, @Body() body: CreateColumnDto) { return this.boards.addColumn(projectId, boardId, body); }"
+      },
+      {
+        "method": "PATCH",
+        "fullPath": "/organizations/:orgId/projects/:projectId/boards/:boardId/columns/:columnId",
+        "signature": "@Patch(':boardId/columns/:columnId') @UseGuards(ProjectPermissionGuard) @RequirePermissions('MANAGE_BOARD') updateColumn(@Param('projectId') projectId: string, @Param('boardId') boardId: string, @Param('columnId') columnId: string, @Body() body: UpdateColumnDto) { return this.boards.updateColumn(projectId, boardId, columnId, body); }"
+      },
+      {
+        "method": "PATCH",
+        "fullPath": "/organizations/:orgId/projects/:projectId/boards/:boardId/columns/:columnId/states",
+        "signature": "@Patch(':boardId/columns/:columnId/states') @UseGuards(ProjectPermissionGuard) @RequirePermissions('MANAGE_BOARD') mapStates(@Param('projectId') projectId: string, @Param('boardId') boardId: string, @Param('columnId') columnId: string, @Body() body: MapColumnStatesDto) { return this.boards.mapStates(projectId, boardId, columnId, body.workflowStateIds); }"
+      },
+      {
+        "method": "POST",
+        "fullPath": "/organizations/:orgId/projects/:projectId/boards/:boardId/issues/reorder",
+        "signature": "@Post(':boardId/issues/reorder') reorder(@Param('projectId') projectId: string, @Param('boardId') boardId: string, @Body() body: ReorderIssueDto) { return this.boards.reorder(projectId, boardId, body); }"
+      },
+      {
+        "method": "GET",
+        "fullPath": "/organizations/:orgId/projects/:projectId/boards/:boardId",
+        "signature": "@Get(':boardId') getBoard(@Param('projectId') projectId: string, @Param('boardId') boardId: string) { return this.boards.getBoardIssues(projectId, boardId); }"
+      },
+      {
+        "method": "GET",
+        "fullPath": "/organizations/:orgId/projects/:projectId/boards/:boardId/issues",
+        "signature": "@Get(':boardId/issues') getIssues(@Param('projectId') projectId: string, @Param('boardId') boardId: string) { return this.boards.getBoardIssues(projectId, boardId); }"
+      }
+    ]
+  },
+  {
+    "file": "backend/src/modules/catalog/catalog.controller.ts",
+    "name": "catalog.controller.ts",
+    "basePrefix": "organizations/:orgId/catalog",
+    "endpoints": [
+      {
+        "method": "GET",
+        "fullPath": "/organizations/:orgId/catalog/issue-types",
+        "signature": "@Get('issue-types') listTypes(@Param('orgId') orgId: string) { return this.catalog.listTypes(orgId); }"
+      },
+      {
+        "method": "POST",
+        "fullPath": "/organizations/:orgId/catalog/issue-types",
+        "signature": "@Post('issue-types') @UseGuards(OrgPermissionGuard) @RequirePermissions('MANAGE_ISSUE_TYPES') createType(@Param('orgId') orgId: string, @Body() body: { key: string; name: string; description?: string }) { return this.catalog.createType(orgId, body); }"
+      },
+      {
+        "method": "GET",
+        "fullPath": "/organizations/:orgId/catalog/labels",
+        "signature": "@Get('labels') listLabels(@Param('orgId') orgId: string) { return this.catalog.listLabels(orgId); }"
+      },
+      {
+        "method": "DELETE",
+        "fullPath": "/organizations/:orgId/catalog/labels/:labelId",
+        "signature": "@Delete('labels/:labelId') @UseGuards(OrgPermissionGuard) @RequirePermissions('MANAGE_LABELS') archiveLabel(@Param('orgId') orgId: string, @Param('labelId') id: string) { return this.catalog.archiveLabel(orgId, id); }"
+      },
+      {
+        "method": "GET",
+        "fullPath": "/organizations/:orgId/catalog/link-types",
+        "signature": "@Get('link-types') listLinkTypes(@Param('orgId') orgId: string) { return this.catalog.listLinkTypes(orgId); }"
+      },
+      {
+        "method": "POST",
+        "fullPath": "/organizations/:orgId/catalog/link-types",
+        "signature": "@Post('link-types') @UseGuards(OrgPermissionGuard) @RequirePermissions('MANAGE_LINK_TYPES') createLinkType(@Param('orgId') orgId: string, @Body() body: { key: string; outwardLabel: string; inwardLabel: string; directionality?: 'directed' | 'symmetric' }) { return this.catalog.createLinkType(orgId, body); }"
+      },
+      {
+        "method": "DELETE",
+        "fullPath": "/organizations/:orgId/catalog/link-types/:linkTypeId",
+        "signature": "@Delete('link-types/:linkTypeId') @UseGuards(OrgPermissionGuard) @RequirePermissions('MANAGE_LINK_TYPES') archiveLinkType(@Param('orgId') orgId: string, @Param('linkTypeId') id: string) { return this.catalog.archiveLinkType(orgId, id); }"
+      }
+    ]
+  },
+  {
+    "file": "backend/src/modules/custom-field/custom-field.controller.ts",
+    "name": "custom-field.controller.ts",
+    "basePrefix": "organizations/:orgId/custom-fields",
+    "endpoints": [
+      {
+        "method": "GET",
+        "fullPath": "/organizations/:orgId/custom-fields",
+        "signature": "@Get() list(@Param('orgId') orgId: string) { return this.fields.list(orgId); }"
+      },
+      {
+        "method": "POST",
+        "fullPath": "/organizations/:orgId/custom-fields",
+        "signature": "@Post() @UseGuards(OrgPermissionGuard) @RequirePermissions('MANAGE_CUSTOM_FIELDS') create(@Param('orgId') orgId: string, @Body() body: CreateCustomFieldDto) { return this.fields.create(orgId, body); }"
+      },
+      {
+        "method": "POST",
+        "fullPath": "/organizations/:orgId/custom-fields/:fieldId/contexts",
+        "signature": "@Post(':fieldId/contexts') @UseGuards(OrgPermissionGuard) @RequirePermissions('MANAGE_CUSTOM_FIELDS') context(@Param('orgId') orgId: string, @Param('fieldId') fieldId: string, @Body() body: CreateContextDto) { return this.fields.createContext(orgId, fieldId, body); }"
+      },
+      {
+        "method": "POST",
+        "fullPath": "/organizations/:orgId/custom-fields/:fieldId/options",
+        "signature": "@Post(':fieldId/options') @UseGuards(OrgPermissionGuard) @RequirePermissions('MANAGE_CUSTOM_FIELDS') option(@Param('orgId') orgId: string, @Param('fieldId') fieldId: string, @Body() body: CreateOptionDto) { return this.fields.createOption(orgId, fieldId, body); }"
+      },
+      {
+        "method": "POST",
+        "fullPath": "/organizations/:orgId/custom-fields/issues/:issueId/value",
+        "signature": "@Post('issues/:issueId/value') setValue(@Param('orgId') orgId: string, @Param('issueId') issueId: string, @CurrentMember('id') memberId: string, @Body() body: SetValueDto) { return this.fields.setValue(orgId, issueId, memberId, body); }"
+      }
+    ]
+  },
+  {
+    "file": "backend/src/modules/issue/attachment.controller.ts",
+    "name": "attachment.controller.ts",
+    "basePrefix": "organizations/:orgId/issues/:issueId/attachments",
+    "endpoints": [
+      {
+        "method": "POST",
+        "fullPath": "/organizations/:orgId/issues/:issueId/attachments",
+        "signature": "@Post() @RequirePermissions('ADD_ATTACHMENT') @UseInterceptors(FileInterceptor('file')) upload(@Param('orgId') orgId: string, @Param('issueId') issueId: string, @CurrentMember('id') memberId: string, @UploadedFile() file: UploadedAttachmentFile) { return this.attachments.upload(orgId, issueId, memberId, file); }"
+      },
+      {
+        "method": "GET",
+        "fullPath": "/organizations/:orgId/issues/:issueId/attachments",
+        "signature": "@Get() list(@Param('orgId') orgId: string, @Param('issueId') issueId: string, @CurrentMember('id') memberId: string, @Query() pagination: PaginationDto) { return this.attachments.list(orgId, issueId, memberId, pagination); }"
+      },
+      {
+        "method": "GET",
+        "fullPath": "/organizations/:orgId/issues/:issueId/attachments/:attachmentId",
+        "signature": "@Get(':attachmentId') async download(@Param('orgId') orgId: string, @Param('attachmentId') attachmentId: string, @CurrentMember('id') memberId: string, @Res() response: Response) {"
+      },
+      {
+        "method": "DELETE",
+        "fullPath": "/organizations/:orgId/issues/:issueId/attachments/:attachmentId",
+        "signature": "@Delete(':attachmentId') @RequirePermissions('DELETE_ATTACHMENT') remove(@Param('orgId') orgId: string, @Param('attachmentId') attachmentId: string, @CurrentMember('id') memberId: string) { return this.attachments.remove(orgId, attachmentId, memberId); }"
+      }
+    ]
+  },
+  {
+    "file": "backend/src/modules/issue/issue.controller.ts",
+    "name": "issue.controller.ts",
+    "basePrefix": "organizations/:orgId/issues/:issueId",
+    "endpoints": [
+      {
+        "method": "GET",
+        "fullPath": "/organizations/:orgId/issues/:issueId",
+        "signature": "@Get() get(@Param('orgId') orgId: string, @Param('issueId') issueId: string, @CurrentMember('id') memberId: string, @CurrentIssue() issue?: Issue) { return this.issues.getDetail(orgId, issueId, memberId, issue); }"
+      },
+      {
+        "method": "PATCH",
+        "fullPath": "/organizations/:orgId/issues/:issueId",
+        "signature": "@Patch() @RequirePermissions('EDIT_ISSUE') update(@Param('orgId') orgId: string, @Param('issueId') issueId: string, @CurrentMember('id') memberId: string, @Body() body: any) { return this.issues.update(orgId, issueId, memberId, body); }"
+      },
+      {
+        "method": "DELETE",
+        "fullPath": "/organizations/:orgId/issues/:issueId",
+        "signature": "@Delete() @RequirePermissions('DELETE_ISSUE') delete(@Param('orgId') orgId: string, @Param('issueId') issueId: string, @CurrentMember('id') memberId: string) { return this.issues.delete(orgId, issueId, memberId); }"
+      },
+      {
+        "method": "POST",
+        "fullPath": "/organizations/:orgId/issues/:issueId/transitions",
+        "signature": "@Post('transitions') @RequirePermissions('TRANSITION_ISSUE') transition(@Param('orgId') orgId: string, @Param('issueId') issueId: string, @CurrentMember('id') memberId: string, @Body() body: any) { return this.issues.transition(orgId, issueId, memberId, body); }"
+      },
+      {
+        "method": "GET",
+        "fullPath": "/organizations/:orgId/issues/:issueId/transitions",
+        "signature": "@Get('transitions') transitions(@Param('orgId') orgId: string, @Param('issueId') issueId: string, @CurrentMember('id') memberId: string) { return this.issues.listTransitions(orgId, issueId, memberId); }"
+      },
+      {
+        "method": "GET",
+        "fullPath": "/organizations/:orgId/issues/:issueId/labels",
+        "signature": "@Get('labels') labels(@Param('orgId') orgId: string, @Param('issueId') issueId: string, @CurrentMember('id') memberId: string) { return this.issues.listLabels(orgId, issueId, memberId); }"
+      },
+      {
+        "method": "GET",
+        "fullPath": "/organizations/:orgId/issues/:issueId/watchers",
+        "signature": "@Get('watchers') watchers(@Param('orgId') orgId: string, @Param('issueId') issueId: string, @CurrentMember('id') memberId: string) { return this.issues.listWatchers(orgId, issueId, memberId); }"
+      },
+      {
+        "method": "GET",
+        "fullPath": "/organizations/:orgId/issues/:issueId/links",
+        "signature": "@Get('links') links(@Param('orgId') orgId: string, @Param('issueId') issueId: string, @CurrentMember('id') memberId: string) { return this.issues.listLinks(orgId, issueId, memberId); }"
+      },
+      {
+        "method": "GET",
+        "fullPath": "/organizations/:orgId/issues/:issueId/history",
+        "signature": "@Get('history') history(@Param('orgId') orgId: string, @Param('issueId') issueId: string, @CurrentMember('id') memberId: string) { return this.issues.listHistory(orgId, issueId, memberId); }"
+      },
+      {
+        "method": "POST",
+        "fullPath": "/organizations/:orgId/issues/:issueId/comments",
+        "signature": "@Post('comments') @RequirePermissions('ADD_COMMENT') addComment(@Param('orgId') orgId: string, @Param('issueId') issueId: string, @CurrentMember('id') memberId: string, @Body() body: CreateCommentDto) { return this.issues.addComment(orgId, issueId, memberId, body); }"
+      },
+      {
+        "method": "GET",
+        "fullPath": "/organizations/:orgId/issues/:issueId/comments",
+        "signature": "@Get('comments') comments(@Param('orgId') orgId: string, @Param('issueId') issueId: string, @CurrentMember('id') memberId: string, @Query() pagination: PaginationDto) { return this.issues.listComments(orgId, issueId, memberId, pagination); }"
+      },
+      {
+        "method": "DELETE",
+        "fullPath": "/organizations/:orgId/issues/:issueId/comments/:commentId",
+        "signature": "@Delete('comments/:commentId') @RequirePermissions('DELETE_COMMENT') deleteComment(@Param('orgId') orgId: string, @Param('issueId') issueId: string, @Param('commentId') commentId: string, @CurrentMember('id') memberId: string) { return this.issues.deleteComment(orgId, issueId, commentId, memberId); }"
+      },
+      {
+        "method": "POST",
+        "fullPath": "/organizations/:orgId/issues/:issueId/work-logs",
+        "signature": "@Post('work-logs') @RequirePermissions('LOG_WORK') addWorkLog(@Param('orgId') orgId: string, @Param('issueId') issueId: string, @CurrentMember('id') memberId: string, @Body() body: CreateWorkLogDto) { return this.issues.addWorkLog(orgId, issueId, memberId, body); }"
+      },
+      {
+        "method": "GET",
+        "fullPath": "/organizations/:orgId/issues/:issueId/work-logs",
+        "signature": "@Get('work-logs') workLogs(@Param('orgId') orgId: string, @Param('issueId') issueId: string, @CurrentMember('id') memberId: string, @Query() pagination: PaginationDto) { return this.issues.listWorkLogs(orgId, issueId, memberId, pagination); }"
+      },
+      {
+        "method": "POST",
+        "fullPath": "/organizations/:orgId/issues/:issueId/labels",
+        "signature": "@Post('labels') @RequirePermissions('EDIT_ISSUE') addLabel(@Param('orgId') orgId: string, @Param('issueId') issueId: string, @CurrentMember('id') memberId: string, @Body() body: AddLabelDto) { return this.issues.addLabel(orgId, issueId, memberId, body); }"
+      },
+      {
+        "method": "POST",
+        "fullPath": "/organizations/:orgId/issues/:issueId/watchers",
+        "signature": "@Post('watchers') @RequirePermissions('MANAGE_WATCHERS') addWatcher(@Param('orgId') orgId: string, @Param('issueId') issueId: string, @CurrentMember('id') memberId: string, @Body() body: AddWatcherDto) { return this.issues.addWatcher(orgId, issueId, memberId, body); }"
+      },
+      {
+        "method": "POST",
+        "fullPath": "/organizations/:orgId/issues/:issueId/links",
+        "signature": "@Post('links') @RequirePermissions('LINK_ISSUE') linkIssue(@Param('orgId') orgId: string, @Param('issueId') issueId: string, @CurrentMember('id') memberId: string, @Body() body: CreateIssueLinkDto) { return this.issues.linkIssue(orgId, issueId, memberId, body); }"
+      }
+    ]
+  },
+  {
+    "file": "backend/src/modules/job/job.controller.ts",
+    "name": "job.controller.ts",
+    "basePrefix": "organizations/:orgId/jobs",
+    "endpoints": [
+      {
+        "method": "GET",
+        "fullPath": "/organizations/:orgId/jobs",
+        "signature": "@Get() list(@Param('orgId') orgId: string, @CurrentMember('id') memberId: string) { return this.jobs.list(orgId, memberId); }"
+      },
+      {
+        "method": "POST",
+        "fullPath": "/organizations/:orgId/jobs",
+        "signature": "@Post() create(@Param('orgId') orgId: string, @CurrentMember('id') memberId: string, @Body() body: { jobType: 'reconciliation' | 'import' | 'export'; idempotencyKey: string; input?: Record<string, unknown> }) { return this.jobs.create(orgId, memberId, body); }"
+      },
+      {
+        "method": "GET",
+        "fullPath": "/organizations/:orgId/jobs/:jobId",
+        "signature": "@Get(':jobId') get(@Param('orgId') orgId: string, @Param('jobId') jobId: string, @CurrentMember('id') memberId: string) { return this.jobs.get(orgId, memberId, jobId); }"
+      },
+      {
+        "method": "DELETE",
+        "fullPath": "/organizations/:orgId/jobs/:jobId",
+        "signature": "@Delete(':jobId') cancel(@Param('orgId') orgId: string, @Param('jobId') jobId: string, @CurrentMember('id') memberId: string) { return this.jobs.cancel(orgId, memberId, jobId); }"
+      }
+    ]
+  },
+  {
+    "file": "backend/src/modules/notification/notification.controller.ts",
+    "name": "notification.controller.ts",
+    "basePrefix": "organizations/:orgId/notifications",
+    "endpoints": [
+      {
+        "method": "GET",
+        "fullPath": "/organizations/:orgId/notifications",
+        "signature": "@Get() list(@Param('orgId') orgId: string, @CurrentMember('id') memberId: string) { return this.outbox.list(orgId, memberId); }"
+      },
+      {
+        "method": "PATCH",
+        "fullPath": "/organizations/:orgId/notifications/:notificationId/read",
+        "signature": "@Patch(':notificationId/read') markRead(@Param('orgId') orgId: string, @Param('notificationId') notificationId: string, @CurrentMember('id') memberId: string) { return this.outbox.markRead(orgId, memberId, notificationId); }"
+      },
+      {
+        "method": "GET",
+        "fullPath": "/organizations/:orgId/notifications/preferences",
+        "signature": "@Get('preferences') listPreferences(@Param('orgId') orgId: string, @CurrentMember('id') memberId: string) { return this.preferences.list(orgId, memberId); }"
+      },
+      {
+        "method": "PUT",
+        "fullPath": "/organizations/:orgId/notifications/preferences",
+        "signature": "@Put('preferences') setPreference(@Param('orgId') orgId: string, @CurrentMember('id') memberId: string, @Body() body: { notificationType: string; channel: 'in_app' | 'email'; enabled: boolean }) { return this.preferences.upsert(orgId, memberId, body); }"
+      }
+    ]
+  },
+  {
+    "file": "backend/src/modules/organization/organization.controller.ts",
+    "name": "organization.controller.ts",
+    "basePrefix": "organizations",
+    "endpoints": [
+      {
+        "method": "POST",
+        "fullPath": "/organizations",
+        "signature": "@Post() create(@Req() request: RequestWithUser, @Body() body: CreateOrganizationDto) {"
+      },
+      {
+        "method": "GET",
+        "fullPath": "/organizations",
+        "signature": "@Get() list(@Req() request: RequestWithUser) {"
+      },
+      {
+        "method": "GET",
+        "fullPath": "/organizations/invitations/me",
+        "signature": "@Get('invitations/me') myInvitations(@Req() request: RequestWithUser) {"
+      },
+      {
+        "method": "POST",
+        "fullPath": "/organizations/invitations/accept",
+        "signature": "@Post('invitations/accept') accept(@Req() request: RequestWithUser, @Body() body: AcceptInvitationDto) {"
+      },
+      {
+        "method": "POST",
+        "fullPath": "/organizations/invitations/decline",
+        "signature": "@Post('invitations/decline') decline(@Req() request: RequestWithUser, @Body() body: DeclineInvitationDto) {"
+      },
+      {
+        "method": "GET",
+        "fullPath": "/organizations/:orgId",
+        "signature": "@Get(':orgId') @UseGuards(OrgMembershipGuard) get(@Param('orgId') orgId: string) {"
+      },
+      {
+        "method": "PATCH",
+        "fullPath": "/organizations/:orgId",
+        "signature": "@Patch(':orgId') @UseGuards(OrgMembershipGuard, OrgPermissionGuard) @RequirePermissions('MANAGE_ORG') update(@Param('orgId') orgId: string, @Body() body: UpdateOrganizationDto) {"
+      },
+      {
+        "method": "GET",
+        "fullPath": "/organizations/:orgId/members",
+        "signature": "@Get(':orgId/members') @UseGuards(OrgMembershipGuard) members(@Param('orgId') orgId: string) {"
+      },
+      {
+        "method": "GET",
+        "fullPath": "/organizations/:orgId/roles",
+        "signature": "@Get(':orgId/roles') @UseGuards(OrgMembershipGuard) roles(@Param('orgId') orgId: string) {"
+      },
+      {
+        "method": "GET",
+        "fullPath": "/organizations/:orgId/invitations",
+        "signature": "@Get(':orgId/invitations') @UseGuards(OrgMembershipGuard, OrgPermissionGuard) @RequirePermissions('MANAGE_USERS') invitations(@Param('orgId') orgId: string) {"
+      },
+      {
+        "method": "GET",
+        "fullPath": "/organizations/:orgId/departments",
+        "signature": "@Get(':orgId/departments') @UseGuards(OrgMembershipGuard) departments(@Param('orgId') orgId: string) {"
+      },
+      {
+        "method": "GET",
+        "fullPath": "/organizations/:orgId/departments/:departmentId/members",
+        "signature": "@Get(':orgId/departments/:departmentId/members') @UseGuards(OrgMembershipGuard) departmentMembers(@Param('orgId') orgId: string, @Param('departmentId') departmentId: string) {"
+      },
+      {
+        "method": "GET",
+        "fullPath": "/organizations/:orgId/groups",
+        "signature": "@Get(':orgId/groups') @UseGuards(OrgMembershipGuard) groups(@Param('orgId') orgId: string) {"
+      },
+      {
+        "method": "GET",
+        "fullPath": "/organizations/:orgId/groups/:groupId/members",
+        "signature": "@Get(':orgId/groups/:groupId/members') @UseGuards(OrgMembershipGuard) groupMembers(@Param('orgId') orgId: string, @Param('groupId') groupId: string) {"
+      },
+      {
+        "method": "POST",
+        "fullPath": "/organizations/:orgId/invitations",
+        "signature": "@Post(':orgId/invitations') @UseGuards(OrgMembershipGuard, OrgPermissionGuard) @RequirePermissions('MANAGE_USERS') invite(@Param('orgId') orgId: string, @CurrentMember('id') memberId: string, @Body() body: InviteMemberDto) {"
+      },
+      {
+        "method": "DELETE",
+        "fullPath": "/organizations/:orgId/invitations/:invitationId",
+        "signature": "@Delete(':orgId/invitations/:invitationId') @UseGuards(OrgMembershipGuard, OrgPermissionGuard) @RequirePermissions('MANAGE_USERS') revokeInvitation(@Param('orgId') orgId: string, @Param('invitationId') invitationId: string) {"
+      },
+      {
+        "method": "POST",
+        "fullPath": "/organizations/:orgId/invitations/:invitationId/resend",
+        "signature": "@Post(':orgId/invitations/:invitationId/resend') @UseGuards(OrgMembershipGuard, OrgPermissionGuard) @RequirePermissions('MANAGE_USERS') resendInvitation(@Param('orgId') orgId: string, @Param('invitationId') invitationId: string, @CurrentMember('id') memberId: string) {"
+      },
+      {
+        "method": "DELETE",
+        "fullPath": "/organizations/:orgId/members/me",
+        "signature": "@Delete(':orgId/members/me') @UseGuards(OrgMembershipGuard) leaveOrganization(@Param('orgId') orgId: string, @Req() request: RequestWithUser) {"
+      },
+      {
+        "method": "PATCH",
+        "fullPath": "/organizations/:orgId/members/:memberId/status",
+        "signature": "@Patch(':orgId/members/:memberId/status') @UseGuards(OrgMembershipGuard, OrgPermissionGuard) @RequirePermissions('MANAGE_USERS') updateStatus(@Param('orgId') orgId: string, @Param('memberId') memberId: string, @Body() body: UpdateMemberStatusDto) {"
+      },
+      {
+        "method": "POST",
+        "fullPath": "/organizations/:orgId/departments",
+        "signature": "@Post(':orgId/departments') @UseGuards(OrgMembershipGuard, OrgPermissionGuard) @RequirePermissions('MANAGE_DEPARTMENTS') createDepartment(@Param('orgId') orgId: string, @Body() body: CreateDepartmentDto) {"
+      },
+      {
+        "method": "POST",
+        "fullPath": "/organizations/:orgId/departments/:departmentId/members",
+        "signature": "@Post(':orgId/departments/:departmentId/members') @UseGuards(OrgMembershipGuard, OrgPermissionGuard) @RequirePermissions('MANAGE_DEPARTMENTS') addDepartmentMember(@Param('orgId') orgId: string, @Param('departmentId') departmentId: string, @Body() body: AddMemberDto) {"
+      },
+      {
+        "method": "PATCH",
+        "fullPath": "/organizations/:orgId/departments/:departmentId",
+        "signature": "@Patch(':orgId/departments/:departmentId') @UseGuards(OrgMembershipGuard, OrgPermissionGuard) @RequirePermissions('MANAGE_DEPARTMENTS') updateDepartment(@Param('orgId') orgId: string, @Param('departmentId') departmentId: string, @Body() body: UpdateDepartmentDto) {"
+      },
+      {
+        "method": "DELETE",
+        "fullPath": "/organizations/:orgId/departments/:departmentId/members/:memberId",
+        "signature": "@Delete(':orgId/departments/:departmentId/members/:memberId') @UseGuards(OrgMembershipGuard, OrgPermissionGuard) @RequirePermissions('MANAGE_DEPARTMENTS') removeDepartmentMember(@Param('orgId') orgId: string, @Param('departmentId') departmentId: string, @Param('memberId') memberId: string) {"
+      },
+      {
+        "method": "POST",
+        "fullPath": "/organizations/:orgId/groups",
+        "signature": "@Post(':orgId/groups') @UseGuards(OrgMembershipGuard, OrgPermissionGuard) @RequirePermissions('MANAGE_GROUPS') createGroup(@Param('orgId') orgId: string, @Body() body: CreateGroupDto) {"
+      },
+      {
+        "method": "POST",
+        "fullPath": "/organizations/:orgId/groups/:groupId/members",
+        "signature": "@Post(':orgId/groups/:groupId/members') @UseGuards(OrgMembershipGuard, OrgPermissionGuard) @RequirePermissions('MANAGE_GROUPS') addGroupMember(@Param('orgId') orgId: string, @Param('groupId') groupId: string, @CurrentMember('id') actorMemberId: string, @Body() body: AddMemberDto) {"
+      },
+      {
+        "method": "PATCH",
+        "fullPath": "/organizations/:orgId/groups/:groupId",
+        "signature": "@Patch(':orgId/groups/:groupId') @UseGuards(OrgMembershipGuard, OrgPermissionGuard) @RequirePermissions('MANAGE_GROUPS') updateGroup(@Param('orgId') orgId: string, @Param('groupId') groupId: string, @Body() body: UpdateGroupDto) {"
+      },
+      {
+        "method": "DELETE",
+        "fullPath": "/organizations/:orgId/groups/:groupId/members/:memberId",
+        "signature": "@Delete(':orgId/groups/:groupId/members/:memberId') @UseGuards(OrgMembershipGuard, OrgPermissionGuard) @RequirePermissions('MANAGE_GROUPS') removeGroupMember(@Param('orgId') orgId: string, @Param('groupId') groupId: string, @Param('memberId') memberId: string) {"
+      },
+      {
+        "method": "POST",
+        "fullPath": "/organizations/:orgId/roles",
+        "signature": "@Post(':orgId/roles') @UseGuards(OrgMembershipGuard, OrgPermissionGuard) @RequirePermissions('MANAGE_ORG') createRole(@Param('orgId') orgId: string, @Body() body: CreateOrgRoleDto) {"
+      },
+      {
+        "method": "POST",
+        "fullPath": "/organizations/:orgId/roles/assign",
+        "signature": "@Post(':orgId/roles/assign') @UseGuards(OrgMembershipGuard, OrgPermissionGuard) @RequirePermissions('MANAGE_ORG') assignRole(@Param('orgId') orgId: string, @Body() body: AssignOrgRoleDto) {"
+      },
+      {
+        "method": "POST",
+        "fullPath": "/organizations/:orgId/roles/:roleId/permissions",
+        "signature": "@Post(':orgId/roles/:roleId/permissions') @UseGuards(OrgMembershipGuard, OrgPermissionGuard) @RequirePermissions('MANAGE_ORG') setRolePermissions(@Param('orgId') orgId: string, @Param('roleId') roleId: string, @Body() body: { permissionKeys: string[] }) {"
+      },
+      {
+        "method": "GET",
+        "fullPath": "/organizations/:orgId/roles/:roleId/permissions",
+        "signature": "@Get(':orgId/roles/:roleId/permissions') @UseGuards(OrgMembershipGuard, OrgPermissionGuard) @RequirePermissions('MANAGE_ORG') rolePermissions(@Param('orgId') orgId: string, @Param('roleId') roleId: string) {"
+      }
+    ]
+  },
+  {
+    "file": "backend/src/modules/productivity/dashboard.controller.ts",
+    "name": "dashboard.controller.ts",
+    "basePrefix": "organizations/:orgId/dashboards",
+    "endpoints": [
+      {
+        "method": "GET",
+        "fullPath": "/organizations/:orgId/dashboards",
+        "signature": "@Get() list(@Param('orgId') orgId: string, @CurrentMember('id') memberId: string) { return this.dashboards.list(orgId, memberId); }"
+      },
+      {
+        "method": "POST",
+        "fullPath": "/organizations/:orgId/dashboards",
+        "signature": "@Post() create(@Param('orgId') orgId: string, @CurrentMember('id') memberId: string, @Body() body: { name: string; description?: string }) { return this.dashboards.create(orgId, memberId, body); }"
+      },
+      {
+        "method": "GET",
+        "fullPath": "/organizations/:orgId/dashboards/:dashboardId/widgets",
+        "signature": "@Get(':dashboardId/widgets') widgets(@Param('orgId') orgId: string, @Param('dashboardId') id: string, @CurrentMember('id') memberId: string) { return this.dashboards.getWidgets(orgId, memberId, id); }"
+      },
+      {
+        "method": "POST",
+        "fullPath": "/organizations/:orgId/dashboards/:dashboardId/widgets",
+        "signature": "@Post(':dashboardId/widgets') addWidget(@Param('orgId') orgId: string, @Param('dashboardId') id: string, @CurrentMember('id') memberId: string, @Body() body: { widgetType: string; savedFilterId?: string; configJson?: Record<string, unknown>; position?: number }) { return this.dashboards.addWidget(orgId, memberId, id, body); }"
+      },
+      {
+        "method": "POST",
+        "fullPath": "/organizations/:orgId/dashboards/:dashboardId/shares",
+        "signature": "@Post(':dashboardId/shares') share(@Param('orgId') orgId: string, @Param('dashboardId') id: string, @CurrentMember('id') memberId: string, @Body() body: { granteeType: string; orgMemberId?: string; projectId?: string; canEdit?: boolean }) { return this.dashboards.share(orgId, memberId, id, body); }"
+      }
+    ]
+  },
+  {
+    "file": "backend/src/modules/project/project.controller.ts",
+    "name": "project.controller.ts",
+    "basePrefix": "organizations/:orgId/projects",
+    "endpoints": [
+      {
+        "method": "POST",
+        "fullPath": "/organizations/:orgId/projects",
+        "signature": "@Post() @UseGuards(OrgPermissionGuard) @RequirePermissions('CREATE_PROJECT') create(@Param('orgId') orgId: string, @CurrentMember('id') memberId: string, @Body() body: CreateProjectDto) { return this.projects.create(orgId, memberId, body); }"
+      },
+      {
+        "method": "GET",
+        "fullPath": "/organizations/:orgId/projects",
+        "signature": "@Get() list(@Param('orgId') orgId: string, @CurrentMember('id') memberId: string, @Query() pagination: PaginationDto) { return this.projects.list(orgId, memberId, pagination); }"
+      },
+      {
+        "method": "GET",
+        "fullPath": "/organizations/:orgId/projects/:projectId",
+        "signature": "@Get(':projectId') @UseGuards(ProjectPermissionGuard) @RequirePermissions('BROWSE_PROJECT') get(@Param('orgId') orgId: string, @Param('projectId') projectId: string, @CurrentMember('id') memberId: string) { return this.projects.get(orgId, projectId, memberId); }"
+      },
+      {
+        "method": "GET",
+        "fullPath": "/organizations/:orgId/projects/:projectId/workflow",
+        "signature": "@Get(':projectId/workflow') @UseGuards(ProjectPermissionGuard) @RequirePermissions('BROWSE_PROJECT') workflow(@Param('orgId') orgId: string, @Param('projectId') projectId: string, @CurrentMember('id') memberId: string) { return this.projects.getProjectWorkflow(orgId, projectId, memberId); }"
+      },
+      {
+        "method": "PATCH",
+        "fullPath": "/organizations/:orgId/projects/:projectId/archive",
+        "signature": "@Patch(':projectId/archive') @UseGuards(ProjectPermissionGuard) @RequirePermissions('MANAGE_PROJECT') archive(@Param('orgId') orgId: string, @Param('projectId') projectId: string, @CurrentMember('id') memberId: string) { return this.projects.archive(orgId, projectId, memberId); }"
+      },
+      {
+        "method": "PATCH",
+        "fullPath": "/organizations/:orgId/projects/:projectId",
+        "signature": "@Patch(':projectId') @UseGuards(ProjectPermissionGuard) @RequirePermissions('MANAGE_PROJECT') update(@Param('orgId') orgId: string, @Param('projectId') projectId: string, @CurrentMember('id') memberId: string, @Body() body: UpdateProjectDto) { return this.projects.update(orgId, projectId, memberId, body); }"
+      },
+      {
+        "method": "PATCH",
+        "fullPath": "/organizations/:orgId/projects/:projectId/restore",
+        "signature": "@Patch(':projectId/restore') @UseGuards(ProjectPermissionGuard) @RequirePermissions('MANAGE_PROJECT') restore(@Param('orgId') orgId: string, @Param('projectId') projectId: string, @CurrentMember('id') memberId: string) { return this.projects.restore(orgId, projectId, memberId); }"
+      },
+      {
+        "method": "GET",
+        "fullPath": "/organizations/:orgId/projects/:projectId/members",
+        "signature": "@Get(':projectId/members') @UseGuards(ProjectPermissionGuard) @RequirePermissions('BROWSE_PROJECT') members(@Param('orgId') orgId: string, @Param('projectId') projectId: string, @CurrentMember('id') memberId: string) { return this.projects.listMembers(orgId, projectId, memberId); }"
+      },
+      {
+        "method": "POST",
+        "fullPath": "/organizations/:orgId/projects/:projectId/members",
+        "signature": "@Post(':projectId/members') @UseGuards(ProjectPermissionGuard) @RequirePermissions('MANAGE_MEMBERS') addMember(@Param('orgId') orgId: string, @Param('projectId') projectId: string, @CurrentMember('id') memberId: string, @Body() body: AddProjectMemberDto) { return this.projects.addMember(orgId, projectId, memberId, body); }"
+      },
+      {
+        "method": "PATCH",
+        "fullPath": "/organizations/:orgId/projects/:projectId/members/:projectMemberId/status",
+        "signature": "@Patch(':projectId/members/:projectMemberId/status') @UseGuards(ProjectPermissionGuard) @RequirePermissions('MANAGE_MEMBERS') updateMemberStatus(@Param('orgId') orgId: string, @Param('projectId') projectId: string, @Param('projectMemberId') projectMemberId: string, @CurrentMember('id') memberId: string, @Body() body: UpdateProjectMemberStatusDto) { return this.projects.updateMemberStatus(orgId, projectId, memberId, projectMemberId, body.status); }"
+      },
+      {
+        "method": "GET",
+        "fullPath": "/organizations/:orgId/projects/:projectId/roles",
+        "signature": "@Get(':projectId/roles') @UseGuards(ProjectPermissionGuard) @RequirePermissions('BROWSE_PROJECT') roles(@Param('orgId') orgId: string, @Param('projectId') projectId: string, @CurrentMember('id') memberId: string) { return this.projects.listRoles(orgId, projectId, memberId); }"
+      },
+      {
+        "method": "POST",
+        "fullPath": "/organizations/:orgId/projects/:projectId/roles",
+        "signature": "@Post(':projectId/roles') @UseGuards(ProjectPermissionGuard) @RequirePermissions('MANAGE_PROJECT') createRole(@Param('orgId') orgId: string, @Param('projectId') projectId: string, @CurrentMember('id') memberId: string, @Body() body: CreateProjectRoleDto) { return this.projects.createRole(orgId, projectId, memberId, body); }"
+      },
+      {
+        "method": "POST",
+        "fullPath": "/organizations/:orgId/projects/:projectId/roles/direct",
+        "signature": "@Post(':projectId/roles/direct') @UseGuards(ProjectPermissionGuard) @RequirePermissions('MANAGE_PROJECT') assignDirectRole(@Param('orgId') orgId: string, @Param('projectId') projectId: string, @CurrentMember('id') memberId: string, @Body() body: AssignProjectRoleDto) { return this.projects.assignDirectRole(orgId, projectId, memberId, body); }"
+      },
+      {
+        "method": "POST",
+        "fullPath": "/organizations/:orgId/projects/:projectId/roles/group",
+        "signature": "@Post(':projectId/roles/group') @UseGuards(ProjectPermissionGuard) @RequirePermissions('MANAGE_PROJECT') assignGroupRole(@Param('orgId') orgId: string, @Param('projectId') projectId: string, @CurrentMember('id') memberId: string, @Body() body: AssignProjectGroupRoleDto) { return this.projects.assignGroupRole(orgId, projectId, memberId, body); }"
+      },
+      {
+        "method": "GET",
+        "fullPath": "/organizations/:orgId/projects/:projectId/permissions/effective/:projectMemberId",
+        "signature": "@Get(':projectId/permissions/effective/:projectMemberId') @UseGuards(ProjectPermissionGuard) @RequirePermissions('BROWSE_PROJECT') effectivePermissions(@Param('orgId') orgId: string, @Param('projectId') projectId: string, @Param('projectMemberId') projectMemberId: string, @CurrentMember('id') memberId: string) { return this.projects.effectivePermissions(orgId, projectId, memberId, projectMemberId); }"
+      },
+      {
+        "method": "GET",
+        "fullPath": "/organizations/:orgId/projects/:projectId/permission-scheme",
+        "signature": "@Get(':projectId/permission-scheme') @UseGuards(ProjectPermissionGuard) @RequirePermissions('BROWSE_PROJECT') permissionScheme(@Param('orgId') orgId: string, @Param('projectId') projectId: string, @CurrentMember('id') memberId: string) { return this.projects.getPermissionScheme(orgId, projectId, memberId); }"
+      },
+      {
+        "method": "PATCH",
+        "fullPath": "/organizations/:orgId/projects/:projectId/permission-scheme",
+        "signature": "@Patch(':projectId/permission-scheme') @UseGuards(ProjectPermissionGuard) @RequirePermissions('MANAGE_PROJECT') setPermissionScheme(@Param('orgId') orgId: string, @Param('projectId') projectId: string, @CurrentMember('id') memberId: string, @Body() body: SetPermissionSchemeDto) { return this.projects.setPermissionScheme(orgId, projectId, memberId, body.entries); }"
+      },
+      {
+        "method": "GET",
+        "fullPath": "/organizations/:orgId/projects/:projectId/components",
+        "signature": "@Get(':projectId/components') @UseGuards(ProjectPermissionGuard) @RequirePermissions('BROWSE_PROJECT') components(@Param('orgId') orgId: string, @Param('projectId') projectId: string, @CurrentMember('id') memberId: string) { return this.projects.listComponents(orgId, projectId, memberId); }"
+      },
+      {
+        "method": "POST",
+        "fullPath": "/organizations/:orgId/projects/:projectId/components",
+        "signature": "@Post(':projectId/components') @UseGuards(ProjectPermissionGuard) @RequirePermissions('MANAGE_COMPONENTS') createComponent(@Param('orgId') orgId: string, @Param('projectId') projectId: string, @CurrentMember('id') memberId: string, @Body() body: CreateComponentDto) { return this.projects.createComponent(orgId, projectId, memberId, body); }"
+      },
+      {
+        "method": "PATCH",
+        "fullPath": "/organizations/:orgId/projects/:projectId/components/:componentId",
+        "signature": "@Patch(':projectId/components/:componentId') @UseGuards(ProjectPermissionGuard) @RequirePermissions('MANAGE_COMPONENTS') updateComponent(@Param('orgId') orgId: string, @Param('projectId') projectId: string, @Param('componentId') componentId: string, @CurrentMember('id') memberId: string, @Body() body: UpdateComponentDto) { return this.projects.updateComponent(orgId, projectId, componentId, memberId, body); }"
+      },
+      {
+        "method": "PATCH",
+        "fullPath": "/organizations/:orgId/projects/:projectId/components/:componentId/archive",
+        "signature": "@Patch(':projectId/components/:componentId/archive') @UseGuards(ProjectPermissionGuard) @RequirePermissions('MANAGE_COMPONENTS') archiveComponent(@Param('orgId') orgId: string, @Param('projectId') projectId: string, @Param('componentId') componentId: string, @CurrentMember('id') memberId: string) { return this.projects.archiveComponent(orgId, projectId, componentId, memberId); }"
+      },
+      {
+        "method": "GET",
+        "fullPath": "/organizations/:orgId/projects/:projectId/versions",
+        "signature": "@Get(':projectId/versions') @UseGuards(ProjectPermissionGuard) @RequirePermissions('BROWSE_PROJECT') versions(@Param('orgId') orgId: string, @Param('projectId') projectId: string, @CurrentMember('id') memberId: string) { return this.projects.listVersions(orgId, projectId, memberId); }"
+      },
+      {
+        "method": "POST",
+        "fullPath": "/organizations/:orgId/projects/:projectId/versions",
+        "signature": "@Post(':projectId/versions') @UseGuards(ProjectPermissionGuard) @RequirePermissions('MANAGE_VERSIONS') createVersion(@Param('orgId') orgId: string, @Param('projectId') projectId: string, @CurrentMember('id') memberId: string, @Body() body: CreateVersionDto) { return this.projects.createVersion(orgId, projectId, memberId, body); }"
+      },
+      {
+        "method": "PATCH",
+        "fullPath": "/organizations/:orgId/projects/:projectId/versions/:versionId",
+        "signature": "@Patch(':projectId/versions/:versionId') @UseGuards(ProjectPermissionGuard) @RequirePermissions('MANAGE_VERSIONS') updateVersion(@Param('orgId') orgId: string, @Param('projectId') projectId: string, @Param('versionId') versionId: string, @CurrentMember('id') memberId: string, @Body() body: UpdateVersionDto) { return this.projects.updateVersion(orgId, projectId, versionId, memberId, body); }"
+      },
+      {
+        "method": "PATCH",
+        "fullPath": "/organizations/:orgId/projects/:projectId/versions/:versionId/release",
+        "signature": "@Patch(':projectId/versions/:versionId/release') @UseGuards(ProjectPermissionGuard) @RequirePermissions('MANAGE_VERSIONS') releaseVersion(@Param('orgId') orgId: string, @Param('projectId') projectId: string, @Param('versionId') versionId: string, @CurrentMember('id') memberId: string) { return this.projects.releaseVersion(orgId, projectId, versionId, memberId); }"
+      },
+      {
+        "method": "PATCH",
+        "fullPath": "/organizations/:orgId/projects/:projectId/versions/:versionId/archive",
+        "signature": "@Patch(':projectId/versions/:versionId/archive') @UseGuards(ProjectPermissionGuard) @RequirePermissions('MANAGE_VERSIONS') archiveVersion(@Param('orgId') orgId: string, @Param('projectId') projectId: string, @Param('versionId') versionId: string, @CurrentMember('id') memberId: string) { return this.projects.archiveVersion(orgId, projectId, versionId, memberId); }"
+      },
+      {
+        "method": "POST",
+        "fullPath": "/organizations/:orgId/projects/:projectId/issues",
+        "signature": "@Post(':projectId/issues') @UseGuards(ProjectPermissionGuard) @RequirePermissions('CREATE_ISSUE') createIssue(@Param('orgId') orgId: string, @Param('projectId') projectId: string, @CurrentMember('id') memberId: string, @Body() body: CreateIssueDto) { return this.projects.createIssue(orgId, projectId, memberId, body); }"
+      },
+      {
+        "method": "GET",
+        "fullPath": "/organizations/:orgId/projects/:projectId/issues",
+        "signature": "@Get(':projectId/issues') @UseGuards(ProjectPermissionGuard) @RequirePermissions('BROWSE_PROJECT') listIssues(@Param('orgId') orgId: string, @Param('projectId') projectId: string, @CurrentMember('id') memberId: string, @Query() pagination: PaginationDto) { return this.projects.listIssues(orgId, projectId, memberId, pagination); }"
+      },
+      {
+        "method": "GET",
+        "fullPath": "/organizations/:orgId/projects/:projectId/backlog",
+        "signature": "@Get(':projectId/backlog') @UseGuards(ProjectPermissionGuard) @RequirePermissions('BROWSE_PROJECT') backlog(@Param('orgId') orgId: string, @Param('projectId') projectId: string, @CurrentMember('id') memberId: string, @Query() pagination: PaginationDto) { return this.projects.backlog(orgId, projectId, memberId, pagination); }"
+      },
+      {
+        "method": "PATCH",
+        "fullPath": "/organizations/:orgId/projects/:projectId/issues/:issueId",
+        "signature": "@Patch(':projectId/issues/:issueId') @UseGuards(ProjectPermissionGuard) @RequirePermissions('EDIT_ISSUE') updateIssue(@Param('orgId') orgId: string, @Param('projectId') projectId: string, @Param('issueId') issueId: string, @CurrentMember('id') memberId: string, @Body() body: UpdateIssueDto) { return this.projects.updateIssue(orgId, projectId, issueId, memberId, body); }"
+      },
+      {
+        "method": "POST",
+        "fullPath": "/organizations/:orgId/projects/:projectId/issues/:issueId/transition",
+        "signature": "@Post(':projectId/issues/:issueId/transition') @UseGuards(ProjectPermissionGuard) @RequirePermissions('TRANSITION_ISSUE') transition(@Param('orgId') orgId: string, @Param('projectId') projectId: string, @Param('issueId') issueId: string, @CurrentMember('id') memberId: string, @Body() body: TransitionIssueDto) { return this.projects.transitionIssue(orgId, projectId, issueId, memberId, body); }"
+      },
+      {
+        "method": "DELETE",
+        "fullPath": "/organizations/:orgId/projects/:projectId/issues/:issueId",
+        "signature": "@Delete(':projectId/issues/:issueId') @UseGuards(ProjectPermissionGuard) @RequirePermissions('DELETE_ISSUE') deleteIssue(@Param('orgId') orgId: string, @Param('projectId') projectId: string, @Param('issueId') issueId: string, @CurrentMember('id') memberId: string) { return this.projects.deleteIssue(orgId, projectId, issueId, memberId); }"
+      }
+    ]
+  },
+  {
+    "file": "backend/src/modules/search/issue-search.controller.ts",
+    "name": "issue-search.controller.ts",
+    "basePrefix": "organizations/:orgId/issues",
+    "endpoints": [
+      {
+        "method": "GET",
+        "fullPath": "/organizations/:orgId/issues/search",
+        "signature": "@Get('search') searchIssues(@Param('orgId') orgId: string, @CurrentMember('id') memberId: string, @Query() query: IssueSearchDto) { return this.search.search(orgId, memberId, query); }"
+      }
+    ]
+  },
+  {
+    "file": "backend/src/modules/search/saved-filter.controller.ts",
+    "name": "saved-filter.controller.ts",
+    "basePrefix": "organizations/:orgId/filters",
+    "endpoints": [
+      {
+        "method": "GET",
+        "fullPath": "/organizations/:orgId/filters",
+        "signature": "@Get() list(@Param('orgId') orgId: string, @CurrentMember('id') memberId: string) { return this.filters.list(orgId, memberId); }"
+      },
+      {
+        "method": "POST",
+        "fullPath": "/organizations/:orgId/filters",
+        "signature": "@Post() create(@Param('orgId') orgId: string, @CurrentMember('id') memberId: string, @Body() body: { name: string; description?: string; queryText: string }) { return this.filters.create(orgId, memberId, body); }"
+      },
+      {
+        "method": "GET",
+        "fullPath": "/organizations/:orgId/filters/:filterId",
+        "signature": "@Get(':filterId') get(@Param('orgId') orgId: string, @Param('filterId') filterId: string, @CurrentMember('id') memberId: string) { return this.filters.get(orgId, filterId, memberId); }"
+      },
+      {
+        "method": "POST",
+        "fullPath": "/organizations/:orgId/filters/:filterId/shares",
+        "signature": "@Post(':filterId/shares') share(@Param('orgId') orgId: string, @Param('filterId') filterId: string, @CurrentMember('id') memberId: string, @Body() body: { granteeType: string; orgMemberId?: string; projectId?: string; groupId?: string; projectRoleKey?: string; canEdit?: boolean }) { return this.filters.share(orgId, filterId, memberId, body); }"
+      },
+      {
+        "method": "POST",
+        "fullPath": "/organizations/:orgId/filters/:filterId/subscriptions",
+        "signature": "@Post(':filterId/subscriptions') subscribe(@Param('orgId') orgId: string, @Param('filterId') filterId: string, @CurrentMember('id') memberId: string, @Body() body: { cronExpression: string; timezone?: string }) { return this.filters.subscribe(orgId, filterId, memberId, body); }"
+      }
+    ]
+  },
+  {
+    "file": "backend/src/modules/sprint/sprint.controller.ts",
+    "name": "sprint.controller.ts",
+    "basePrefix": "organizations/:orgId/projects/:projectId",
+    "endpoints": [
+      {
+        "method": "POST",
+        "fullPath": "/organizations/:orgId/projects/:projectId/boards/:boardId/sprints",
+        "signature": "@Post('boards/:boardId/sprints') @RequirePermissions('MANAGE_SPRINTS') create(@Param('orgId') orgId: string, @Param('projectId') projectId: string, @Param('boardId') boardId: string, @Body() body: CreateSprintDto) { return this.sprints.create(orgId, projectId, boardId, body); }"
+      },
+      {
+        "method": "GET",
+        "fullPath": "/organizations/:orgId/projects/:projectId/sprints",
+        "signature": "@Get('sprints') @RequirePermissions('BROWSE_PROJECT') list(@Param('orgId') orgId: string, @Param('projectId') projectId: string) { return this.sprints.list(orgId, projectId); }"
+      },
+      {
+        "method": "PATCH",
+        "fullPath": "/organizations/:orgId/projects/:projectId/sprints/:sprintId/start",
+        "signature": "@Patch('sprints/:sprintId/start') @RequirePermissions('MANAGE_SPRINTS') start(@Param('orgId') orgId: string, @Param('projectId') projectId: string, @Param('sprintId') sprintId: string) { return this.sprints.start(orgId, projectId, sprintId); }"
+      },
+      {
+        "method": "PATCH",
+        "fullPath": "/organizations/:orgId/projects/:projectId/sprints/:sprintId/close",
+        "signature": "@Patch('sprints/:sprintId/close') @RequirePermissions('MANAGE_SPRINTS') close(@Param('orgId') orgId: string, @Param('projectId') projectId: string, @Param('sprintId') sprintId: string) { return this.sprints.close(orgId, projectId, sprintId); }"
+      },
+      {
+        "method": "POST",
+        "fullPath": "/organizations/:orgId/projects/:projectId/sprints/:sprintId/issues",
+        "signature": "@Post('sprints/:sprintId/issues') @RequirePermissions('EDIT_ISSUE') assign(@Param('orgId') orgId: string, @Param('projectId') projectId: string, @Param('sprintId') sprintId: string, @CurrentMember('id') memberId: string, @Body() body: AssignIssueDto) { return this.sprints.assign(orgId, projectId, sprintId, body.issueId, memberId); }"
+      }
+    ]
+  },
+  {
+    "file": "backend/src/modules/webhook/webhook.controller.ts",
+    "name": "webhook.controller.ts",
+    "basePrefix": "organizations/:orgId/webhooks",
+    "endpoints": [
+      {
+        "method": "GET",
+        "fullPath": "/organizations/:orgId/webhooks",
+        "signature": "@Get() list(@Param('orgId') orgId: string, @CurrentMember('id') memberId: string) { return this.webhooks.list(orgId, memberId); }"
+      },
+      {
+        "method": "POST",
+        "fullPath": "/organizations/:orgId/webhooks",
+        "signature": "@Post() create(@Param('orgId') orgId: string, @CurrentMember('id') memberId: string, @Body() body: { url: string; events: string[]; projectId?: string }) { return this.webhooks.create(orgId, memberId, body); }"
+      },
+      {
+        "method": "PATCH",
+        "fullPath": "/organizations/:orgId/webhooks/:webhookId/pause",
+        "signature": "@Patch(':webhookId/pause') pause(@Param('orgId') orgId: string, @Param('webhookId') id: string, @CurrentMember('id') memberId: string) { return this.webhooks.pause(orgId, memberId, id); }"
+      },
+      {
+        "method": "DELETE",
+        "fullPath": "/organizations/:orgId/webhooks/:webhookId",
+        "signature": "@Delete(':webhookId') remove(@Param('orgId') orgId: string, @Param('webhookId') id: string, @CurrentMember('id') memberId: string) { return this.webhooks.remove(orgId, memberId, id); }"
+      }
+    ]
+  },
+  {
+    "file": "backend/src/modules/workflow/workflow.controller.ts",
+    "name": "workflow.controller.ts",
+    "basePrefix": "organizations/:orgId/workflows",
+    "endpoints": [
+      {
+        "method": "GET",
+        "fullPath": "/organizations/:orgId/workflows",
+        "signature": "@Get() list(@Param('orgId') orgId: string) { return this.workflows.list(orgId); }"
+      },
+      {
+        "method": "GET",
+        "fullPath": "/organizations/:orgId/workflows/:workflowId",
+        "signature": "@Get(':workflowId') detail(@Param('orgId') orgId: string, @Param('workflowId') workflowId: string) { return this.workflows.detail(orgId, workflowId); }"
+      },
+      {
+        "method": "POST",
+        "fullPath": "/organizations/:orgId/workflows",
+        "signature": "@Post() @UseGuards(OrgPermissionGuard) @RequirePermissions('MANAGE_WORKFLOWS') create(@Param('orgId') orgId: string, @Body() body: CreateWorkflowDto) { return this.workflows.create(orgId, body); }"
+      },
+      {
+        "method": "POST",
+        "fullPath": "/organizations/:orgId/workflows/guards",
+        "signature": "@Post('guards') @UseGuards(OrgPermissionGuard) @RequirePermissions('MANAGE_WORKFLOWS') addGuard(@Param('orgId') orgId: string, @Body() body: CreateGuardDto) { return this.workflows.addGuard(orgId, body); }"
+      }
+    ]
+  },
+  {
+    "file": "backend/src/modules/workspace/workspace.controller.ts",
+    "name": "workspace.controller.ts",
+    "basePrefix": "workspace",
+    "endpoints": [
+      {
+        "method": "GET",
+        "fullPath": "/workspace/bootstrap",
+        "signature": "@Get('bootstrap') getBootstrap( @Req() req: AuthenticatedRequest, @Query('orgId') orgId?: string, @Query('projectId') projectId?: string, ) {"
+      }
+    ]
+  }
+]

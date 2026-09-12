@@ -472,9 +472,12 @@ export class ProjectService {
       if (input.remainingEstimateSeconds !== undefined) issue.remainingEstimateSeconds = input.remainingEstimateSeconds;
       if (input.priority !== undefined) issue.priority = input.priority;
       if (input.componentId !== undefined) issue.componentId = input.componentId || null;
-      if (input.fixVersionId !== undefined) issue.fixVersionId = input.fixVersionId || null;
       issue.version += 1;
-      return manager.save(issue);
+      const saved = await manager.save(issue);
+      const payload = { issueId: saved.id, issueKey: saved.key, projectId, updatedByMemberId: memberId, version: saved.version };
+      await manager.save(ActivityLog, manager.create(ActivityLog, { orgId, actorType: 'member', actorMemberId: memberId, projectId, issueId: saved.id, eventType: EVENT_TYPES.ISSUE_UPDATED, payloadJson: payload }));
+      await manager.save(OutboxEvent, manager.create(OutboxEvent, { orgId, aggregateType: 'issue', aggregateId: saved.id, eventType: EVENT_TYPES.ISSUE_UPDATED, payloadJson: payload, status: 'pending', idempotencyKey: `issue-updated:${saved.id}:${saved.version}`, publishedAt: null, retryCount: 0, lastError: null }));
+      return saved;
     });
   }
 

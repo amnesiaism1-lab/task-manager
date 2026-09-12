@@ -24,6 +24,8 @@ export class CustomFieldController {
   @UseGuards(OrgPermissionGuard)
   @RequirePermissions('MANAGE_CUSTOM_FIELDS')
   option(@Param('orgId') orgId: string, @Param('fieldId') fieldId: string, @Body() body: CreateOptionDto) { return this.fields.createOption(orgId, fieldId, body); }
+  @Get('contexts/project/:projectId')
+  projectContexts(@Param('orgId') orgId: string, @Param('projectId') projectId: string) { return this.fields.getContextsForProject(orgId, projectId); }
   @Post('issues/:issueId/value')
   setValue(@Param('orgId') orgId: string, @Param('issueId') issueId: string, @CurrentMember('id') memberId: string, @Body() body: SetValueDto) { return this.fields.setValue(orgId, issueId, memberId, body); }
 }

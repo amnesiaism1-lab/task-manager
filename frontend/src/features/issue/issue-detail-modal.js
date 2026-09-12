@@ -310,19 +310,33 @@ export function renderIssueDetailModal(issue, state) {
               </div>
             </div>
 
-            ${issue.component ? `
-              <div class="detail-attribute-row mt-3">
-                <span class="attr-label">Component</span>
-                <span class="attr-value text-xs text-indigo-400 font-medium">${escapeHtml(issue.component.name || issue.component)}</span>
+            <div class="detail-attribute-row mt-3">
+              <span class="attr-label">Component</span>
+              <div class="attr-value">
+                <select id="detail-component-select" class="select-clean w-full bg-slate-900 border border-slate-800 rounded px-2.5 py-1.5 text-xs">
+                  <option value="">None</option>
+                  ${(state.components || []).map(c => `
+                    <option value="${c.id}" ${c.id === (issue.componentId || issue.component?.id) ? 'selected' : ''}>
+                      ${escapeHtml(c.name)}
+                    </option>
+                  `).join('')}
+                </select>
               </div>
-            ` : ''}
+            </div>
 
-            ${issue.fixVersion ? `
-              <div class="detail-attribute-row mt-3">
-                <span class="attr-label">Fix Version</span>
-                <span class="attr-value text-xs text-emerald-400 font-medium">${escapeHtml(issue.fixVersion.name || issue.fixVersion)}</span>
+            <div class="detail-attribute-row mt-3">
+              <span class="attr-label">Fix Version</span>
+              <div class="attr-value">
+                <select id="detail-fix-version-select" class="select-clean w-full bg-slate-900 border border-slate-800 rounded px-2.5 py-1.5 text-xs">
+                  <option value="">None</option>
+                  ${(state.versions || []).filter(v => v.status !== 'archived').map(v => `
+                    <option value="${v.id}" ${v.id === (issue.fixVersionId || issue.fixVersion?.id) ? 'selected' : ''}>
+                      ${escapeHtml(v.name)} (${escapeHtml(v.status)})
+                    </option>
+                  `).join('')}
+                </select>
               </div>
-            ` : ''}
+            </div>
 
             <div class="detail-attribute-row labels-row mt-3">
               <span class="attr-label">Labels</span>
@@ -336,16 +350,41 @@ export function renderIssueDetailModal(issue, state) {
               </div>
             </div>
 
-            ${(state.customFields || []).length > 0 ? `
+            ${((issue.customFields && issue.customFields.length > 0) ? issue.customFields : (state.customFields || [])).length > 0 ? `
               <div class="pt-3 mt-3 border-t border-slate-800/80">
                 <div class="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">Custom Fields</div>
-                ${(state.customFields || []).map(cf => {
-                  const valObj = (issue.customFieldValues || []).find(v => v.customFieldId === cf.id);
-                  const displayVal = valObj ? (valObj.stringValue || valObj.numberValue || valObj.option?.label || valObj.dateValue || 'Not set') : 'Not set';
+                ${((issue.customFields && issue.customFields.length > 0) ? issue.customFields : (state.customFields || [])).map(cf => {
+                  const val = cf.value !== null && cf.value !== undefined ? cf.value : '';
+                  const ctxId = cf.contextId || cf.id;
+                  let inputHtml = '';
+                  if (cf.fieldType === 'select') {
+                    const opts = cf.options || [];
+                    inputHtml = `
+                      <select class="custom-field-input select-clean w-full bg-slate-900 border border-slate-800 rounded px-2.5 py-1 text-xs" data-context-id="${ctxId}" data-field-type="select">
+                        <option value="">Select option...</option>
+                        ${opts.map(o => `
+                          <option value="${escapeHtml(o.value)}" ${String(val) === String(o.value) ? 'selected' : ''}>${escapeHtml(o.label || o.value)}</option>
+                        `).join('')}
+                      </select>
+                    `;
+                  } else if (cf.fieldType === 'number') {
+                    inputHtml = `
+                      <input type="number" class="custom-field-input w-full text-xs px-2 py-1 bg-slate-900 border border-slate-800 rounded" data-context-id="${ctxId}" data-field-type="number" value="${escapeHtml(String(val))}" placeholder="Enter number..." />
+                    `;
+                  } else if (cf.fieldType === 'date') {
+                    const dateVal = val ? new Date(val).toISOString().split('T')[0] : '';
+                    inputHtml = `
+                      <input type="date" class="custom-field-input w-full text-xs px-2 py-1 bg-slate-900 border border-slate-800 rounded" data-context-id="${ctxId}" data-field-type="date" value="${dateVal}" />
+                    `;
+                  } else {
+                    inputHtml = `
+                      <input type="text" class="custom-field-input w-full text-xs px-2 py-1 bg-slate-900 border border-slate-800 rounded" data-context-id="${ctxId}" data-field-type="text" value="${escapeHtml(String(val))}" placeholder="Enter value..." />
+                    `;
+                  }
                   return `
-                    <div class="detail-attribute-row py-1">
-                      <span class="attr-label text-slate-400 text-xs">${escapeHtml(cf.name)}</span>
-                      <span class="attr-value text-xs text-slate-300 font-medium">${escapeHtml(String(displayVal))}</span>
+                    <div class="detail-attribute-row py-1.5 flex flex-col gap-1">
+                      <span class="attr-label text-slate-400 text-xs font-medium">${escapeHtml(cf.name)} ${cf.isRequired ? '<span class="text-rose-400">*</span>' : ''}</span>
+                      <div class="attr-value w-full">${inputHtml}</div>
                     </div>
                   `;
                 }).join('')}
@@ -424,23 +463,27 @@ function renderAttachmentItem(att, issue, state) {
 }
 
 function renderLinkItem(link, issue, state) {
-  const isOutward = link.issueId === issue.id;
-  const targetId = isOutward ? link.linkedIssueId : link.issueId;
-  const targetIssue = (state.issues || []).find(i => i.id === targetId);
-  const linkType = (state.linkTypes || []).find(lt => lt.id === link.linkTypeId);
+  const isOutward = link.isOutward !== undefined ? link.isOutward : (link.issueId === issue.id);
+  const target = link.targetIssue || (state.issues || []).find(i => i.id === (isOutward ? link.linkedIssueId : link.issueId));
+  const linkType = link.linkType || (state.linkTypes || []).find(lt => lt.id === link.linkTypeId);
 
   const relationship = isOutward ? (linkType?.outwardLabel || 'links to') : (linkType?.inwardLabel || 'linked by');
 
   return `
-    <div class="p-3 rounded-xl bg-slate-950/60 border border-slate-800/80 flex items-center justify-between gap-3 text-xs">
+    <div class="p-3 rounded-xl bg-slate-950/60 border border-slate-800/80 flex items-center justify-between gap-3 text-xs" data-link-id="${link.id}">
       <div class="flex items-center gap-2 truncate">
         <span class="text-slate-500 uppercase tracking-wider text-[10px] font-bold">${escapeHtml(relationship)}</span>
-        ${targetIssue ? `
-          <span class="issue-key-link" data-open-issue="${targetIssue.id}">${escapeHtml(targetIssue.key)}</span>
-          <span class="text-slate-300 truncate">${escapeHtml(targetIssue.summary)}</span>
-        ` : `<span class="text-slate-500">Issue ${targetId.slice(0, 8)}</span>`}
+        ${target ? `
+          <button type="button" class="issue-key-link font-mono font-bold text-blue-400 hover:underline cursor-pointer bg-transparent border-0 p-0 text-xs" data-open-issue="${target.id}">${escapeHtml(target.key)}</button>
+          <span class="text-slate-300 truncate">${escapeHtml(target.summary)}</span>
+        ` : `<span class="text-slate-500">Linked Issue</span>`}
       </div>
-      ${targetIssue ? renderStatusBadge(targetIssue.state || 'Open') : ''}
+      <div class="flex items-center gap-2 shrink-0">
+        ${target?.state ? renderStatusBadge(target.state) : ''}
+        <button type="button" class="icon-button btn-delete-link text-slate-500 hover:text-red-400 p-1" data-link-id="${link.id}" title="Remove link">
+          ${renderIcon('trash', 'w-3 h-3')}
+        </button>
+      </div>
     </div>
   `;
 }

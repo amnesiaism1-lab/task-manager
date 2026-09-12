@@ -14,9 +14,26 @@ import { AuthModule } from '../auth/auth.module';
 import { CustomFieldController } from './custom-field.controller';
 import { CustomFieldService } from './custom-field.service';
 import { IssueModule } from '../issue/issue.module';
+import { ActivityLog } from '../../database/entities/audit/activity-log.entity';
+import { OutboxEvent } from '../../database/entities/audit/outbox-event.entity';
 
 @Module({
-	imports: [TypeOrmModule.forFeature([CustomField, CustomFieldContext, CustomFieldOption, IssueCustomFieldValue, Issue, ProjectMember, OrganizationMember]), PermissionModule, AuthModule, IssueModule],
+	imports: [
+		TypeOrmModule.forFeature([
+			CustomField,
+			CustomFieldContext,
+			CustomFieldOption,
+			IssueCustomFieldValue,
+			Issue,
+			ProjectMember,
+			OrganizationMember,
+			ActivityLog,
+			OutboxEvent,
+		]),
+		PermissionModule,
+		AuthModule,
+		IssueModule,
+	],
 	controllers: [CustomFieldController],
 	providers: [CustomFieldService, OrgMembershipGuard, OrgPermissionGuard],
 })

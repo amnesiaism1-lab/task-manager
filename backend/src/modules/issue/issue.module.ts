@@ -29,9 +29,50 @@ import { WorkflowTransition } from '../../database/entities/workflow/workflow-tr
 import { IssueStateHistory } from '../../database/entities/issue/issue-state-history.entity';
 import { IssueType } from '../../database/entities/issue/issue-type.entity';
 import { PermissionModule } from '../permission/permission.module';
+import { ProjectComponent } from '../../database/entities/project/project-component.entity';
+import { ProjectVersion } from '../../database/entities/project/project-version.entity';
+import { CustomFieldContext } from '../../database/entities/custom-field/custom-field-context.entity';
+import { CustomField } from '../../database/entities/custom-field/custom-field.entity';
+import { CustomFieldOption } from '../../database/entities/custom-field/custom-field-option.entity';
+import { IssueCustomFieldValue } from '../../database/entities/custom-field/issue-custom-field-value.entity';
+import { ActivityLog } from '../../database/entities/audit/activity-log.entity';
+import { OutboxEvent } from '../../database/entities/audit/outbox-event.entity';
 
 @Module({
-	imports: [TypeOrmModule.forFeature([Issue, Comment, WorkLog, ProjectMember, OrganizationMember, Label, IssueLabel, IssueWatcher, IssueLinkType, IssueLink, Attachment, Project, IssueSecurityScheme, IssueSecurityLevel, IssueSecurityGrant, WorkflowState, WorkflowTransition, IssueStateHistory, IssueType]), AuthModule, StorageModule, PermissionModule],
+	imports: [
+		TypeOrmModule.forFeature([
+			Issue,
+			Comment,
+			WorkLog,
+			ProjectMember,
+			OrganizationMember,
+			Label,
+			IssueLabel,
+			IssueWatcher,
+			IssueLinkType,
+			IssueLink,
+			Attachment,
+			Project,
+			IssueSecurityScheme,
+			IssueSecurityLevel,
+			IssueSecurityGrant,
+			WorkflowState,
+			WorkflowTransition,
+			IssueStateHistory,
+			IssueType,
+			ProjectComponent,
+			ProjectVersion,
+			CustomFieldContext,
+			CustomField,
+			CustomFieldOption,
+			IssueCustomFieldValue,
+			ActivityLog,
+			OutboxEvent,
+		]),
+		AuthModule,
+		StorageModule,
+		PermissionModule,
+	],
 	controllers: [IssueController, AttachmentController],
 	providers: [IssueService, AttachmentService, IssueAccessService, OrgMembershipGuard, IssuePermissionGuard],
 	exports: [IssueAccessService, IssuePermissionGuard],

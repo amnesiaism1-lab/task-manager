@@ -84,6 +84,28 @@ export function renderIssueCreateModal(state) {
         </div>
       </div>
 
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div class="form-group">
+          <label for="create-issue-component" class="text-xs font-semibold text-slate-300">Component</label>
+          <select id="create-issue-component" name="componentId" class="select-clean w-full bg-slate-900 border border-slate-800 rounded px-3 py-2 text-xs">
+            <option value="">None</option>
+            ${(state.components || []).map(c => `
+              <option value="${c.id}">${escapeHtml(c.name)}</option>
+            `).join('')}
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="create-issue-fix-version" class="text-xs font-semibold text-slate-300">Fix Version</label>
+          <select id="create-issue-fix-version" name="fixVersionId" class="select-clean w-full bg-slate-900 border border-slate-800 rounded px-3 py-2 text-xs">
+            <option value="">None</option>
+            ${(state.versions || []).map(v => `
+              <option value="${v.id}">${escapeHtml(v.name)}</option>
+            `).join('')}
+          </select>
+        </div>
+      </div>
+
       <div class="flex items-center justify-end gap-3 pt-4 border-t border-slate-800">
         <button type="button" class="button ghost btn-modal-cancel">Cancel</button>
         <button type="submit" class="button primary">Create Issue</button>

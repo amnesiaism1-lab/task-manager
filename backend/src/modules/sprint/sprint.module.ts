@@ -13,8 +13,12 @@ import { AuthModule } from '../auth/auth.module';
 import { SprintController } from './sprint.controller';
 import { SprintService } from './sprint.service';
 
+import { WorkflowState } from '../../database/entities/workflow/workflow-state.entity';
+import { ActivityLog } from '../../database/entities/audit/activity-log.entity';
+import { OutboxEvent } from '../../database/entities/audit/outbox-event.entity';
+
 @Module({
-	imports: [TypeOrmModule.forFeature([Board, Sprint, Issue, IssueSprintHistory, Project, OrganizationMember]), PermissionModule, AuthModule],
+	imports: [TypeOrmModule.forFeature([Board, Sprint, Issue, IssueSprintHistory, Project, OrganizationMember, WorkflowState, ActivityLog, OutboxEvent]), PermissionModule, AuthModule],
 	controllers: [SprintController],
 	providers: [SprintService, OrgMembershipGuard, ProjectPermissionGuard],
 })

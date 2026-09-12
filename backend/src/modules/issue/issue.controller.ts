@@ -32,4 +32,5 @@ export class IssueController {
   @Post('labels') @RequirePermissions('EDIT_ISSUE') addLabel(@Param('orgId') orgId: string, @Param('issueId') issueId: string, @CurrentMember('id') memberId: string, @Body() body: AddLabelDto) { return this.issues.addLabel(orgId, issueId, memberId, body); }
   @Post('watchers') @RequirePermissions('MANAGE_WATCHERS') addWatcher(@Param('orgId') orgId: string, @Param('issueId') issueId: string, @CurrentMember('id') memberId: string, @Body() body: AddWatcherDto) { return this.issues.addWatcher(orgId, issueId, memberId, body); }
   @Post('links') @RequirePermissions('LINK_ISSUE') linkIssue(@Param('orgId') orgId: string, @Param('issueId') issueId: string, @CurrentMember('id') memberId: string, @Body() body: CreateIssueLinkDto) { return this.issues.linkIssue(orgId, issueId, memberId, body); }
+  @Delete('links/:linkId') @RequirePermissions('LINK_ISSUE') deleteLink(@Param('orgId') orgId: string, @Param('issueId') issueId: string, @Param('linkId') linkId: string, @CurrentMember('id') memberId: string) { return this.issues.deleteLink(orgId, issueId, linkId, memberId); }
 }
