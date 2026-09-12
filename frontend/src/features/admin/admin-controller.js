@@ -303,70 +303,179 @@ export function bindAdminEvents(ctx = {}) {
     }
   });
 
-  // Create Department
-  document.querySelector('#form-create-department')?.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const body = Object.fromEntries(new FormData(e.target));
-    const { org } = store.getState();
-    try {
-      await request(`/organizations/${org}/departments`, { method: 'POST', body: JSON.stringify(body) });
-      showToast('Department created', 'success');
-      e.target.reset();
-      await reload();
-    } catch (err) {
-      showToast(err.message, 'error');
-    }
+  // Create Department Modal Trigger
+  document.querySelector('#btn-create-dept')?.addEventListener('click', () => {
+    openModal({
+      title: 'Create Department',
+      subtitle: 'ORGANIZATION HIERARCHY',
+      size: 'small',
+      contentHtml: `
+        <form id="form-create-department" class="space-y-4">
+          <div>
+            <label class="block text-xs font-semibold text-text-muted uppercase tracking-wider mb-1.5">Department Name</label>
+            <input name="name" class="w-full px-3 py-2 bg-surface-hover/50 border border-border-default rounded-md text-sm text-text-primary focus:outline-none focus:border-brand-primary" placeholder="e.g. Engineering, Product, Security" required />
+          </div>
+          <div class="flex items-center justify-end gap-3 pt-3 border-t border-border-default">
+            <button type="button" class="button ghost btn-modal-cancel">Cancel</button>
+            <button type="submit" class="button primary">Create Department</button>
+          </div>
+        </form>
+      `,
+    });
+    document.querySelector('.btn-modal-cancel')?.addEventListener('click', closeModal);
+    document.querySelector('#form-create-department')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const body = Object.fromEntries(new FormData(e.target));
+      const { org } = store.getState();
+      try {
+        store.setState({ loading: true });
+        await request(`/organizations/${org}/departments`, { method: 'POST', body: JSON.stringify(body) });
+        closeModal();
+        showToast('Department created successfully', 'success');
+        await reload();
+      } catch (err) {
+        showToast(err.message, 'error');
+      } finally {
+        store.setState({ loading: false });
+      }
+    });
   });
 
-  // Create Group
-  document.querySelector('#form-create-group')?.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const body = Object.fromEntries(new FormData(e.target));
-    const { org } = store.getState();
-    try {
-      await request(`/organizations/${org}/groups`, { method: 'POST', body: JSON.stringify(body) });
-      showToast('Group created', 'success');
-      e.target.reset();
-      await reload();
-    } catch (err) {
-      showToast(err.message, 'error');
-    }
+  // Create Group Modal Trigger
+  document.querySelector('#btn-create-group')?.addEventListener('click', () => {
+    openModal({
+      title: 'Create User Group',
+      subtitle: 'ACCESS & ROLE ASSIGNMENT COHORT',
+      size: 'small',
+      contentHtml: `
+        <form id="form-create-group" class="space-y-4">
+          <div>
+            <label class="block text-xs font-semibold text-text-muted uppercase tracking-wider mb-1.5">Group Name</label>
+            <input name="name" class="w-full px-3 py-2 bg-surface-hover/50 border border-border-default rounded-md text-sm text-text-primary focus:outline-none focus:border-brand-primary" placeholder="e.g. Core Engineers, QA Team" required />
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-text-muted uppercase tracking-wider mb-1.5">Description (Optional)</label>
+            <textarea name="description" class="w-full px-3 py-2 bg-surface-hover/50 border border-border-default rounded-md text-sm text-text-primary focus:outline-none focus:border-brand-primary" rows="2" placeholder="Cohort purpose..."></textarea>
+          </div>
+          <div class="flex items-center justify-end gap-3 pt-3 border-t border-border-default">
+            <button type="button" class="button ghost btn-modal-cancel">Cancel</button>
+            <button type="submit" class="button primary">Create Group</button>
+          </div>
+        </form>
+      `,
+    });
+    document.querySelector('.btn-modal-cancel')?.addEventListener('click', closeModal);
+    document.querySelector('#form-create-group')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const body = Object.fromEntries(new FormData(e.target));
+      const { org } = store.getState();
+      try {
+        store.setState({ loading: true });
+        await request(`/organizations/${org}/groups`, { method: 'POST', body: JSON.stringify(body) });
+        closeModal();
+        showToast('Group created successfully', 'success');
+        await reload();
+      } catch (err) {
+        showToast(err.message, 'error');
+      } finally {
+        store.setState({ loading: false });
+      }
+    });
   });
 
-  // Create Component
-  document.querySelector('#form-create-component')?.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const body = Object.fromEntries(new FormData(e.target));
-    const { org, selectedProjectId } = store.getState();
-    try {
-      await request(`/organizations/${org}/projects/${selectedProjectId}/components`, {
-        method: 'POST',
-        body: JSON.stringify(body),
-      });
-      showToast('Component added', 'success');
-      e.target.reset();
-      await reload();
-    } catch (err) {
-      showToast(err.message, 'error');
-    }
+  // Create Component Modal Trigger
+  document.querySelector('#btn-add-component')?.addEventListener('click', () => {
+    openModal({
+      title: 'Add Project Component',
+      subtitle: 'MODULAR ARCHITECTURE SUBSYSTEM',
+      size: 'small',
+      contentHtml: `
+        <form id="form-create-component" class="space-y-4">
+          <div>
+            <label class="block text-xs font-semibold text-text-muted uppercase tracking-wider mb-1.5">Component Name</label>
+            <input name="name" class="w-full px-3 py-2 bg-surface-hover/50 border border-border-default rounded-md text-sm text-text-primary focus:outline-none focus:border-brand-primary" placeholder="e.g. Auth-Service, Payment-Gateway" required />
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-text-muted uppercase tracking-wider mb-1.5">Description (Optional)</label>
+            <textarea name="description" class="w-full px-3 py-2 bg-surface-hover/50 border border-border-default rounded-md text-sm text-text-primary focus:outline-none focus:border-brand-primary" rows="2" placeholder="Subsystem scope and responsibilities..."></textarea>
+          </div>
+          <div class="flex items-center justify-end gap-3 pt-3 border-t border-border-default">
+            <button type="button" class="button ghost btn-modal-cancel">Cancel</button>
+            <button type="submit" class="button primary">Create Component</button>
+          </div>
+        </form>
+      `,
+    });
+    document.querySelector('.btn-modal-cancel')?.addEventListener('click', closeModal);
+    document.querySelector('#form-create-component')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const body = Object.fromEntries(new FormData(e.target));
+      const { org, selectedProjectId } = store.getState();
+      try {
+        store.setState({ loading: true });
+        await request(`/organizations/${org}/projects/${selectedProjectId}/components`, {
+          method: 'POST',
+          body: JSON.stringify(body),
+        });
+        closeModal();
+        showToast('Component added successfully', 'success');
+        await reload();
+      } catch (err) {
+        showToast(err.message, 'error');
+      } finally {
+        store.setState({ loading: false });
+      }
+    });
   });
 
-  // Create Version
-  document.querySelector('#form-create-version')?.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const body = Object.fromEntries(new FormData(e.target));
-    const { org, selectedProjectId } = store.getState();
-    try {
-      await request(`/organizations/${org}/projects/${selectedProjectId}/versions`, {
-        method: 'POST',
-        body: JSON.stringify(body),
-      });
-      showToast('Version created', 'success');
-      e.target.reset();
-      await reload();
-    } catch (err) {
-      showToast(err.message, 'error');
-    }
+  // Create Version Modal Trigger
+  document.querySelector('#btn-add-version')?.addEventListener('click', () => {
+    openModal({
+      title: 'Create Release Version',
+      subtitle: 'TARGET MILESTONE RELEASE',
+      size: 'small',
+      contentHtml: `
+        <form id="form-create-version" class="space-y-4">
+          <div>
+            <label class="block text-xs font-semibold text-text-muted uppercase tracking-wider mb-1.5">Version Name</label>
+            <input name="name" class="w-full px-3 py-2 bg-surface-hover/50 border border-border-default rounded-md text-sm text-text-primary focus:outline-none focus:border-brand-primary font-mono" placeholder="e.g. v1.0.0, 2026.Q4" required />
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-text-muted uppercase tracking-wider mb-1.5">Description (Optional)</label>
+            <textarea name="description" class="w-full px-3 py-2 bg-surface-hover/50 border border-border-default rounded-md text-sm text-text-primary focus:outline-none focus:border-brand-primary" rows="2" placeholder="Milestone deliverables and scope..."></textarea>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-text-muted uppercase tracking-wider mb-1.5">Release Date (Optional)</label>
+            <input type="date" name="releaseDate" class="w-full px-3 py-2 bg-surface-hover/50 border border-border-default rounded-md text-sm text-text-primary focus:outline-none focus:border-brand-primary" />
+          </div>
+          <div class="flex items-center justify-end gap-3 pt-3 border-t border-border-default">
+            <button type="button" class="button ghost btn-modal-cancel">Cancel</button>
+            <button type="submit" class="button primary">Create Version</button>
+          </div>
+        </form>
+      `,
+    });
+    document.querySelector('.btn-modal-cancel')?.addEventListener('click', closeModal);
+    document.querySelector('#form-create-version')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const body = Object.fromEntries(new FormData(e.target));
+      if (!body.releaseDate) delete body.releaseDate;
+      const { org, selectedProjectId } = store.getState();
+      try {
+        store.setState({ loading: true });
+        await request(`/organizations/${org}/projects/${selectedProjectId}/versions`, {
+          method: 'POST',
+          body: JSON.stringify(body),
+        });
+        closeModal();
+        showToast('Version created successfully', 'success');
+        await reload();
+      } catch (err) {
+        showToast(err.message, 'error');
+      } finally {
+        store.setState({ loading: false });
+      }
+    });
   });
 
   // Release Version
