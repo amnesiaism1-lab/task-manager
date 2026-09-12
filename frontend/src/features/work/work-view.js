@@ -1,5 +1,6 @@
 import { escapeHtml, formatDate } from '../../shared/utils/formatters.js';
 import { renderAvatar, renderPriorityBadge, renderStatusBadge, renderTypeBadge } from '../../shared/components/badges.js';
+import { renderIcon } from '../../shared/components/icons.js';
 
 export function renderWorkView(state) {
   const issues = state.issues || [];
@@ -12,7 +13,7 @@ export function renderWorkView(state) {
       <div class="work-hero-banner">
         <div class="hero-left">
           <p class="eyebrow warm">WORKSPACE / CONTROL CENTER</p>
-          <h2>Welcome back, ${escapeHtml(state.user?.fullName?.split(' ')[0] || 'Engineer')} 👋</h2>
+          <h2>Welcome back, ${escapeHtml(state.user?.fullName?.split(' ')[0] || 'Engineer')}</h2>
           <p class="muted">Here is your team's current focus, active sprint handoffs, and issues requiring your review.</p>
         </div>
         <div class="hero-stats-group">
@@ -33,12 +34,17 @@ export function renderWorkView(state) {
           <div class="panel-box">
             <div class="panel-box-head">
               <h4>Assigned to Me (${myIssues.length})</h4>
-              <button class="button primary btn-sm" id="btn-quick-create-work">+ New Issue</button>
+              <button class="button primary btn-sm" id="btn-quick-create-work">
+                ${renderIcon('plus', 'w-3.5 h-3.5')}
+                <span>New Issue</span>
+              </button>
             </div>
 
             <div class="work-issues-list">
               ${myIssues.length ? myIssues.map(issue => renderWorkIssueItem(issue, state)).join('') : `
-                <div class="empty-hint-text">No issues currently assigned to you. Grab one from the Board or Backlog!</div>
+                <div class="p-8 text-center text-slate-500 text-xs border border-dashed border-slate-800 rounded-xl">
+                  No issues currently assigned to you. Grab one from the Board or Backlog!
+                </div>
               `}
             </div>
           </div>
@@ -48,7 +54,11 @@ export function renderWorkView(state) {
               <h4>Recent Project Activity</h4>
             </div>
             <div class="work-issues-list">
-              ${recentIssues.map(issue => renderWorkIssueItem(issue, state)).join('')}
+              ${recentIssues.length ? recentIssues.map(issue => renderWorkIssueItem(issue, state)).join('') : `
+                <div class="p-8 text-center text-slate-500 text-xs border border-dashed border-slate-800 rounded-xl">
+                  No recent activity recorded yet.
+                </div>
+              `}
             </div>
           </div>
         </div>
@@ -59,21 +69,21 @@ export function renderWorkView(state) {
             <h4>Quick Navigation</h4>
             <div class="shortcut-buttons">
               <button class="shortcut-btn" data-nav-view="boards">
-                <span class="btn-icon">▥</span>
+                <span class="btn-icon">${renderIcon('board', 'w-4 h-4')}</span>
                 <div class="btn-text">
                   <strong>Kanban & Scrum Boards</strong>
                   <small>Move and transition active cards</small>
                 </div>
               </button>
               <button class="shortcut-btn" data-nav-view="backlog">
-                <span class="btn-icon">▤</span>
+                <span class="btn-icon">${renderIcon('backlog', 'w-4 h-4')}</span>
                 <div class="btn-text">
                   <strong>Scrum Backlog</strong>
                   <small>Plan sprints and story estimates</small>
                 </div>
               </button>
               <button class="shortcut-btn" data-nav-view="filters">
-                <span class="btn-icon">◇</span>
+                <span class="btn-icon">${renderIcon('filter', 'w-4 h-4')}</span>
                 <div class="btn-text">
                   <strong>Filter Library</strong>
                   <small>Query issues with AST filters</small>
@@ -82,10 +92,13 @@ export function renderWorkView(state) {
             </div>
           </div>
 
-          <div class="panel-box audit-highlight-box">
-            <p class="eyebrow">TRANSACTIONAL AUDITING</p>
-            <h4>Optimistic Locking Active</h4>
-            <p class="muted-small">Every issue transition checks expected versions to prevent concurrent collision. Audit logs are committed in the same database transaction.</p>
+          <div class="panel-box audit-highlight-box bg-slate-900/40 border-slate-800">
+            <div class="flex items-center gap-2 mb-2 text-blue-400">
+              ${renderIcon('shield', 'w-4 h-4')}
+              <p class="eyebrow warm mb-0">Transactional Auditing</p>
+            </div>
+            <h4 class="text-sm font-bold text-white mb-1">Optimistic Locking Active</h4>
+            <p class="muted-small leading-relaxed">Every issue transition checks expected versions to prevent concurrent collision. Audit logs are committed in the same database transaction.</p>
           </div>
         </div>
       </div>

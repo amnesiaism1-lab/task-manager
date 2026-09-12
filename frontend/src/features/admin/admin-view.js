@@ -1,5 +1,6 @@
 import { escapeHtml, formatDate } from '../../shared/utils/formatters.js';
 import { renderAvatar } from '../../shared/components/badges.js';
+import { renderIcon } from '../../shared/components/icons.js';
 
 export function renderAdminView(state) {
   const currentTab = state.adminTab || 'org';
@@ -18,35 +19,45 @@ export function renderAdminView(state) {
       <!-- Admin Tab Navigation -->
       <div class="admin-tab-nav">
         <button class="admin-tab-btn ${currentTab === 'org' ? 'active' : ''}" data-admin-tab="org">
-          🏢 Organization
+          ${renderIcon('building', 'w-4 h-4')}
+          <span>Organization</span>
         </button>
         <button class="admin-tab-btn ${currentTab === 'members' ? 'active' : ''}" data-admin-tab="members">
-          👥 Members & Invites (${state.members?.length || 0})
+          ${renderIcon('users', 'w-4 h-4')}
+          <span>Members & Invites (${state.members?.length || 0})</span>
         </button>
         <button class="admin-tab-btn ${currentTab === 'roles' ? 'active' : ''}" data-admin-tab="roles">
-          🛡️ Roles & Permissions
+          ${renderIcon('shield', 'w-4 h-4')}
+          <span>Roles & Permissions</span>
         </button>
         <button class="admin-tab-btn ${currentTab === 'groups' ? 'active' : ''}" data-admin-tab="groups">
-          🌲 Departments & Groups
+          ${renderIcon('folder', 'w-4 h-4')}
+          <span>Departments & Groups</span>
         </button>
         <button class="admin-tab-btn ${currentTab === 'fields' ? 'active' : ''}" data-admin-tab="fields">
-          ✨ Custom Fields
+          ${renderIcon('sparkles', 'w-4 h-4')}
+          <span>Custom Fields</span>
         </button>
         <button class="admin-tab-btn ${currentTab === 'workflows' ? 'active' : ''}" data-admin-tab="workflows">
-          🔄 Workflows & FSM (${state.workflows?.length || 0})
+          ${renderIcon('refresh', 'w-4 h-4')}
+          <span>Workflows & FSM (${state.workflows?.length || 0})</span>
         </button>
         <button class="admin-tab-btn ${currentTab === 'catalog' ? 'active' : ''}" data-admin-tab="catalog">
-          📋 Issue Types & Catalog
+          ${renderIcon('board', 'w-4 h-4')}
+          <span>Issue Types & Catalog</span>
         </button>
         <button class="admin-tab-btn ${currentTab === 'audit' ? 'active' : ''}" data-admin-tab="audit">
-          📜 Audit & Outbox
+          ${renderIcon('code', 'w-4 h-4')}
+          <span>Audit & Outbox</span>
         </button>
         <button class="admin-tab-btn ${currentTab === 'project' ? 'active' : ''}" data-admin-tab="project">
-          📁 Project Settings (${state.selectedProjectId ? 'Active' : 'Select'})
+          ${renderIcon('settings', 'w-4 h-4')}
+          <span>Project Settings (${state.selectedProjectId ? 'Active' : 'Select'})</span>
         </button>
         ${state.user?.isSystemAdmin ? `
           <button class="admin-tab-btn ${currentTab === 'system' ? 'active' : ''}" data-admin-tab="system">
-            ⚡ Platform Admin
+            ${renderIcon('bolt', 'w-4 h-4')}
+            <span>Platform Admin</span>
           </button>
         ` : ''}
       </div>

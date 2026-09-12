@@ -1,3 +1,5 @@
+import { renderIcon } from './icons.js';
+
 /**
  * Toast Notification System
  */
@@ -14,12 +16,14 @@ export function showToast(message, type = 'info', duration = 4000) {
   const toast = document.createElement('div');
   toast.className = `toast toast-${type}`;
 
-  const icon = type === 'success' ? '✓' : type === 'error' ? '✕' : type === 'warning' ? '⚠' : 'ℹ';
+  const iconName = type === 'success' ? 'checkCircle' : type === 'error' ? 'alertCircle' : type === 'warning' ? 'alertCircle' : 'info';
 
   toast.innerHTML = `
-    <span class="toast-icon">${icon}</span>
+    <span class="toast-icon">${renderIcon(iconName, 'w-4 h-4')}</span>
     <span class="toast-message">${escapeHtml(message)}</span>
-    <button class="toast-close" aria-label="Close">×</button>
+    <button class="toast-close" aria-label="Close">
+      ${renderIcon('close', 'w-3.5 h-3.5')}
+    </button>
   `;
 
   const close = () => {

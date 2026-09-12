@@ -1,10 +1,11 @@
 import { escapeHtml, initials } from '../utils/formatters.js';
+import { renderIcon } from './icons.js';
 
 export function renderStatusBadge(stateOrName) {
   const name = typeof stateOrName === 'string' ? stateOrName : (stateOrName?.name || 'Open');
   const category = (typeof stateOrName === 'object' && stateOrName?.category) ? stateOrName.category : getCategoryFromName(name);
 
-  return `<span class="badge badge-status status-${category}">${escapeHtml(name)}</span>`;
+  return `<span class="badge badge-status status-${category}"><span class="badge-dot"></span>${escapeHtml(name)}</span>`;
 }
 
 function getCategoryFromName(name) {
@@ -19,43 +20,52 @@ export function renderTypeBadge(typeOrKey) {
   const key = String(rawKey || 'task').toLowerCase();
   const name = typeof typeOrKey === 'string' ? typeOrKey : (typeOrKey?.name || 'Task');
 
-  let icon = '✓';
+  let iconName = 'typeTask';
   let className = 'type-task';
 
   if (key === 'bug') {
-    icon = '●';
+    iconName = 'typeBug';
     className = 'type-bug';
   } else if (key === 'story') {
-    icon = '▲';
+    iconName = 'typeStory';
     className = 'type-story';
   } else if (key === 'epic') {
-    icon = '⚡';
+    iconName = 'typeEpic';
     className = 'type-epic';
   }
 
-  return `<span class="badge badge-type ${className}" title="${escapeHtml(name)}"><span class="badge-icon">${icon}</span> ${escapeHtml(name)}</span>`;
+  return `
+    <span class="badge badge-type ${className}" title="${escapeHtml(name)}">
+      <span class="badge-icon">${renderIcon(iconName, 'w-3.5 h-3.5')}</span>
+      <span>${escapeHtml(name)}</span>
+    </span>
+  `.trim();
 }
 
 export function renderPriorityBadge(priority = 'Medium') {
   const p = String(priority || 'Medium').toLowerCase();
-  let icon = '—';
+  let iconName = 'priorityMedium';
   let className = 'priority-medium';
 
   if (p === 'highest' || p === 'critical' || p === 'blocker') {
-    icon = '↑↑';
+    iconName = 'priorityHighest';
     className = 'priority-highest';
   } else if (p === 'high') {
-    icon = '↑';
+    iconName = 'priorityHigh';
     className = 'priority-high';
   } else if (p === 'low') {
-    icon = '↓';
+    iconName = 'priorityLow';
     className = 'priority-low';
   } else if (p === 'lowest') {
-    icon = '↓↓';
+    iconName = 'priorityLowest';
     className = 'priority-lowest';
   }
 
-  return `<span class="badge badge-priority ${className}" title="Priority: ${escapeHtml(priority || 'Medium')}">${icon}</span>`;
+  return `
+    <span class="badge badge-priority ${className}" title="Priority: ${escapeHtml(priority || 'Medium')}">
+      ${renderIcon(iconName, 'w-3.5 h-3.5')}
+    </span>
+  `.trim();
 }
 
 export function renderAvatar(userOrName, size = 'sm') {
@@ -64,7 +74,7 @@ export function renderAvatar(userOrName, size = 'sm') {
   const init = initials(name);
 
   const sizeClasses = {
-    xs: 'w-[22px] h-[22px] text-[9px]',
+    xs: 'w-[22px] h-[22px] text-[10px]',
     sm: 'w-[28px] h-[28px] text-[11px]',
     md: 'w-[34px] h-[34px] text-[13px]',
     lg: 'w-[44px] h-[44px] text-[16px]',
@@ -72,13 +82,20 @@ export function renderAvatar(userOrName, size = 'sm') {
   const szCls = sizeClasses[size] || sizeClasses.sm;
 
   if (avatarUrl) {
-    return `<img class="avatar avatar-${size} ${szCls} rounded-full object-cover shrink-0 inline-block" src="${escapeHtml(avatarUrl)}" alt="${escapeHtml(name)}" title="${escapeHtml(name)}" />`;
+    return `<img class="avatar avatar-${size} ${szCls} rounded-full object-cover shrink-0 inline-block border border-border-default/60 shadow-sm" src="${escapeHtml(avatarUrl)}" alt="${escapeHtml(name)}" title="${escapeHtml(name)}" />`;
   }
 
-  // Generate deterministic pastel color from name
+  // Generate deterministic modern gradient from name
   let hash = 0;
   for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
-  const hue = Math.abs(hash % 360);
+  const hue1 = Math.abs(hash % 360);
+  const hue2 = (hue1 + 45) % 360;
 
-  return `<span class="avatar avatar-${size} ${szCls} rounded-full inline-flex items-center justify-center font-bold text-white select-none shrink-0" style="background-color: hsl(${hue}, 65%, 45%);" title="${escapeHtml(name)}">${escapeHtml(init)}</span>`;
+  return `
+    <span class="avatar avatar-${size} ${szCls} rounded-full inline-flex items-center justify-center font-bold text-white select-none shrink-0 shadow-sm border border-white/10" 
+          style="background: linear-gradient(135deg, hsl(${hue1}, 70%, 48%), hsl(${hue2}, 75%, 38%));" 
+          title="${escapeHtml(name)}">
+      ${escapeHtml(init)}
+    </span>
+  `.trim();
 }

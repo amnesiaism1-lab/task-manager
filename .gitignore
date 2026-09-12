@@ -18,6 +18,8 @@ uploads/
 .idea/
 .vscode/
 
+scratch/
+
 # Allow shared package dist for monorepo deployments
 !shared/dist/
 !shared/dist/**

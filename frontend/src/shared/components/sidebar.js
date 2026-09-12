@@ -1,25 +1,36 @@
+import { renderIcon } from './icons.js';
+
 export function renderSidebar(state) {
   const currentView = state.view;
 
   const navItems = [
-    { id: 'work', label: 'Work', icon: '◈', badge: state.issues.length ? String(state.issues.length) : '' },
-    { id: 'boards', label: 'Boards', icon: '▥', badge: '' },
-    { id: 'backlog', label: 'Backlog', icon: '▤', badge: state.backlog?.length ? String(state.backlog.length) : '' },
-    { id: 'filters', label: 'Filters', icon: '◇', badge: '' },
-    { id: 'dashboards', label: 'Dashboards', icon: '📊', badge: '' },
-    { id: 'automation', label: 'Automation', icon: '⚡', badge: '' },
-    { id: 'integrations', label: 'Integrations', icon: '🔌', badge: '' },
-    { id: 'jobs', label: 'Jobs', icon: '▦', badge: '' },
-    { id: 'admin', label: 'Admin', icon: '⚙️', badge: '' },
+    { id: 'work', label: 'Work', icon: 'work', badge: state.issues.length ? String(state.issues.length) : '' },
+    { id: 'boards', label: 'Boards', icon: 'board', badge: '' },
+    { id: 'backlog', label: 'Backlog', icon: 'backlog', badge: state.backlog?.length ? String(state.backlog.length) : '' },
+    { id: 'filters', label: 'Filters', icon: 'filter', badge: '' },
+    { id: 'dashboards', label: 'Dashboards', icon: 'dashboard', badge: '' },
+    { id: 'automation', label: 'Automation', icon: 'automation', badge: '' },
+    { id: 'integrations', label: 'Integrations', icon: 'integration', badge: '' },
+    { id: 'jobs', label: 'Jobs', icon: 'job', badge: '' },
+    { id: 'admin', label: 'Admin', icon: 'admin', badge: '' },
   ];
 
   return `
-    <aside class="app-sidebar">
-      <div class="sidebar-brand" title="Task Manager Pro">
+    <aside class="app-sidebar" id="app-sidebar">
+      <div class="sidebar-brand">
         <div class="brand-logo">
-          <span class="logo-mark">TM</span>
-          <span class="brand-name">Task Manager</span>
+          <div class="logo-mark-wrap">
+            <span class="logo-mark">TM</span>
+          </div>
+          <div class="brand-text-col">
+            <span class="brand-name">Task Manager</span>
+            <span class="brand-tier">ENTERPRISE</span>
+          </div>
         </div>
+        <!-- Mobile Drawer Close Button -->
+        <button class="icon-button mobile-drawer-close" id="btn-mobile-sidebar-close" aria-label="Close menu">
+          ${renderIcon('close', 'w-4 h-4')}
+        </button>
       </div>
 
       <nav class="sidebar-nav">
@@ -36,12 +47,13 @@ export function renderSidebar(state) {
       <div class="sidebar-footer">
         <div class="project-pill-info" title="${state.selectedProjectId ? 'Active Project' : 'All Projects'}">
           <span class="project-dot"></span>
-          <span class="project-pill-text">
-            ${state.projects.find(p => p.id === state.selectedProjectId)?.key || 'ALL'}
+          <span class="project-pill-text truncate">
+            ${state.projects.find(p => p.id === state.selectedProjectId)?.name || 'All Workspace Projects'}
           </span>
         </div>
       </div>
     </aside>
+    <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
   `;
 }
 
@@ -51,7 +63,7 @@ function renderNavItem(item, currentView) {
 
   return `
     <button class="nav-item ${isActive ? 'active' : ''}" data-nav-view="${item.id}" title="${item.label}">
-      <span class="nav-icon">${item.icon}</span>
+      <span class="nav-icon">${renderIcon(item.icon, 'w-4 h-4')}</span>
       <span class="nav-label">${item.label}</span>
       ${badgeHtml}
     </button>

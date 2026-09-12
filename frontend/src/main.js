@@ -295,9 +295,26 @@ function render() {
 // -----------------------------------------------------------------------------
 
 function bindShellEvents() {
+  // Mobile sidebar drawer toggle & close
+  const toggleBtn = document.querySelector('#btn-mobile-sidebar-toggle');
+  const closeDrawerBtn = document.querySelector('#btn-mobile-sidebar-close');
+  const backdrop = document.querySelector('#sidebar-backdrop');
+
+  toggleBtn?.addEventListener('click', () => {
+    document.body.classList.toggle('sidebar-open');
+  });
+
+  const closeDrawer = () => {
+    document.body.classList.remove('sidebar-open');
+  };
+
+  closeDrawerBtn?.addEventListener('click', closeDrawer);
+  backdrop?.addEventListener('click', closeDrawer);
+
   // Sidebar navigation items
   document.querySelectorAll('[data-nav-view]').forEach(btn => {
     btn.addEventListener('click', async () => {
+      closeDrawer();
       const targetView = btn.dataset.navView;
       store.setState({ view: targetView });
       await loadViewData(targetView);

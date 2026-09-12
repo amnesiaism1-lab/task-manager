@@ -1,3 +1,5 @@
+import { renderIcon } from './icons.js';
+
 /**
  * Universal Modal Dialog Manager
  */
@@ -22,7 +24,9 @@ export function openModal({ title = '', subtitle = '', contentHtml = '', size = 
           ${subtitle ? `<p class="eyebrow">${subtitle}</p>` : ''}
           <h3>${title}</h3>
         </div>
-        <button class="icon-button modal-close-btn" aria-label="Close modal">×</button>
+        <button class="icon-button modal-close-btn" aria-label="Close modal">
+          ${renderIcon('close', 'w-4 h-4')}
+        </button>
       </div>
       <div class="modal-body">
         ${contentHtml}
@@ -30,6 +34,8 @@ export function openModal({ title = '', subtitle = '', contentHtml = '', size = 
     </div>
   `;
 
+  // Force reflow for smooth animation
+  void modalOverlay.offsetWidth;
   modalOverlay.classList.add('active');
   document.body.classList.add('modal-open');
 
