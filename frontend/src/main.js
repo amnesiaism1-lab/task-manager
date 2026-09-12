@@ -48,6 +48,38 @@ import { loadAdminData, bindAdminEvents } from './features/admin/admin-controlle
 import { loadNotifications, bindNotificationsEvents } from './features/notifications/notifications-controller.js';
 import { openUserProfileModalController } from './features/user-profile/user-profile-controller.js';
 
+if (typeof window !== 'undefined') {
+  window.__TM = {
+    store,
+    request,
+    showToast,
+    openModal,
+    closeModal,
+    loadViewData,
+    loadInitialData,
+    openCreateOrgModal,
+    openCreateProjectModal,
+    openJoinOrgModal,
+    openInviteMemberModal,
+    openPendingInvitationsModal,
+    openSettingsModal,
+    openIssueDetailModal,
+    openIssueCreateModal,
+    openUserProfileModalController,
+    loadBoards,
+    loadSprints,
+    loadBacklog,
+    loadIssues,
+    loadFilters,
+    loadDashboards,
+    loadAutomationRules,
+    loadIntegrations,
+    loadJobs,
+    loadAdminData,
+    loadNotifications,
+  };
+}
+
 const app = document.querySelector('#app');
 
 // -----------------------------------------------------------------------------
