@@ -96,8 +96,10 @@ export function bindIssueDetailModalEvents(initialIssue, { request, store, showT
     const transitionKey = e.target.value;
     if (!transitionKey) return;
 
+    const prevValue = transitionSelect.value;
     try {
-      store.setState({ loading: true });
+      transitionSelect.disabled = true;
+      transitionSelect.classList.add('opacity-50');
       await request(`/organizations/${org}/issues/${currentIssue.id}/transitions`, {
         method: 'POST',
         body: JSON.stringify({
@@ -105,16 +107,18 @@ export function bindIssueDetailModalEvents(initialIssue, { request, store, showT
           version: currentIssue.version,
         }),
       });
-      showToast('Status transitioned successfully', 'success');
+      showToast('Status transitioned successfully', 'success', 2000);
       await refreshModal();
       if (loadBoardData && store.getState().selectedBoardId) {
-        loadBoardData(request, store, store.getState().selectedBoardId);
+        await loadBoardData(store.getState().selectedBoardId, request, store);
       }
       if (loadIssues) loadIssues(request, store, store.getState().query);
     } catch (err) {
       showToast(err.message, 'error');
+      transitionSelect.value = prevValue;
     } finally {
-      store.setState({ loading: false });
+      transitionSelect.disabled = false;
+      transitionSelect.classList.remove('opacity-50');
     }
   });
 

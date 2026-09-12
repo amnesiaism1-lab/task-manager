@@ -807,6 +807,22 @@ img.avatar, .avatar {
 .board-card:active {
   cursor: grabbing;
 }
+.board-card.is-moving-sync {
+  opacity: 0.85;
+  border-color: var(--blue-500);
+  box-shadow: 0 0 0 1px var(--blue-500), 0 4px 12px rgba(59, 130, 246, 0.25);
+  transition: transform 0.15s ease, opacity 0.2s ease;
+}
+.board-card.is-dragging {
+  opacity: 0.4;
+  transform: scale(0.98);
+}
+.column-cards-container.drag-over {
+  background: rgba(59, 130, 246, 0.06);
+  border-radius: var(--radius-md);
+  outline: 2px dashed rgba(59, 130, 246, 0.6);
+  outline-offset: -2px;
+}
 
 .card-top-row, .card-bottom-row {
   display: flex;

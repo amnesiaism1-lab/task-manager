@@ -206,32 +206,71 @@ export class IssueService {
 
   async transition(orgId: string, issueId: string, memberId: string, input: any) {
     const issue = await this.accessibleIssue(orgId, issueId, memberId);
-    const transitionKey = input.transitionKey;
-    const transition = await this.transitions.findOne({ where: { workflowId: issue.workflowId, key: transitionKey, fromStateId: issue.stateId } });
-    if (!transition) throw new NotFoundException('Transition not found');
-    const target = await this.states.findOne({ where: { id: transition.toStateId } });
-    if (!target) throw new NotFoundException('Target state not found');
+    let transition: WorkflowTransition | null = null;
+
+    if (input.transitionKey) {
+      transition = await this.transitions.findOne({
+        where: { workflowId: issue.workflowId, key: input.transitionKey, fromStateId: issue.stateId },
+      });
+    } else if (input.toStateId) {
+      transition = await this.transitions.findOne({
+        where: { workflowId: issue.workflowId, fromStateId: issue.stateId, toStateId: input.toStateId },
+      });
+      if (!transition) {
+        transition = await this.transitions.findOne({
+          where: { workflowId: issue.workflowId, toStateId: input.toStateId },
+        });
+      }
+    } else if (input.targetStatusName) {
+      const allStates = await this.states.find({ where: { workflowId: issue.workflowId } });
+      const targetState = allStates.find((s) => s.name.toLowerCase() === String(input.targetStatusName).toLowerCase());
+      if (targetState) {
+        transition = await this.transitions.findOne({
+          where: { workflowId: issue.workflowId, fromStateId: issue.stateId, toStateId: targetState.id },
+        });
+        if (!transition) {
+          transition = await this.transitions.findOne({
+            where: { workflowId: issue.workflowId, toStateId: targetState.id },
+          });
+        }
+      }
+    }
+
+    let target: WorkflowState | null = null;
+    if (transition) {
+      target = await this.states.findOne({ where: { id: transition.toStateId } });
+    } else if (input.toStateId) {
+      target = await this.states.findOne({ where: { id: input.toStateId, workflowId: issue.workflowId } });
+    }
+    if (!target) throw new NotFoundException('Target workflow state or valid transition not found');
+
+    if (!transition) {
+      transition = (await this.transitions.findOne({ where: { workflowId: issue.workflowId, toStateId: target.id } })) ??
+                   (await this.transitions.findOne({ where: { workflowId: issue.workflowId } }));
+    }
+
+    const effectiveTransitionId = transition ? transition.id : target.id;
 
     return this.dataSource.transaction(async (manager) => {
       const locked = await manager.findOne(Issue, { where: { id: issueId, orgId, deletedAt: IsNull() }, lock: { mode: 'pessimistic_write' } });
       if (!locked) throw new NotFoundException('Issue not found');
-      locked.stateId = target.id;
+      locked.stateId = target!.id;
       locked.version += 1;
-      locked.resolvedAt = target.isTerminal ? new Date() : null;
+      locked.resolvedAt = target!.isTerminal ? new Date() : null;
       await manager.save(locked);
       await manager.save(IssueStateHistory, manager.create(IssueStateHistory, {
         orgId,
         issueId,
-        fromStateId: transition.fromStateId,
-        toStateId: transition.toStateId,
-        transitionId: transition.id,
+        fromStateId: transition ? transition.fromStateId : issue.stateId,
+        toStateId: target!.id,
+        transitionId: effectiveTransitionId,
         actorMemberId: memberId,
         comment: input.comment || null,
         idempotencyKey: input.idempotencyKey || null,
         versionBefore: locked.version - 1,
         versionAfter: locked.version,
       }));
-      return locked;
+      return { ...locked, state: target };
     });
   }
 }

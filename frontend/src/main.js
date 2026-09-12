@@ -157,6 +157,52 @@ export async function loadInitialData(targetOrgId, targetProjectId) {
 // UI Rendering
 // -----------------------------------------------------------------------------
 
+const lastRenderState = {
+  token: null,
+  hasOrgs: false,
+  org: null,
+  selectedProjectId: null,
+  view: null,
+  loading: null,
+  unreadCount: null,
+};
+
+function getViewHtml(state) {
+  switch (state.view) {
+    case 'boards':
+      return renderBoardView(state);
+    case 'backlog':
+      return renderBacklogView(state);
+    case 'filters':
+      return renderSearchView(state);
+    case 'dashboards':
+      return renderDashboardView(state);
+    case 'automation':
+      return renderAutomationView(state);
+    case 'integrations':
+      return renderIntegrationsView(state);
+    case 'jobs':
+      return renderJobsView(state);
+    case 'admin':
+      return renderAdminView(state);
+    case 'notifications':
+      return renderNotificationsView(state);
+    case 'work':
+    default:
+      return renderWorkView(state);
+  }
+}
+
+function updateSyncIndicator(loading) {
+  const syncIndicator = document.querySelector('.sync-indicator');
+  if (syncIndicator) {
+    syncIndicator.className = `sync-indicator ${loading ? 'syncing' : 'online'}`;
+    syncIndicator.title = loading ? 'Syncing with server...' : 'System connected';
+    const syncLabel = syncIndicator.querySelector('.sync-label');
+    if (syncLabel) syncLabel.textContent = loading ? 'Syncing' : 'Ready';
+  }
+}
+
 function render() {
   const state = store.getState();
 
@@ -164,6 +210,8 @@ function render() {
   if (!state.token) {
     app.innerHTML = renderAuthView(state);
     bindAuthEvents(loadInitialData);
+    lastRenderState.token = null;
+    lastRenderState.hasOrgs = false;
     return;
   }
 
@@ -171,45 +219,53 @@ function render() {
   if (state.organizations.length === 0) {
     app.innerHTML = renderOnboardingView(state);
     bindOnboardingEvents(loadInitialData);
+    lastRenderState.token = state.token;
+    lastRenderState.hasOrgs = false;
     return;
   }
 
-  // Render full SaaS shell
-  let currentViewHtml = '';
-  switch (state.view) {
-    case 'boards':
-      currentViewHtml = renderBoardView(state);
-      break;
-    case 'backlog':
-      currentViewHtml = renderBacklogView(state);
-      break;
-    case 'filters':
-      currentViewHtml = renderSearchView(state);
-      break;
-    case 'dashboards':
-      currentViewHtml = renderDashboardView(state);
-      break;
-    case 'automation':
-      currentViewHtml = renderAutomationView(state);
-      break;
-    case 'integrations':
-      currentViewHtml = renderIntegrationsView(state);
-      break;
-    case 'jobs':
-      currentViewHtml = renderJobsView(state);
-      break;
-    case 'admin':
-      currentViewHtml = renderAdminView(state);
-      break;
-    case 'notifications':
-      currentViewHtml = renderNotificationsView(state);
-      break;
-    case 'work':
-    default:
-      currentViewHtml = renderWorkView(state);
-      break;
+  const shellMounted = Boolean(document.querySelector('.app-shell'));
+  const sameContext = shellMounted &&
+    lastRenderState.token === state.token &&
+    lastRenderState.org === state.org &&
+    lastRenderState.selectedProjectId === state.selectedProjectId &&
+    lastRenderState.hasOrgs === true;
+
+  if (sameContext) {
+    // 1. If only loading state changed, update the indicator without touching DOM
+    if (lastRenderState.loading !== state.loading &&
+        lastRenderState.view === state.view &&
+        lastRenderState.unreadCount === state.unreadCount) {
+      updateSyncIndicator(state.loading);
+      lastRenderState.loading = state.loading;
+      return;
+    }
+
+    // 2. Targeted update of main view area while preserving shell and scroll position
+    const currentViewHtml = getViewHtml(state);
+    const mainArea = document.querySelector('#main-scroll-area');
+    if (mainArea) {
+      const prevScrollTop = mainArea.scrollTop;
+      mainArea.innerHTML = currentViewHtml;
+      mainArea.scrollTop = prevScrollTop;
+    }
+
+    // Update active nav button
+    document.querySelectorAll('[data-nav-view]').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.navView === state.view);
+    });
+
+    updateSyncIndicator(state.loading);
+    bindViewEvents(state.view);
+
+    lastRenderState.view = state.view;
+    lastRenderState.loading = state.loading;
+    lastRenderState.unreadCount = state.unreadCount;
+    return;
   }
 
+  // Full SaaS shell render when context changes (org, project, initial mount)
+  const currentViewHtml = getViewHtml(state);
   app.innerHTML = `
     <div class="app-shell app-layout">
       ${renderSidebar(state)}
@@ -224,6 +280,14 @@ function render() {
 
   bindShellEvents();
   bindViewEvents(state.view);
+
+  lastRenderState.token = state.token;
+  lastRenderState.hasOrgs = true;
+  lastRenderState.org = state.org;
+  lastRenderState.selectedProjectId = state.selectedProjectId;
+  lastRenderState.view = state.view;
+  lastRenderState.loading = state.loading;
+  lastRenderState.unreadCount = state.unreadCount;
 }
 
 // -----------------------------------------------------------------------------

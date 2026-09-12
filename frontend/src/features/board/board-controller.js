@@ -143,42 +143,101 @@ export function bindBoardEvents(ctx = {}) {
 export async function handleIssueColumnDrop(issueId, targetColumnId, { request = appRequest, store = appStore, showToast = appShowToast } = {}) {
   const { org, selectedBoardId, boardData } = store.getState();
   const targetCol = boardData?.columns?.find(c => c.id === targetColumnId);
-  if (!targetCol) return;
+  const sourceCol = boardData?.columns?.find(c => c.issues?.some(i => i.id === issueId));
+  if (!targetCol || !sourceCol || sourceCol.id === targetColumnId) return;
 
-  try {
-    store.setState({ loading: true });
-    const issue = await request(`/organizations/${org}/issues/${issueId}`);
-    const targetStatusName = targetCol.name.toLowerCase();
-    const matchingTransition = (issue.transitions || []).find(t =>
-      t.name.toLowerCase().includes(targetStatusName) ||
-      targetStatusName.includes(t.name.toLowerCase())
-    );
+  const issue = sourceCol.issues?.find(i => i.id === issueId);
+  if (!issue) return;
 
-    if (matchingTransition) {
-      await request(`/organizations/${org}/issues/${issueId}/transitions`, {
-        method: 'POST',
-        body: JSON.stringify({
-          transitionKey: matchingTransition.key,
-          version: issue.version,
-        }),
-      });
-      showToast(`Issue ${issue.key} moved to ${targetCol.name}`, 'success');
-    } else {
-      await request(`/organizations/${org}/issues/${issueId}`, {
-        method: 'PATCH',
-        body: JSON.stringify({
-          version: issue.version,
-        }),
-      });
-      showToast(`Moved ${issue.key}`, 'info');
+  // 1. Instant 0ms Optimistic DOM Update
+  const cardEl = document.querySelector(`.board-card[data-issue-id="${issueId}"]`);
+  const sourceZone = document.querySelector(`.column-cards-container[data-droppable-column="${sourceCol.id}"]`);
+  const targetZone = document.querySelector(`.column-cards-container[data-droppable-column="${targetColumnId}"]`);
+  const originalNextSibling = cardEl?.nextSibling;
+
+  if (cardEl && targetZone) {
+    const emptyTarget = targetZone.querySelector('.column-empty-placeholder');
+    if (emptyTarget) emptyTarget.remove();
+    targetZone.appendChild(cardEl);
+    cardEl.classList.add('is-moving-sync');
+
+    if (sourceZone && !sourceZone.querySelector('.board-card')) {
+      sourceZone.innerHTML = '<div class="column-empty-placeholder">No issues in column</div>';
     }
 
-    await loadBoardData(selectedBoardId, request, store);
+    const sourceBadge = document.querySelector(`.kanban-column[data-column-id="${sourceCol.id}"] .column-count-badge`);
+    const targetBadge = document.querySelector(`.kanban-column[data-column-id="${targetColumnId}"] .column-count-badge`);
+    if (sourceBadge) {
+      const newSourceCount = Math.max(0, (sourceCol.issues?.length || 1) - 1);
+      sourceBadge.textContent = sourceCol.wipLimit ? `${newSourceCount} / ${sourceCol.wipLimit}` : `${newSourceCount}`;
+    }
+    if (targetBadge) {
+      const newTargetCount = (targetCol.issues?.length || 0) + 1;
+      targetBadge.textContent = targetCol.wipLimit ? `${newTargetCount} / ${targetCol.wipLimit}` : `${newTargetCount}`;
+    }
+  }
+
+  // 2. Instant in-memory state update
+  sourceCol.issues = (sourceCol.issues || []).filter(i => i.id !== issueId);
+  const targetStateId = targetCol.stateIds?.[0] || issue.stateId;
+  const updatedIssue = {
+    ...issue,
+    stateId: targetStateId,
+    state: { id: targetStateId, name: targetCol.name },
+  };
+  targetCol.issues = [...(targetCol.issues || []), updatedIssue];
+
+  // 3. Background asynchronous persistence (non-blocking, no screen spinner!)
+  try {
+    const payload = {
+      version: issue.version,
+      toStateId: targetCol.stateIds?.[0],
+      targetStatusName: targetCol.name,
+    };
+
+    const matchingTransition = (issue.transitions || []).find(t =>
+      t.name.toLowerCase().includes(targetCol.name.toLowerCase()) ||
+      targetCol.name.toLowerCase().includes(t.name.toLowerCase())
+    );
+    if (matchingTransition) {
+      payload.transitionKey = matchingTransition.key;
+    }
+
+    const res = await request(`/organizations/${org}/issues/${issueId}/transitions`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+
+    if (res?.version) {
+      updatedIssue.version = res.version;
+    }
+    cardEl?.classList.remove('is-moving-sync');
+    showToast(`Issue ${issue.key} moved to ${targetCol.name}`, 'success', 2000);
   } catch (err) {
-    showToast(err.message, 'error');
+    console.warn('Optimistic drop error, rolling back:', err);
+    // Optimistic Rollback DOM
+    if (cardEl && sourceZone) {
+      const emptySource = sourceZone.querySelector('.column-empty-placeholder');
+      if (emptySource) emptySource.remove();
+
+      if (originalNextSibling && sourceZone.contains(originalNextSibling)) {
+        sourceZone.insertBefore(cardEl, originalNextSibling);
+      } else {
+        sourceZone.appendChild(cardEl);
+      }
+      cardEl.classList.remove('is-moving-sync');
+    }
+    if (targetZone && !targetZone.querySelector('.board-card')) {
+      targetZone.innerHTML = '<div class="column-empty-placeholder">No issues in column</div>';
+    }
+
+    // Rollback in-memory
+    targetCol.issues = (targetCol.issues || []).filter(i => i.id !== issueId);
+    sourceCol.issues = [...(sourceCol.issues || []), issue];
+
+    // Restore accurate state from server
     await loadBoardData(selectedBoardId, request, store);
-  } finally {
-    store.setState({ loading: false });
+    showToast(`Failed to move issue: ${err.message}`, 'error');
   }
 }
 
