@@ -7,16 +7,23 @@ import { Issue } from '../../types';
 import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/ui/Modal';
 import { Input } from '../../components/ui/Input';
+import { Badge } from '../../components/ui/Badge';
+import { formatDate } from '../../lib/utils';
 import {
   BarChart3,
   Plus,
   TrendingUp,
   PieChart,
+  CheckCircle2,
+  Clock,
+  Activity,
+  Layers,
+  Sparkles,
 } from 'lucide-react';
 
 export const DashboardView: React.FC = () => {
-  const { activeOrgId, activeProjectId } = useWorkspaceStore();
-  const { showToast } = useUIStore();
+  const { activeOrgId, activeProjectId, projects } = useWorkspaceStore();
+  const { showToast, openModal } = useUIStore();
   const queryClient = useQueryClient();
 
   const [createModalOpen, setCreateModalOpen] = useState(false);
@@ -81,25 +88,26 @@ export const DashboardView: React.FC = () => {
       (i.priority || '').toLowerCase() === 'low' || (i.priority || '').toLowerCase() === 'lowest'
   ).length;
 
+  const totalPoints = issues.reduce((acc, cur) => acc + (Number((cur as any).storyPoints) || 0), 0);
+
   const handleCreateDashboard = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newDashName.trim()) return;
 
     try {
       setIsCreating(true);
-      const res = await request(`/organizations/${activeOrgId}/dashboards`, {
+      await request(`/organizations/${activeOrgId}/dashboards`, {
         method: 'POST',
         body: JSON.stringify({
           name: newDashName.trim(),
           description: newDashDesc.trim() || undefined,
         }),
       });
-      showToast('Dashboard created!', 'success');
+      showToast('Dashboard created successfully!', 'success');
       setNewDashName('');
       setNewDashDesc('');
       setCreateModalOpen(false);
       queryClient.invalidateQueries({ queryKey: ['dashboards'] });
-      if (res?.id) setSelectedDashId(res.id);
     } catch (err: any) {
       showToast(err.message || 'Failed to create dashboard', 'error');
     } finally {
@@ -107,22 +115,29 @@ export const DashboardView: React.FC = () => {
     }
   };
 
+  const currentProject = projects.find((p) => p.id === activeProjectId);
+
   return (
-    <div className="space-y-6">
-      {/* Header Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-surface-card border border-border/80 rounded-2xl p-5 shadow-card">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-blue-500/10 text-blue-400 flex items-center justify-center border border-blue-500/20 shadow-sm">
+    <div className="space-y-6 animate-fade-in">
+      {/* Top Banner Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-surface-card border border-border/80 rounded-2xl p-6 shadow-card backdrop-blur-md">
+        <div className="flex items-center gap-3.5">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-amber-500/20 to-orange-500/20 text-amber-400 flex items-center justify-center border border-amber-500/30 shadow-sm">
             <BarChart3 className="w-5 h-5" />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-lg font-bold text-white tracking-tight">
-                {activeDashboard?.name || 'Agile Metrics & Analytics'}
+              <h1 className="text-xl font-bold text-white tracking-tight">
+                {activeDashboard?.name || 'Agile Velocity & Health Dashboard'}
               </h1>
+              {currentProject && (
+                <Badge variant="subtle" size="xs" className="font-mono">
+                  {currentProject.key}
+                </Badge>
+              )}
             </div>
-            <p className="text-xs text-text-secondary">
-              {activeDashboard?.description || 'Team workload, velocity, and completion trends.'}
+            <p className="text-xs text-text-secondary mt-0.5">
+              Live delivery metrics, sprint velocity progress, and quality indicators.
             </p>
           </div>
         </div>
@@ -132,7 +147,7 @@ export const DashboardView: React.FC = () => {
             <select
               value={activeDashboard?.id}
               onChange={(e) => setSelectedDashId(e.target.value)}
-              className="bg-surface-surface text-xs rounded-lg px-3 py-2 border border-border outline-none cursor-pointer"
+              className="bg-surface-surface text-xs rounded-xl px-3 py-2 border border-border/80 focus:border-brand-500 outline-none cursor-pointer"
             >
               {dashboards.map((d) => (
                 <option key={d.id} value={d.id}>
@@ -144,56 +159,93 @@ export const DashboardView: React.FC = () => {
 
           <Button
             size="sm"
-            variant="secondary"
+            variant="primary"
             leftIcon={<Plus className="w-4 h-4" />}
             onClick={() => setCreateModalOpen(true)}
+            className="shadow-glow font-semibold"
           >
             New Dashboard
           </Button>
         </div>
       </div>
 
-      {/* Metric Cards Grid */}
+      {/* Bento Metric Cards Grid */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-surface-card border border-border/80 rounded-2xl p-5 space-y-2 shadow-sm">
-          <span className="text-xs font-semibold text-text-muted">Total Workload</span>
-          <div className="text-3xl font-extrabold text-white">{totalIssues}</div>
-          <p className="text-[11px] text-text-muted">Active issues tracked</p>
+        {/* Card 1: Total Workload */}
+        <div className="bg-surface-card border border-border/80 rounded-2xl p-5 shadow-card relative overflow-hidden group hover:border-brand-500/40 transition-all hover:-translate-y-0.5">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-text-muted">Total Issues</span>
+            <div className="p-2 rounded-xl bg-brand-500/10 text-brand-400">
+              <Layers className="w-4 h-4" />
+            </div>
+          </div>
+          <div className="text-3xl font-extrabold text-white mt-2 tracking-tight">{totalIssues}</div>
+          <div className="flex items-center gap-1.5 text-[11px] text-text-muted mt-1">
+            <span className="font-mono font-semibold text-brand-400">{totalPoints}</span>
+            <span>story points tracked</span>
+          </div>
         </div>
 
-        <div className="bg-surface-card border border-border/80 rounded-2xl p-5 space-y-2 shadow-sm">
-          <span className="text-xs font-semibold text-slate-400">To Do</span>
-          <div className="text-3xl font-extrabold text-slate-300">{todoIssues.length}</div>
-          <p className="text-[11px] text-text-muted">{todoPct}% of total volume</p>
+        {/* Card 2: To Do */}
+        <div className="bg-surface-card border border-border/80 rounded-2xl p-5 shadow-card relative overflow-hidden group hover:border-slate-500/40 transition-all hover:-translate-y-0.5">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-slate-400">Backlog & To Do</span>
+            <div className="p-2 rounded-xl bg-slate-500/10 text-slate-400">
+              <Clock className="w-4 h-4" />
+            </div>
+          </div>
+          <div className="text-3xl font-extrabold text-slate-200 mt-2 tracking-tight">{todoIssues.length}</div>
+          <div className="flex items-center gap-1.5 text-[11px] text-text-muted mt-1">
+            <span className="font-mono font-semibold text-slate-300">{todoPct}%</span>
+            <span>of total backlog</span>
+          </div>
         </div>
 
-        <div className="bg-surface-card border border-border/80 rounded-2xl p-5 space-y-2 shadow-sm">
-          <span className="text-xs font-semibold text-blue-400">In Progress</span>
-          <div className="text-3xl font-extrabold text-blue-400">{inProgressIssues.length}</div>
-          <p className="text-[11px] text-text-muted">{inProgPct}% being executed</p>
+        {/* Card 3: In Progress */}
+        <div className="bg-surface-card border border-border/80 rounded-2xl p-5 shadow-card relative overflow-hidden group hover:border-blue-500/40 transition-all hover:-translate-y-0.5">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-blue-400">In Progress</span>
+            <div className="p-2 rounded-xl bg-blue-500/10 text-blue-400">
+              <Activity className="w-4 h-4" />
+            </div>
+          </div>
+          <div className="text-3xl font-extrabold text-blue-400 mt-2 tracking-tight">{inProgressIssues.length}</div>
+          <div className="flex items-center gap-1.5 text-[11px] text-text-muted mt-1">
+            <span className="font-mono font-semibold text-blue-300">{inProgPct}%</span>
+            <span>currently executing</span>
+          </div>
         </div>
 
-        <div className="bg-surface-card border border-border/80 rounded-2xl p-5 space-y-2 shadow-sm">
-          <span className="text-xs font-semibold text-emerald-400">Completed</span>
-          <div className="text-3xl font-extrabold text-emerald-400">{doneIssues.length}</div>
-          <p className="text-[11px] text-text-muted">{donePct}% resolution rate</p>
+        {/* Card 4: Done */}
+        <div className="bg-surface-card border border-border/80 rounded-2xl p-5 shadow-card relative overflow-hidden group hover:border-emerald-500/40 transition-all hover:-translate-y-0.5">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-emerald-400">Completed & Resolved</span>
+            <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-400">
+              <CheckCircle2 className="w-4 h-4" />
+            </div>
+          </div>
+          <div className="text-3xl font-extrabold text-emerald-400 mt-2 tracking-tight">{doneIssues.length}</div>
+          <div className="flex items-center gap-1.5 text-[11px] text-text-muted mt-1">
+            <span className="font-mono font-semibold text-emerald-300">{donePct}%</span>
+            <span>completion rate</span>
+          </div>
         </div>
       </div>
 
       {/* Visual Analytics Row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Status Distribution Progress Bar */}
-        <div className="bg-surface-card border border-border/80 rounded-2xl p-6 shadow-sm space-y-4">
+        {/* Status Breakdown Progress Bar */}
+        <div className="bg-surface-card border border-border/80 rounded-2xl p-6 shadow-card space-y-4 backdrop-blur-md">
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-bold text-white flex items-center gap-2">
               <PieChart className="w-4 h-4 text-brand-400" />
-              Status Breakdown
+              Status Allocation Pipeline
             </h3>
-            <span className="text-xs text-text-muted">{totalIssues} items</span>
+            <span className="text-xs text-text-muted font-mono">{totalIssues} items</span>
           </div>
 
           {/* Multi-segment Progress Bar */}
-          <div className="w-full h-4 bg-surface-surface rounded-full overflow-hidden flex border border-border/60">
+          <div className="w-full h-3.5 bg-surface-surface rounded-full overflow-hidden flex border border-white/5 shadow-inner">
             <div
               style={{ width: `${todoPct}%` }}
               className="bg-slate-600 transition-all duration-500"
@@ -201,7 +253,7 @@ export const DashboardView: React.FC = () => {
             />
             <div
               style={{ width: `${inProgPct}%` }}
-              className="bg-blue-500 transition-all duration-500"
+              className="bg-blue-500 transition-all duration-500 shadow-glow"
               title={`In Progress: ${inProgPct}%`}
             />
             <div
@@ -228,19 +280,19 @@ export const DashboardView: React.FC = () => {
         </div>
 
         {/* Priority Heat Distribution */}
-        <div className="bg-surface-card border border-border/80 rounded-2xl p-6 shadow-sm space-y-4">
+        <div className="bg-surface-card border border-border/80 rounded-2xl p-6 shadow-card space-y-4 backdrop-blur-md">
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-bold text-white flex items-center gap-2">
               <TrendingUp className="w-4 h-4 text-emerald-400" />
-              Priority Distribution
+              Priority Severity Distribution
             </h3>
           </div>
 
-          <div className="space-y-3">
+          <div className="space-y-3.5">
             <div className="space-y-1">
               <div className="flex items-center justify-between text-xs">
-                <span className="text-rose-400 font-medium">High & Critical</span>
-                <span className="text-text-muted">{highPriority}</span>
+                <span className="text-rose-400 font-medium">Highest & High</span>
+                <span className="text-text-muted font-mono">{highPriority} issues</span>
               </div>
               <div className="w-full h-2 bg-surface-surface rounded-full overflow-hidden">
                 <div
@@ -253,7 +305,7 @@ export const DashboardView: React.FC = () => {
             <div className="space-y-1">
               <div className="flex items-center justify-between text-xs">
                 <span className="text-amber-400 font-medium">Medium</span>
-                <span className="text-text-muted">{medPriority}</span>
+                <span className="text-text-muted font-mono">{medPriority} issues</span>
               </div>
               <div className="w-full h-2 bg-surface-surface rounded-full overflow-hidden">
                 <div
@@ -266,7 +318,7 @@ export const DashboardView: React.FC = () => {
             <div className="space-y-1">
               <div className="flex items-center justify-between text-xs">
                 <span className="text-blue-400 font-medium">Low & Lowest</span>
-                <span className="text-text-muted">{lowPriority}</span>
+                <span className="text-text-muted font-mono">{lowPriority} issues</span>
               </div>
               <div className="w-full h-2 bg-surface-surface rounded-full overflow-hidden">
                 <div
@@ -279,18 +331,67 @@ export const DashboardView: React.FC = () => {
         </div>
       </div>
 
+      {/* Recent Issues Feed */}
+      <div className="bg-surface-card border border-border/80 rounded-2xl overflow-hidden shadow-card backdrop-blur-md">
+        <div className="px-6 py-4 border-b border-border/80 bg-surface-elevated/40 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Sparkles className="w-4 h-4 text-brand-400" />
+            <h3 className="text-sm font-bold text-white">Recent Project Issues</h3>
+          </div>
+          <Button
+            size="xs"
+            variant="ghost"
+            onClick={() => openModal('createIssue')}
+          >
+            Create Issue
+          </Button>
+        </div>
+
+        <div className="divide-y divide-border/50">
+          {issues.slice(0, 5).map((issue) => (
+            <div
+              key={issue.id}
+              onClick={() => openModal('issueDetail', issue)}
+              className="px-6 py-3.5 hover:bg-surface-hover/70 cursor-pointer flex items-center justify-between gap-4 transition-colors group"
+            >
+              <div className="flex items-center gap-3 min-w-0">
+                <span className="font-mono text-xs font-bold text-brand-400">{issue.key}</span>
+                <span className="text-xs font-medium text-text-primary truncate group-hover:text-white transition-colors">
+                  {issue.title || (issue as any).summary}
+                </span>
+              </div>
+
+              <div className="flex items-center gap-3 shrink-0">
+                <Badge variant="subtle" size="xs">
+                  {issue.status || (issue as any).state || 'Open'}
+                </Badge>
+                <span className="text-[11px] text-text-muted font-mono hidden sm:inline">
+                  {formatDate(issue.updatedAt || issue.createdAt)}
+                </span>
+              </div>
+            </div>
+          ))}
+
+          {issues.length === 0 && (
+            <div className="py-10 text-center text-xs text-text-muted italic">
+              No issues recorded yet.
+            </div>
+          )}
+        </div>
+      </div>
+
       {/* Create Dashboard Modal */}
       <Modal
         isOpen={createModalOpen}
         onClose={() => setCreateModalOpen(false)}
         title="Create New Dashboard"
-        description="Add a customizable reporting board for your workspace."
+        description="Add a customized analytics view for your organization."
         maxWidth="sm"
       >
         <form onSubmit={handleCreateDashboard} className="space-y-4">
           <Input
             label="Dashboard Name *"
-            placeholder="e.g. Executive Overview"
+            placeholder="e.g. Sprint Velocity & Bug Triage"
             value={newDashName}
             onChange={(e) => setNewDashName(e.target.value)}
             required
@@ -298,7 +399,7 @@ export const DashboardView: React.FC = () => {
           />
           <Input
             label="Description"
-            placeholder="e.g. Velocity and burnup metrics"
+            placeholder="e.g. Cross-project tracking for Q3 releases"
             value={newDashDesc}
             onChange={(e) => setNewDashDesc(e.target.value)}
           />

@@ -15,7 +15,6 @@ import {
   User as UserIcon,
   Settings,
   Sparkles,
-  Wifi,
   RefreshCw,
 } from 'lucide-react';
 
@@ -31,8 +30,6 @@ export const Header: React.FC = () => {
   } = useWorkspaceStore();
   const {
     openModal,
-    searchQuery,
-    setSearchQuery,
     setView,
     isSyncing,
   } = useUIStore();
@@ -186,49 +183,60 @@ export const Header: React.FC = () => {
         </Button>
       </div>
 
-      {/* Center: Global Search Bar */}
+      {/* Center: Global Search Bar / Command Palette Trigger */}
       <div className="flex-1 max-w-md mx-2 hidden md:block">
-        <div className="relative">
-          <Search className="w-3.5 h-3.5 text-text-muted absolute left-3 top-1/2 -translate-y-1/2" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') setView('filters');
-            }}
-            placeholder="Search issues, projects, or JQL (/)..."
-            className="w-full bg-surface-surface text-text-primary placeholder:text-text-muted text-xs rounded-lg pl-9 pr-8 py-1.5 border border-border/80 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500/30 transition-all"
-          />
-        </div>
+        <button
+          type="button"
+          onClick={() => openModal('commandPalette')}
+          className="w-full bg-surface-surface/70 hover:bg-surface-surface text-text-primary text-xs rounded-xl px-3.5 py-2 border border-border/80 hover:border-brand-500/40 flex items-center justify-between transition-all group shadow-inner"
+        >
+          <div className="flex items-center gap-2.5 text-text-muted group-hover:text-text-secondary">
+            <Search className="w-3.5 h-3.5 text-text-muted group-hover:text-brand-400 transition-colors" />
+            <span className="font-normal truncate">Search issues, actions, or commands...</span>
+          </div>
+          <kbd className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-mono text-text-muted bg-surface-elevated/80 border border-white/10 rounded-md shadow-sm">
+            <span>Ctrl</span>
+            <span>K</span>
+          </kbd>
+        </button>
       </div>
 
-      {/* Right: Sync Indicator, Notifications, User Menu */}
+      {/* Right: Sync Indicator, Search on Mobile, Notifications, User Menu */}
       <div className="flex items-center gap-2 shrink-0">
+        {/* Mobile Search Trigger */}
+        <button
+          onClick={() => openModal('commandPalette')}
+          className="p-2 rounded-xl text-text-muted hover:text-text-primary hover:bg-surface-hover md:hidden transition-colors"
+          aria-label="Search"
+        >
+          <Search className="w-4 h-4" />
+        </button>
+
         {/* Sync Indicator */}
         <div
-          className={`flex items-center gap-1.5 px-2 py-1 rounded-full text-[11px] font-medium border ${
+          className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium border transition-all ${
             isSyncing
-              ? 'border-amber-500/30 bg-amber-500/10 text-amber-300'
+              ? 'border-amber-500/30 bg-amber-500/10 text-amber-300 animate-pulse'
               : 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300'
           }`}
-          title={isSyncing ? 'Synchronizing with server...' : 'Connected and synced'}
+          title={isSyncing ? 'Synchronizing with server...' : 'Connected and synced with Syd1 edge'}
         >
           {isSyncing ? (
             <RefreshCw className="w-3 h-3 animate-spin text-amber-400" />
           ) : (
-            <Wifi className="w-3 h-3 text-emerald-400" />
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
           )}
-          <span className="hidden sm:inline">{isSyncing ? 'Syncing' : 'Ready'}</span>
+          <span className="hidden sm:inline">{isSyncing ? 'Syncing' : 'Connected'}</span>
         </div>
 
-        {/* Notifications Icon Button */}
+        {/* Notifications Icon Button with Unread Badge */}
         <button
           onClick={() => setView('notifications')}
-          className="p-2 rounded-lg text-text-muted hover:text-text-primary hover:bg-surface-hover transition-colors relative"
+          className="p-2 rounded-xl text-text-muted hover:text-text-primary hover:bg-surface-hover transition-colors relative"
           aria-label="Notifications"
         >
           <Bell className="w-4 h-4" />
+          <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-brand-500 rounded-full ring-2 ring-surface-surface animate-pulse" />
         </button>
 
         {/* User Profile Avatar Dropdown */}

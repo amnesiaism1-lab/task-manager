@@ -6,6 +6,7 @@ import { IssueDetailModal } from './IssueDetailModal';
 import { UserProfileModal } from './UserProfileModal';
 import { InviteMemberModal } from './InviteMemberModal';
 import { JoinOrgModal } from './JoinOrgModal';
+import { CommandPalette } from './CommandPalette';
 import { Modal } from '../ui/Modal';
 import { useUIStore } from '../../stores/useUIStore';
 
@@ -22,6 +23,7 @@ export const ModalContainer: React.FC = () => {
       <UserProfileModal />
       <InviteMemberModal />
       <JoinOrgModal />
+      <CommandPalette />
       {modals['customModal'] && (
         <Modal
           isOpen={true}
