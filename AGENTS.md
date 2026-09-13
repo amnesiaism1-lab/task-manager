@@ -9,6 +9,6 @@
 ## 2. Project Architecture & Standards
 - **Monorepo Structure**:
   - `backend/`: NestJS, TypeORM, PostgreSQL, Helmet, Swagger, CommonJS for serverless API entrypoint.
-  - `frontend/`: Vanilla JS / Modern ES Modules, Vite, TailwindCSS.
+  - `frontend/`: React 18 / Next.js-ready, Vite, TypeScript, TailwindCSS (Traditional Vanilla JS preserved on branch `traditional-vanilla` and tag `v1.0.0-traditional`).
   - `shared/`: Common types, enums, DTO interfaces.
 - **Code Quality**: Ensure all code passes `tsc --noEmit` and `oxlint` with 0 errors and 0 warnings.

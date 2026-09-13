@@ -24,7 +24,8 @@ RUN npm install
 
 # 3. Copy frontend source files & build distribution bundle
 COPY frontend/index.html ./
-COPY frontend/vite.config.js ./
+COPY frontend/vite.config.ts ./
+COPY frontend/tsconfig*.json ./
 COPY frontend/tailwind.config.js ./
 COPY frontend/postcss.config.js ./
 COPY frontend/src ./src
