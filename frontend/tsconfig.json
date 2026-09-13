@@ -28,7 +28,7 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"],
-      "@task-manager/shared": ["../shared/src/index.ts"]
+      "@task-manager/shared": ["./src/shared/index.ts"]
     }
   },
   "include": ["src"],

@@ -41,14 +41,14 @@ export function invalidateApiCache() {
 function getDefaultApiUrl(): string {
   if (typeof window === 'undefined') return 'http://localhost:3001/api';
   const stored = localStorage.getItem('tm_api');
-  const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-  if (stored) {
+  if (stored && stored.trim()) {
+    const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
     if (!isLocal && stored.includes('localhost:3001')) {
       return '/api';
     }
     return stored;
   }
-  return isLocal ? 'http://localhost:3001/api' : '/api';
+  return '/api';
 }
 
 let onUnauthorizedCallback: (() => void) | null = null;

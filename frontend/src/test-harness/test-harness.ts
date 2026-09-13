@@ -15,9 +15,11 @@ export function setupTestHarness() {
       return {
         token: auth.token,
         user: auth.user,
-        api: localStorage.getItem('tm_api') || 'http://localhost:3001/api',
+        api: localStorage.getItem('tm_api') || '/api',
         org: ws.activeOrgId,
         selectedProjectId: ws.activeProjectId,
+        currentOrg: ws.organizations.find((o) => o.id === ws.activeOrgId) || null,
+        activeProject: ws.projects.find((p) => p.id === ws.activeProjectId) || null,
         organizations: ws.organizations,
         projects: ws.projects,
         members: ws.members,
@@ -41,7 +43,13 @@ export function setupTestHarness() {
     store: storeAdapter,
     request,
     showToast: (msg: string, type: any = 'info') => useUIStore.getState().showToast(msg, type),
-    openModal: (name: string, data?: any) => useUIStore.getState().openModal(name, data),
+    openModal: (nameOrOptions: string | Record<string, any>, data?: any) => {
+      if (typeof nameOrOptions === 'object' && nameOrOptions !== null) {
+        useUIStore.getState().openModal('customModal', nameOrOptions);
+      } else {
+        useUIStore.getState().openModal(nameOrOptions, data);
+      }
+    },
     closeModal: (name?: string) => {
       if (name) useUIStore.getState().closeModal(name);
       else useUIStore.getState().closeAllModals();
@@ -85,6 +93,9 @@ export function setupTestHarness() {
     },
     loadNotifications: async () => {
       await queryClient.invalidateQueries({ queryKey: ['notifications'] });
+    },
+    loadFilters: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['filters'] });
     },
   };
 }

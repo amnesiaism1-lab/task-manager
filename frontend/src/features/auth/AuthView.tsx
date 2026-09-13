@@ -118,6 +118,7 @@ export const AuthView: React.FC = () => {
         {/* Mode Switcher Tabs */}
         <div className="grid grid-cols-2 bg-surface-surface/60 p-1 rounded-xl border border-border/60 mb-6">
           <button
+            id="tab-login"
             type="button"
             onClick={() => {
               setAuthMode('login');
@@ -134,6 +135,7 @@ export const AuthView: React.FC = () => {
             Sign In
           </button>
           <button
+            id="tab-register"
             type="button"
             onClick={() => {
               setAuthMode('register');
@@ -147,14 +149,16 @@ export const AuthView: React.FC = () => {
             }`}
           >
             <UserPlus className="w-3.5 h-3.5" />
-            Create Account
+            Register
           </button>
         </div>
 
         {/* Form Container */}
         {authMode === 'login' ? (
-          <form onSubmit={handleLogin} className="space-y-4">
+          <form id="form-login" onSubmit={handleLogin} className="space-y-4">
             <Input
+              id="login-email"
+              name="email"
               label="Email Address"
               type="email"
               placeholder="name@company.com"
@@ -165,6 +169,8 @@ export const AuthView: React.FC = () => {
             />
 
             <Input
+              id="login-password"
+              name="password"
               label="Password"
               type="password"
               placeholder="••••••••"
@@ -175,6 +181,8 @@ export const AuthView: React.FC = () => {
 
             {requires2FA && (
               <Input
+                id="login-2fa"
+                name="twoFactorCode"
                 label="Two-Factor Authentication Code (2FA)"
                 placeholder="123456"
                 value={twoFactorCode}
@@ -189,6 +197,7 @@ export const AuthView: React.FC = () => {
             {infoMessage && <p className="text-xs text-brand-300 font-medium">{infoMessage}</p>}
 
             <Button
+              id="btn-login"
               type="submit"
               variant="primary"
               size="md"
@@ -202,6 +211,7 @@ export const AuthView: React.FC = () => {
             {/* Demo Credential Quick Fill */}
             <div className="pt-3 border-t border-border/60">
               <Button
+                id="btn-autofill-admin"
                 type="button"
                 variant="subtle"
                 size="xs"
@@ -214,8 +224,10 @@ export const AuthView: React.FC = () => {
             </div>
           </form>
         ) : (
-          <form onSubmit={handleRegister} className="space-y-4">
+          <form id="form-register" onSubmit={handleRegister} className="space-y-4">
             <Input
+              id="reg-name"
+              name="fullName"
               label="Full Name"
               type="text"
               placeholder="Jane Doe"
@@ -226,6 +238,8 @@ export const AuthView: React.FC = () => {
             />
 
             <Input
+              id="reg-email"
+              name="email"
               label="Work Email"
               type="email"
               placeholder="jane@company.com"
@@ -235,6 +249,8 @@ export const AuthView: React.FC = () => {
             />
 
             <Input
+              id="reg-password"
+              name="password"
               label="Password (min 8 chars)"
               type="password"
               placeholder="••••••••"
@@ -248,6 +264,7 @@ export const AuthView: React.FC = () => {
             {infoMessage && <p className="text-xs text-emerald-400 font-medium">{infoMessage}</p>}
 
             <Button
+              id="btn-register"
               type="submit"
               variant="primary"
               size="md"
@@ -255,7 +272,7 @@ export const AuthView: React.FC = () => {
               isLoading={isLoading}
               rightIcon={<ArrowRight className="w-4 h-4" />}
             >
-              Create Account
+              Register Account
             </Button>
           </form>
         )}

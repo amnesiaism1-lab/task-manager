@@ -14,7 +14,7 @@
     "db:clean": "node scripts/clean_database.mjs",
     "start:backend": "npm --prefix backend run start:dev",
     "start:frontend": "npm --prefix frontend run dev",
-    "lint": "oxlint frontend/src backend/src",
+    "lint": "npx oxlint frontend/src backend/src",
     "docker:up": "docker compose up -d",
     "docker:down": "docker compose down"
   },
