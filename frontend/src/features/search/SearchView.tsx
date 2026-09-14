@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useWorkspaceStore } from '../../stores/useWorkspaceStore';
 import { useUIStore } from '../../stores/useUIStore';
@@ -27,7 +27,7 @@ import {
 } from 'lucide-react';
 
 export const SearchView: React.FC = () => {
-  const { activeOrgId, members } = useWorkspaceStore();
+  const { activeOrgId, activeProjectId, projects, members } = useWorkspaceStore();
   const { searchQuery, setSearchQuery, openModal, showToast } = useUIStore();
 
   const [statusFilter, setStatusFilter] = useState('');
@@ -35,21 +35,57 @@ export const SearchView: React.FC = () => {
   const [assigneeFilter, setAssigneeFilter] = useState('');
   const [viewMode, setViewMode] = useState<'table' | 'cards'>('table');
 
-  const { data: issues = [], isLoading, refetch, isFetching } = useQuery<Issue[]>({
-    queryKey: ['searchIssues', activeOrgId, searchQuery, statusFilter, priorityFilter, assigneeFilter],
+  const currentProjectId = activeProjectId || projects[0]?.id;
+
+  const { data: rawIssues = [], isLoading, refetch, isFetching } = useQuery<Issue[]>({
+    queryKey: ['searchRawIssues', activeOrgId, currentProjectId],
     queryFn: async () => {
       if (!activeOrgId) return [];
-      const params = new URLSearchParams({ page: '1', limit: '100' });
-      if (searchQuery.trim()) params.append('query', searchQuery.trim());
-      if (statusFilter) params.append('status', statusFilter);
-      if (priorityFilter) params.append('priority', priorityFilter);
-      if (assigneeFilter) params.append('assigneeId', assigneeFilter);
-
-      const res = await request(`/organizations/${activeOrgId}/issues/search?${params.toString()}`);
+      const url = currentProjectId
+        ? `/organizations/${activeOrgId}/projects/${currentProjectId}/issues?page=1&limit=100`
+        : `/organizations/${activeOrgId}/issues`;
+      const res = await request(url).catch(() => []);
       return Array.isArray(res) ? res : res?.data || [];
     },
     enabled: !!activeOrgId,
   });
+
+  const issues = useMemo(() => {
+    return rawIssues.filter((issue) => {
+      // 1. Keyword search (title, summary, key, description)
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase().trim();
+        const keyMatch = (issue.key || '').toLowerCase().includes(q);
+        const titleMatch = (issue.title || (issue as any).summary || '').toLowerCase().includes(q);
+        const descMatch = (issue.description || '').toLowerCase().includes(q);
+        if (!keyMatch && !titleMatch && !descMatch) return false;
+      }
+
+      // 2. Status filter
+      if (statusFilter) {
+        const s = formatStatus(issue.status || (issue as any).state).toLowerCase();
+        const filterLower = statusFilter.toLowerCase();
+        if (filterLower.includes('progress') && !s.includes('progress') && !s.includes('doing')) return false;
+        if (filterLower.includes('done') && !s.includes('done') && !s.includes('closed') && !s.includes('resolve')) return false;
+        if (filterLower.includes('open') && !s.includes('todo') && !s.includes('open') && !s.includes('backlog')) return false;
+        if (filterLower.includes('review') && !s.includes('review') && !s.includes('qa')) return false;
+      }
+
+      // 3. Priority filter
+      if (priorityFilter) {
+        const p = (issue.priority || '').toLowerCase();
+        if (!p.includes(priorityFilter.toLowerCase())) return false;
+      }
+
+      // 4. Assignee filter
+      if (assigneeFilter) {
+        const aId = issue.assigneeId || issue.assignee?.id || (issue as any).assigneeMember?.id;
+        if (aId !== assigneeFilter) return false;
+      }
+
+      return true;
+    });
+  }, [rawIssues, searchQuery, statusFilter, priorityFilter, assigneeFilter]);
 
   const clearAllFilters = () => {
     setSearchQuery('');
