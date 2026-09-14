@@ -67,3 +67,12 @@ export function formatStatus(status: any): string {
   return String(status);
 }
 
+export function formatIssueType(type: any): string {
+  if (!type) return 'TASK';
+  if (typeof type === 'string') return type.toUpperCase();
+  if (typeof type === 'object') {
+    return (type.name || type.key || 'TASK').toUpperCase();
+  }
+  return String(type).toUpperCase();
+}
+
