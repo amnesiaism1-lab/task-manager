@@ -57,3 +57,13 @@ export function getInitials(name?: string | null, email?: string | null): string
   }
   return '??';
 }
+
+export function formatStatus(status: any): string {
+  if (!status) return 'To Do';
+  if (typeof status === 'string') return status;
+  if (typeof status === 'object') {
+    return status.name || status.key || status.label || 'To Do';
+  }
+  return String(status);
+}
+

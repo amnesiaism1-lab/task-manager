@@ -7,7 +7,7 @@ import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/ui/Modal';
 import { Input } from '../../components/ui/Input';
-import { getInitials } from '../../lib/utils';
+import { getInitials, formatStatus } from '../../lib/utils';
 import {
   Layers,
   Plus,
@@ -316,7 +316,7 @@ export const BacklogView: React.FC = () => {
                           )}
 
                           <Badge variant="todo" size="xs">
-                            {issue.status || issue.state || 'To Do'}
+                            {formatStatus(issue.status || issue.state || 'To Do')}
                           </Badge>
 
                           {/* Assignee avatar */}
@@ -419,7 +419,7 @@ export const BacklogView: React.FC = () => {
                   )}
 
                   <Badge variant="todo" size="xs">
-                    {issue.status || issue.state || 'To Do'}
+                    {formatStatus(issue.status || issue.state || 'To Do')}
                   </Badge>
 
                   {/* Assignee avatar */}

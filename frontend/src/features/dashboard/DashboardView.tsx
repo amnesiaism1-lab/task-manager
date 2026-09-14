@@ -8,7 +8,7 @@ import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/ui/Modal';
 import { Input } from '../../components/ui/Input';
 import { Badge } from '../../components/ui/Badge';
-import { formatDate } from '../../lib/utils';
+import { formatDate, formatStatus } from '../../lib/utils';
 import {
   BarChart3,
   Plus,
@@ -61,17 +61,18 @@ export const DashboardView: React.FC = () => {
 
   // Calculate metrics
   const totalIssues = issues.length;
-  const todoIssues = issues.filter(
-    (i) =>
-      (i.status || '').toLowerCase().includes('todo') ||
-      (i.status || '').toLowerCase().includes('open')
-  );
-  const inProgressIssues = issues.filter(
-    (i) =>
-      (i.status || '').toLowerCase().includes('progress') ||
-      (i.status || '').toLowerCase().includes('review')
-  );
-  const doneIssues = issues.filter((i) => (i.status || '').toLowerCase().includes('done'));
+  const todoIssues = issues.filter((i) => {
+    const s = formatStatus(i.status).toLowerCase();
+    return s.includes('todo') || s.includes('open');
+  });
+  const inProgressIssues = issues.filter((i) => {
+    const s = formatStatus(i.status).toLowerCase();
+    return s.includes('progress') || s.includes('review');
+  });
+  const doneIssues = issues.filter((i) => {
+    const s = formatStatus(i.status).toLowerCase();
+    return s.includes('done') || s.includes('closed');
+  });
 
   const todoPct = totalIssues ? Math.round((todoIssues.length / totalIssues) * 100) : 0;
   const inProgPct = totalIssues ? Math.round((inProgressIssues.length / totalIssues) * 100) : 0;
@@ -363,7 +364,7 @@ export const DashboardView: React.FC = () => {
 
               <div className="flex items-center gap-3 shrink-0">
                 <Badge variant="subtle" size="xs">
-                  {issue.status || (issue as any).state || 'Open'}
+                  {formatStatus(issue.status || (issue as any).state || 'Open')}
                 </Badge>
                 <span className="text-[11px] text-text-muted font-mono hidden sm:inline">
                   {formatDate(issue.updatedAt || issue.createdAt)}

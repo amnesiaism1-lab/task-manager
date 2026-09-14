@@ -6,7 +6,7 @@ import { request } from '../../lib/api-client';
 import { Issue } from '../../types';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
-import { formatDate } from '../../lib/utils';
+import { formatDate, formatStatus } from '../../lib/utils';
 import {
   Search,
   Filter,
@@ -338,15 +338,15 @@ export const SearchView: React.FC = () => {
 
                   <Badge
                     variant={
-                      (issue.status || '').toLowerCase().includes('done')
+                      formatStatus(issue.status).toLowerCase().includes('done')
                         ? 'done'
-                        : (issue.status || '').toLowerCase().includes('progress')
+                        : formatStatus(issue.status).toLowerCase().includes('progress')
                         ? 'progress'
                         : 'todo'
                     }
                     size="sm"
                   >
-                    {issue.status || (issue as any).state || 'Open'}
+                    {formatStatus(issue.status || (issue as any).state || 'Open')}
                   </Badge>
 
                   <span className="text-[11px] text-text-muted hidden sm:inline font-mono">
@@ -378,7 +378,7 @@ export const SearchView: React.FC = () => {
 
                 <div className="flex items-center justify-between pt-2 border-t border-white/5 text-[11px] text-text-muted">
                   <Badge variant="subtle" size="xs">
-                    {issue.status || (issue as any).state || 'Open'}
+                    {formatStatus(issue.status || (issue as any).state || 'Open')}
                   </Badge>
                   <span className="font-mono">{formatDate(issue.updatedAt || issue.createdAt)}</span>
                 </div>

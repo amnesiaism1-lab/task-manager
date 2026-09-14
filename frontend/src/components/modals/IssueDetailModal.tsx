@@ -6,7 +6,7 @@ import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { request } from '../../lib/api-client';
 import { queryClient } from '../../lib/query-client';
-import { formatDate, formatDateTime, getInitials } from '../../lib/utils';
+import { formatDate, formatDateTime, getInitials, formatStatus } from '../../lib/utils';
 import {
   MessageSquare,
   Clock,
@@ -370,7 +370,7 @@ export const IssueDetailModal: React.FC = () => {
               </label>
               <div className="flex flex-wrap gap-1.5">
                 <Badge variant="progress" size="md">
-                  {issue.state || issue.status || 'Open'}
+                  {formatStatus(issue.state || issue.status || 'Open')}
                 </Badge>
                 {transitions.map((t: any) => (
                   <button

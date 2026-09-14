@@ -7,7 +7,7 @@ import { request } from '../../lib/api-client';
 import { Issue } from '../../types';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
-import { formatDate } from '../../lib/utils';
+import { formatDate, formatStatus } from '../../lib/utils';
 import {
   CheckCircle2,
   Clock,
@@ -44,10 +44,16 @@ export const WorkView: React.FC = () => {
   });
 
   const inProgressIssues = myIssues.filter(
-    (i) => (i.status || '').toLowerCase().includes('progress') || (i.status || '').toLowerCase().includes('doing')
+    (i) => {
+      const s = formatStatus(i.status).toLowerCase();
+      return s.includes('progress') || s.includes('doing');
+    }
   );
   const doneIssues = myIssues.filter(
-    (i) => (i.status || '').toLowerCase().includes('done') || (i.status || '').toLowerCase().includes('resolve')
+    (i) => {
+      const s = formatStatus(i.status).toLowerCase();
+      return s.includes('done') || s.includes('resolve');
+    }
   );
   const todoIssues = myIssues.filter(
     (i) => !inProgressIssues.includes(i) && !doneIssues.includes(i)
@@ -192,15 +198,15 @@ export const WorkView: React.FC = () => {
                 <div className="flex items-center gap-3 shrink-0">
                   <Badge
                     variant={
-                      (issue.status || '').toLowerCase().includes('done')
+                      formatStatus(issue.status).toLowerCase().includes('done')
                         ? 'done'
-                        : (issue.status || '').toLowerCase().includes('progress')
+                        : formatStatus(issue.status).toLowerCase().includes('progress')
                         ? 'progress'
                         : 'todo'
                     }
                     size="sm"
                   >
-                    {issue.status || (issue as any).state || 'Open'}
+                    {formatStatus(issue.status || (issue as any).state || 'Open')}
                   </Badge>
                   <span className="text-[11px] text-text-muted hidden sm:inline">
                     {formatDate(issue.updatedAt || issue.createdAt)}
