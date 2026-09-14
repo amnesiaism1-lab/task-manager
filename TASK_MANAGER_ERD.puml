@@ -94,6 +94,10 @@ package "Identity & Org" {
 
   entity "org_role_permission_entries" as org_role_permission_entries {
     * role_id : UUID <<FK org_roles.id>>
+  }
+
+  entity "org_role_permission_entries" as org_role_permission_entries {
+    * role_id : UUID <<FK org_roles.id>>
     * permission_key : VARCHAR
     --
     ' e.g., MANAGE_ORG, MANAGE_USERS, CREATE_PROJECT
@@ -105,10 +109,13 @@ package "Identity & Org" {
     --
     org_id : UUID <<FK organizations.id>>
     name : VARCHAR
+    description : TEXT
     parent_department_id : UUID <<FK departments.id>>
+    lead_member_id : UUID <<FK organization_members.id>>
     created_at : TIMESTAMP
     updated_at : TIMESTAMP
     ' UQ(org_id, name)
+    ' C-28: parent_department and lead_member must belong to the same organization
   }
 
   entity "department_members" as department_members {
@@ -198,6 +205,7 @@ package "Workspace" {
     description : TEXT
     ' private | org | public
     visibility : VARCHAR
+    department_id : UUID <<FK departments.id>>
     permission_scheme_id : UUID <<FK permission_schemes.id>>
     workflow_scheme_id : UUID <<FK workflow_schemes.id>>
     issue_type_scheme_id : UUID <<FK issue_type_schemes.id>>
@@ -1341,8 +1349,9 @@ org_roles ||--o{ org_role_permission_entries : grants
 organizations ||--o{ departments : contains
 departments ||--o{ department_members : has
 org_members ||--o{ department_members : in
-
 departments |o--o{ departments : parent
+org_members |o--o{ departments : leads
+departments |o--o{ projects : owns / manages
 
 organizations ||--o{ groups : defines
 groups ||--o{ group_members : has

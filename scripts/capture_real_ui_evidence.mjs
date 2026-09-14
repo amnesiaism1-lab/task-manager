@@ -1,7 +1,5 @@
 import { ChromeRunner } from './chrome_runner.mjs';
 import { DbHelper } from './db_helper.mjs';
-import fs from 'fs';
-import path from 'path';
 
 const BASE_URL = 'https://task-manager-pqt2.vercel.app';
 const API_URL = `${BASE_URL}/api`;

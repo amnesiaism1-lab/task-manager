@@ -1,5 +1,4 @@
 import fs from 'fs';
-import path from 'path';
 import { TestContext } from './tests/test_context.mjs';
 import { runAuthSuite } from './tests/suite_auth.mjs';
 import { runOrgSuite } from './tests/suite_org.mjs';

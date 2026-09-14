@@ -19,6 +19,7 @@ import {
   Activity,
   Layers,
   Sparkles,
+  Building,
 } from 'lucide-react';
 
 export const DashboardView: React.FC = () => {
@@ -55,6 +56,17 @@ export const DashboardView: React.FC = () => {
         : `/organizations/${activeOrgId}/issues/search?page=1&limit=100`;
       const res = await request(url);
       return Array.isArray(res) ? res : res?.data || [];
+    },
+    enabled: !!activeOrgId,
+  });
+
+  // 3. Fetch Departments
+  const { data: departments = [] } = useQuery<any[]>({
+    queryKey: ['departments', activeOrgId],
+    queryFn: async () => {
+      if (!activeOrgId) return [];
+      const res = await request(`/organizations/${activeOrgId}/departments`);
+      return Array.isArray(res) ? res : [];
     },
     enabled: !!activeOrgId,
   });
@@ -331,6 +343,60 @@ export const DashboardView: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Department Delivery & Operational Units */}
+      {departments.length > 0 && (
+        <div className="bg-surface-card border border-border/80 rounded-2xl p-6 shadow-card space-y-4 backdrop-blur-md">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <div className="p-2 rounded-xl bg-purple-500/10 text-purple-400 border border-purple-500/20">
+                <Building className="w-4 h-4" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-white tracking-tight">
+                  Organizational Department Units & Delivery Scope
+                </h3>
+                <p className="text-xs text-text-secondary">
+                  Cross-functional department alignment and lead supervision.
+                </p>
+              </div>
+            </div>
+            <span className="text-xs font-mono text-text-muted">
+              {departments.length} units configured
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5 pt-1">
+            {departments.map((dept: any) => (
+              <div
+                key={dept.id}
+                className="p-4 rounded-xl bg-surface-surface/60 border border-border/70 hover:border-brand-500/30 transition-all space-y-2.5"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-text-primary flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-brand-400" />
+                    {dept.name}
+                  </span>
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-surface-elevated text-brand-300 border border-brand-500/20">
+                    {dept.memberCount || 0} members
+                  </span>
+                </div>
+
+                <p className="text-[11px] text-text-muted line-clamp-2">
+                  {dept.description || 'Enterprise department unit managing project delivery.'}
+                </p>
+
+                <div className="pt-2 border-t border-border/50 flex items-center justify-between text-[11px]">
+                  <span className="text-text-muted text-[10px] uppercase font-bold">Department Lead</span>
+                  <span className="text-text-primary font-medium truncate max-w-[140px]">
+                    {dept.leadMember?.fullName || 'Unassigned'}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Recent Issues Feed */}
       <div className="bg-surface-card border border-border/80 rounded-2xl overflow-hidden shadow-card backdrop-blur-md">

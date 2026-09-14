@@ -728,8 +728,8 @@ outbox_events "1" -- "0..*" notifications
 | `org_roles` | `id`, `org_id`, `key`, `name`, `description`, `created_at` | UQ `(org_id,key)` | Role template tại organization. |
 | `org_member_roles` | `org_member_id`, `role_id`, `granted_at`, `granted_by_member_id` | Composite PK `(org_member_id,role_id)` | Gán role org, phải cùng tenant. |
 | `org_role_permission_entries` | `role_id`, `permission_key`, `created_at` | Composite PK `(role_id,permission_key)` | Permission key của role org. |
-| `departments` | `id`, `org_id`, `name`, `parent_department_id`, timestamps | UQ `(org_id,name)`; self FK parent | Cây phòng ban; không được self/cycle hoặc parent khác org. |
-| `department_members` | `department_id`, `org_member_id`, `role_in_department`, `joined_at` | Composite PK `(department_id,org_member_id)` | Gán member cùng org vào department. |
+| `departments` | `id`, `org_id`, `name`, `description`, `parent_department_id`, `lead_member_id`, timestamps | UQ `(org_id,name)`; self FK parent; FK lead_member | Cây phòng ban; không được self/cycle; lead là member active trong org; sở hữu và phân cấp các project trực thuộc. |
+| `department_members` | `department_id`, `org_member_id`, `role_in_department`, `joined_at` | Composite PK `(department_id,org_member_id)` | Gán member cùng org vào department với vai trò cụ thể (LEAD/MEMBER/COORDINATOR). |
 | `groups` | `id`, `org_id`, `name`, `description`, timestamps | UQ `(org_id,name)` | Nhóm linh hoạt, dùng kế thừa role project. |
 | `group_members` | `group_id`, `org_member_id`, `added_at`, `added_by_member_id` | Composite PK `(group_id,org_member_id)` | Thành viên group, tất cả phải cùng tenant. |
 | `auth_sessions` | user, refresh-token hash, status, IP/user-agent, expiry/last-seen/revoked/timestamps | PK; UQ token hash | Session/refresh lifecycle; chỉ lưu hash, hỗ trợ logout một/tất cả phiên. |
@@ -740,7 +740,7 @@ outbox_events "1" -- "0..*" notifications
 
 | Entity | Field nghiệp vụ | Khóa/ràng buộc chính | Mục đích và test trọng tâm |
 |---|---|---|---|
-| `projects` | `id`, org/key/name/visibility, selected core + configuration schemes, creator, `next_issue_number`, timestamps, `archived_at` | UQ `(org_id,key)`; counter ≥1; core schemes cùng project, extension schemes cùng org | Đơn vị làm việc; allocate issue number atomically, không dùng `MAX(key)+1`; selected scheme là aggregate configuration. |
+| `projects` | `id`, org/key/name/visibility, `department_id`, selected core + configuration schemes, creator, `next_issue_number`, timestamps, `archived_at` | UQ `(org_id,key)`; counter ≥1; optional FK `department_id`; core schemes cùng project, extension schemes cùng org | Đơn vị làm việc trực thuộc phòng ban hoặc tổ chức; allocate issue number atomically, không dùng `MAX(key)+1`; selected scheme là aggregate configuration. |
 | `project_roles` | `id`, `project_id`, `key`, `name`, `description`, `created_at` | UQ `(project_id,key)` | Role tại project. |
 | `project_members` | `id`, `project_id`, `org_member_id`, `status`, `joined_at`, `created_at` | UQ `(project_id,org_member_id)` | Member project; org của member phải bằng org của project. |
 | `project_member_roles` | `project_member_id`, `project_role_id`, `granted_at`, `granted_by_member_id` | Composite PK `(project_member_id,project_role_id)` | Gán role trực tiếp cho project member. |
@@ -1276,15 +1276,18 @@ Mỗi use case bên dưới có đầy đủ thành phần của mẫu SRS: acto
 
 | Thuộc tính | Đặc tả |
 |---|---|
-| Actor / Priority | Org Admin / P1 |
-| Trigger | Tạo/sửa/di chuyển/xóa department; add/remove member. |
-| Tiền điều kiện | Actor có permission; parent/member cùng org. |
-| Hậu điều kiện | Cây không cycle; department member unique; role in department nhất quán. |
-| Dữ liệu | `departments`, `department_members`. |
+| Actor / Priority | Org Admin, Department Lead / P1 |
+| Trigger | Tạo/sửa/di chuyển/xóa department; bổ nhiệm trưởng phòng (`lead_member_id`); thêm/gỡ thành viên và gán vai trò (`role_in_department`). |
+| Tiền điều kiện | Actor có permission `MANAGE_DEPARTMENTS`; parent department và thành viên được gán cùng thuộc organization. |
+| Hậu điều kiện | Cây phòng ban không cycle; department member unique theo `(department_id, org_member_id)`; vai trò trong phòng ban nhất quán (`LEAD`, `MEMBER`, `COORDINATOR`); các project trực thuộc phản ánh chính xác đơn vị quản lý. |
+| Dữ liệu | `departments` (`id`, `org_id`, `name`, `description`, `parent_department_id`, `lead_member_id`), `department_members` (`department_id`, `org_member_id`, `role_in_department`, `joined_at`), gián tiếp liên kết `projects` (`department_id`). |
 
-**Luồng cơ bản:** validate name/parent; create/update node hoặc membership; kiểm cycle bằng traversal/constraint; commit/audit.
+**Luồng cơ bản:**
+1. **Quản lý phòng ban:** Validate tên phòng ban không trùng trong cùng tổ chức; kiểm tra parent không tạo chu trình lặp (Cycle Detection); gán `lead_member_id` cho thành viên tích cực; lưu mô tả (`description`).
+2. **Quản lý thành viên phòng ban:** Khi bổ nhiệm `lead_member_id`, hệ thống tự động đồng bộ bản ghi trong `department_members` với `role_in_department = 'LEAD'`. Khi thêm thành viên khác, cho phép chọn vai trò `MEMBER` hoặc `COORDINATOR`.
+3. **Liên kết dự án & Thống kê:** Dự án có thể chỉ định `department_id` để phân định quyền sở hữu và trách nhiệm. Báo cáo phân bổ nhân lực (workload) và bộ lọc tìm kiếm được phân cấp và hiển thị rõ theo cơ cấu phòng ban.
 
-**Thay thế/ngoại lệ:** parent self/descendant/foreign tenant → 422; name duplicate org → 409; delete node có child/member → policy reparent/cascade/reject. **Business rules/NFR:** BR-03, NFR-REL-01; delete policy Q-OPEN-09.
+**Thay thế/ngoại lệ:** parent self/descendant/foreign tenant → 422 Unprocessable Entity; tên duplicate trong cùng org → 409 Conflict; xóa department đang chứa thành viên hoặc project trực thuộc → yêu cầu chuyển giao (reassign) hoặc xác nhận xóa an toàn. **Business rules/NFR:** BR-03, NFR-REL-01, NFR-SEC-01.
 
 ### UC-ORG-09 — Quản lý group và group member
 

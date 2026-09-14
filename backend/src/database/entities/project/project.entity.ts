@@ -8,6 +8,7 @@ export class Project {
   @Column({ length: 160 }) name!: string;
   @Column({ type: 'text', nullable: true }) description!: string | null;
   @Column({ length: 32, default: 'private' }) visibility!: 'private' | 'org' | 'public';
+  @Column({ name: 'department_id', type: 'uuid', nullable: true }) departmentId!: string | null;
   @Column({ name: 'created_by_member_id', type: 'uuid' }) createdByMemberId!: string;
   @Column({ name: 'workflow_key', type: 'varchar', length: 64, nullable: true }) workflowKey!: string | null;
   @Column({ name: 'permission_scheme_id', type: 'uuid', nullable: true }) permissionSchemeId!: string | null;

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 import { useWorkspaceStore } from '../../stores/useWorkspaceStore';
@@ -282,7 +283,7 @@ export const BoardView: React.FC = () => {
               return (
                 <div
                   key={column.id}
-                  className="w-80 shrink-0 bg-surface-surface/60 border border-border/80 rounded-2xl flex flex-col max-h-[calc(100vh-230px)] shadow-card backdrop-blur-sm transition-all"
+                  className="w-80 shrink-0 bg-surface-surface/90 border border-border/80 rounded-2xl flex flex-col max-h-[calc(100vh-230px)] shadow-card"
                 >
                   {/* Column Header */}
                   <div className="p-3.5 border-b border-border/70 flex items-center justify-between bg-surface-elevated/50 rounded-t-2xl">
@@ -324,111 +325,122 @@ export const BoardView: React.FC = () => {
 
                           return (
                             <Draggable key={issue.id} draggableId={issue.id} index={index}>
-                              {(dragProvided, dragSnapshot) => (
-                                <div
-                                  ref={dragProvided.innerRef}
-                                  {...dragProvided.draggableProps}
-                                  {...dragProvided.dragHandleProps}
-                                  onClick={() => openModal('issueDetail', issue)}
-                                  className={`group relative p-3.5 rounded-xl border bg-surface-card hover:bg-surface-hover/80 cursor-pointer transition-all duration-150 space-y-2.5 select-none ${
-                                    dragSnapshot.isDragging
-                                      ? 'shadow-modal border-brand-500 ring-2 ring-brand-500/40 scale-[1.02] z-50'
-                                      : 'border-white/5 shadow-card hover:border-brand-500/40 hover:-translate-y-0.5'
-                                  }`}
-                                >
-                                  {/* Top Bar: Issue Key, Type Icon, Priority & Quick Move */}
-                                  <div className="flex items-center justify-between gap-2">
-                                    <div className="flex items-center gap-1.5">
-                                      {renderIssueTypeIcon(issue.issueType || issue.type)}
-                                      <span className="font-mono text-[11px] font-bold text-brand-400 group-hover:text-brand-300 transition-colors">
-                                        {issue.key}
-                                      </span>
-                                    </div>
+                              {(dragProvided, dragSnapshot) => {
+                                const cardContent = (
+                                  <div
+                                    ref={dragProvided.innerRef}
+                                    {...dragProvided.draggableProps}
+                                    {...dragProvided.dragHandleProps}
+                                    onClick={() => openModal('issueDetail', issue)}
+                                    style={{
+                                      ...dragProvided.draggableProps.style,
+                                      width: dragSnapshot.isDragging ? 300 : undefined,
+                                    }}
+                                    className={`group relative p-3.5 rounded-xl border bg-surface-card cursor-pointer space-y-2.5 select-none ${
+                                      dragSnapshot.isDragging
+                                        ? 'shadow-2xl border-brand-500 ring-2 ring-brand-500/50 z-[99999] opacity-95 pointer-events-auto'
+                                        : 'border-white/5 shadow-card hover:border-brand-500/40 hover:-translate-y-0.5 hover:bg-surface-hover/80 transition-all duration-150'
+                                    }`}
+                                  >
+                                    {/* Top Bar: Issue Key, Type Icon, Priority & Quick Move */}
+                                    <div className="flex items-center justify-between gap-2">
+                                      <div className="flex items-center gap-1.5">
+                                        {renderIssueTypeIcon(issue.issueType || issue.type)}
+                                        <span className="font-mono text-[11px] font-bold text-brand-400 group-hover:text-brand-300 transition-colors">
+                                          {issue.key}
+                                        </span>
+                                      </div>
 
-                                    <div className="flex items-center gap-1.5">
-                                      {renderPriorityIcon(issue.priority)}
+                                      <div className="flex items-center gap-1.5">
+                                        {renderPriorityIcon(issue.priority)}
 
-                                      {/* Quick Move Trigger */}
-                                      <div className="relative">
-                                        <button
-                                          type="button"
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            setActiveMoveMenuIssueId(isMoveMenuOpen ? null : issue.id);
-                                          }}
-                                          title="Quick move to column"
-                                          className="p-1 rounded-md text-text-muted hover:text-text-primary hover:bg-surface-elevated transition-colors opacity-0 group-hover:opacity-100"
-                                        >
-                                          <ArrowRightLeft className="w-3 h-3" />
-                                        </button>
-
-                                        {/* Quick Move Popover Menu */}
-                                        {isMoveMenuOpen && (
-                                          <div
-                                            className="absolute right-0 top-6 w-44 rounded-xl bg-surface-card border border-border/90 shadow-dropdown py-1 z-50 animate-slide-up"
-                                            onClick={(e) => e.stopPropagation()}
+                                        {/* Quick Move Trigger */}
+                                        <div className="relative">
+                                          <button
+                                            type="button"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              setActiveMoveMenuIssueId(isMoveMenuOpen ? null : issue.id);
+                                            }}
+                                            title="Quick move to column"
+                                            className="p-1 rounded-md text-text-muted hover:text-text-primary hover:bg-surface-elevated transition-colors opacity-0 group-hover:opacity-100"
                                           >
-                                            <div className="px-2.5 py-1 text-[10px] font-bold text-text-muted uppercase tracking-wider border-b border-border/60">
-                                              Move to status
+                                            <ArrowRightLeft className="w-3 h-3" />
+                                          </button>
+
+                                          {/* Quick Move Popover Menu */}
+                                          {isMoveMenuOpen && (
+                                            <div
+                                              className="absolute right-0 top-6 w-44 rounded-xl bg-surface-card border border-border/90 shadow-dropdown py-1 z-50 animate-slide-up"
+                                              onClick={(e) => e.stopPropagation()}
+                                            >
+                                              <div className="px-2.5 py-1 text-[10px] font-bold text-text-muted uppercase tracking-wider border-b border-border/60">
+                                                Move to status
+                                              </div>
+                                              {columns
+                                                .filter((c) => c.id !== column.id)
+                                                .map((targetCol) => (
+                                                  <button
+                                                    key={targetCol.id}
+                                                    type="button"
+                                                    onClick={(e) => handleQuickMove(issue, targetCol.name, e)}
+                                                    className="w-full text-left px-2.5 py-1.5 text-xs text-text-primary hover:bg-brand-500/15 hover:text-brand-300 flex items-center justify-between transition-colors"
+                                                  >
+                                                    <span className="truncate">{targetCol.name}</span>
+                                                    <span className={`w-1.5 h-1.5 rounded-full ${getColumnDotColor(targetCol.name)}`} />
+                                                  </button>
+                                                ))}
                                             </div>
-                                            {columns
-                                              .filter((c) => c.id !== column.id)
-                                              .map((targetCol) => (
-                                                <button
-                                                  key={targetCol.id}
-                                                  type="button"
-                                                  onClick={(e) => handleQuickMove(issue, targetCol.name, e)}
-                                                  className="w-full text-left px-2.5 py-1.5 text-xs text-text-primary hover:bg-brand-500/15 hover:text-brand-300 flex items-center justify-between transition-colors"
-                                                >
-                                                  <span className="truncate">{targetCol.name}</span>
-                                                  <span className={`w-1.5 h-1.5 rounded-full ${getColumnDotColor(targetCol.name)}`} />
-                                                </button>
-                                              ))}
-                                          </div>
-                                        )}
+                                          )}
+                                        </div>
                                       </div>
                                     </div>
-                                  </div>
 
-                                  {/* Title / Summary */}
-                                  <p className="text-xs font-semibold text-text-primary line-clamp-2 leading-relaxed tracking-tight group-hover:text-white transition-colors">
-                                    {issue.title || issue.summary}
-                                  </p>
+                                    {/* Title / Summary */}
+                                    <p className="text-xs font-semibold text-text-primary line-clamp-2 leading-relaxed tracking-tight group-hover:text-white transition-colors">
+                                      {issue.title || issue.summary}
+                                    </p>
 
-                                  {/* Bottom Info: Story Points, Sprint, Assignee Avatar */}
-                                  <div className="flex items-center justify-between pt-2 border-t border-white/5 text-[10px] text-text-muted">
-                                    <div className="flex items-center gap-1.5">
-                                      {issue.storyPoints !== undefined && issue.storyPoints !== null && (
-                                        <span className="px-1.5 py-0.5 rounded bg-surface-elevated/70 border border-white/5 text-[10px] font-mono font-semibold text-text-secondary">
-                                          {issue.storyPoints} pts
-                                        </span>
-                                      )}
-                                      {issue.sprint && (
-                                        <span className="truncate max-w-[80px] text-text-muted">
-                                          {issue.sprint.name || 'Sprint'}
+                                    {/* Bottom Info: Story Points, Sprint, Assignee Avatar */}
+                                    <div className="flex items-center justify-between pt-2 border-t border-white/5 text-[10px] text-text-muted">
+                                      <div className="flex items-center gap-1.5">
+                                        {issue.storyPoints !== undefined && issue.storyPoints !== null && (
+                                          <span className="px-1.5 py-0.5 rounded bg-surface-elevated/70 border border-white/5 text-[10px] font-mono font-semibold text-text-secondary">
+                                            {issue.storyPoints} pts
+                                          </span>
+                                        )}
+                                        {issue.sprint && (
+                                          <span className="truncate max-w-[80px] text-text-muted">
+                                            {issue.sprint.name || 'Sprint'}
+                                          </span>
+                                        )}
+                                      </div>
+
+                                      {/* Assignee Avatar */}
+                                      {issue.assignee || issue.assigneeMember ? (
+                                        <div
+                                          className="w-5 h-5 rounded-full bg-gradient-to-tr from-brand-600 to-indigo-500 text-white font-bold flex items-center justify-center text-[9px] shadow-sm ring-1 ring-white/10"
+                                          title={issue.assignee?.fullName || issue.assigneeMember?.fullName || issue.assignee?.email}
+                                        >
+                                          {getInitials(
+                                            issue.assignee?.fullName || issue.assigneeMember?.fullName,
+                                            issue.assignee?.email
+                                          )}
+                                        </div>
+                                      ) : (
+                                        <span className="italic text-[10px] text-text-muted hover:text-text-secondary">
+                                          Unassigned
                                         </span>
                                       )}
                                     </div>
-
-                                    {/* Assignee Avatar */}
-                                    {issue.assignee || issue.assigneeMember ? (
-                                      <div
-                                        className="w-5 h-5 rounded-full bg-gradient-to-tr from-brand-600 to-indigo-500 text-white font-bold flex items-center justify-center text-[9px] shadow-sm ring-1 ring-white/10"
-                                        title={issue.assignee?.fullName || issue.assigneeMember?.fullName || issue.assignee?.email}
-                                      >
-                                        {getInitials(
-                                          issue.assignee?.fullName || issue.assigneeMember?.fullName,
-                                          issue.assignee?.email
-                                        )}
-                                      </div>
-                                    ) : (
-                                      <span className="italic text-[10px] text-text-muted hover:text-text-secondary">
-                                        Unassigned
-                                      </span>
-                                    )}
                                   </div>
-                                </div>
-                              )}
+                                );
+
+                                if (dragSnapshot.isDragging) {
+                                  return createPortal(cardContent, document.body);
+                                }
+                                return cardContent;
+                              }}
                             </Draggable>
                           );
                         })}

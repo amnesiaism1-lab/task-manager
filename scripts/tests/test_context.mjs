@@ -1,6 +1,4 @@
 import { performance } from 'perf_hooks';
-import fs from 'fs';
-import path from 'path';
 import { DbHelper } from '../db_helper.mjs';
 import { ChromeRunner } from '../chrome_runner.mjs';
 

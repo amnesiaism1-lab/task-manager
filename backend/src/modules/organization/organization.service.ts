@@ -149,8 +149,8 @@ export class OrganizationService {
     return this.organizations.save(organization);
   }
 
-  listMembers(orgId: string) {
-    return this.members.createQueryBuilder('member')
+  async listMembers(orgId: string) {
+    const rawMembers = await this.members.createQueryBuilder('member')
       .innerJoin(User, 'user', 'user.id = member.user_id')
       .where('member.org_id = :orgId', { orgId })
       .select('member.id', 'id')
@@ -158,15 +158,84 @@ export class OrganizationService {
       .addSelect('member.status', 'status')
       .addSelect('member.title', 'title')
       .addSelect('member.joined_at', 'joinedAt')
+      .addSelect('member.created_at', 'createdAt')
       .addSelect('user.email', 'email')
       .addSelect('user.full_name', 'fullName')
       .addSelect('user.avatar_url', 'avatarUrl')
       .orderBy('user.full_name', 'ASC')
       .getRawMany();
+
+    if (!rawMembers.length) return [];
+    const memberIds = rawMembers.map((m) => m.id);
+
+    const deptRows = await this.departmentMembers.createQueryBuilder('dm')
+      .innerJoin(Department, 'dept', 'dept.id = dm.department_id')
+      .where('dm.org_member_id IN (:...memberIds)', { memberIds })
+      .select('dm.org_member_id', 'memberId')
+      .addSelect('dept.id', 'departmentId')
+      .addSelect('dept.name', 'departmentName')
+      .addSelect('dm.role_in_department', 'roleInDepartment')
+      .getRawMany();
+
+    const roleRows = await this.memberRoles.createQueryBuilder('mr')
+      .innerJoin(OrganizationRole, 'role', 'role.id = mr.role_id')
+      .where('mr.org_member_id IN (:...memberIds)', { memberIds })
+      .select('mr.org_member_id', 'memberId')
+      .addSelect('role.id', 'roleId')
+      .addSelect('role.key', 'roleKey')
+      .addSelect('role.name', 'roleName')
+      .getRawMany();
+
+    const deptMap = new Map<string, any[]>();
+    for (const d of deptRows) {
+      const list = deptMap.get(d.memberId) || [];
+      list.push({ id: d.departmentId, name: d.departmentName, role: d.roleInDepartment });
+      deptMap.set(d.memberId, list);
+    }
+
+    const roleMap = new Map<string, any[]>();
+    for (const r of roleRows) {
+      const list = roleMap.get(r.memberId) || [];
+      list.push({ id: r.roleId, key: r.roleKey, name: r.roleName });
+      roleMap.set(r.memberId, list);
+    }
+
+    return rawMembers.map((m) => {
+      const assignedRoles = roleMap.get(m.id) || [];
+      const primaryRole = assignedRoles[0]?.key || (m.status === 'active' ? 'member' : 'guest');
+      return {
+        ...m,
+        role: primaryRole,
+        roles: assignedRoles,
+        departments: deptMap.get(m.id) || [],
+        user: {
+          id: m.userId,
+          fullName: m.fullName,
+          email: m.email,
+          avatarUrl: m.avatarUrl,
+        },
+      };
+    });
   }
 
-  listRoles(orgId: string) {
-    return this.roles.find({ where: { orgId }, order: { key: 'ASC' } });
+  async listRoles(orgId: string) {
+    const roles = await this.roles.find({ where: { orgId }, order: { key: 'ASC' } });
+    if (!roles.length) return [];
+    const roleIds = roles.map((r) => r.id);
+    const permissions = await this.rolePermissions.createQueryBuilder('rp')
+      .where('rp.role_id IN (:...roleIds)', { roleIds })
+      .orderBy('rp.permission_key', 'ASC')
+      .getMany();
+    const permMap = new Map<string, string[]>();
+    for (const p of permissions) {
+      const list = permMap.get(p.roleId) || [];
+      list.push(p.permissionKey);
+      permMap.set(p.roleId, list);
+    }
+    return roles.map((r) => ({
+      ...r,
+      permissions: permMap.get(r.id) || [],
+    }));
   }
 
   async listInvitations(orgId: string) {
@@ -174,8 +243,38 @@ export class OrganizationService {
     return invitations.map(({ tokenHash: _tokenHash, ...invitation }) => invitation);
   }
 
-  listDepartments(orgId: string) {
-    return this.departments.find({ where: { orgId }, order: { name: 'ASC' } });
+  async listDepartments(orgId: string) {
+    const departments = await this.departments.find({ where: { orgId }, order: { name: 'ASC' } });
+    if (!departments.length) return [];
+
+    const deptIds = departments.map((d) => d.id);
+    const counts = await this.departmentMembers.createQueryBuilder('dm')
+      .where('dm.department_id IN (:...deptIds)', { deptIds })
+      .select('dm.department_id', 'departmentId')
+      .addSelect('COUNT(dm.org_member_id)', 'count')
+      .groupBy('dm.department_id')
+      .getRawMany();
+    const countMap = new Map(counts.map((c) => [c.departmentId, Number(c.count)]));
+
+    const leadIds = departments.map((d) => d.leadMemberId).filter(Boolean) as string[];
+    let leadMap = new Map<string, any>();
+    if (leadIds.length > 0) {
+      const leads = await this.members.createQueryBuilder('m')
+        .innerJoin(User, 'u', 'u.id = m.user_id')
+        .where('m.id IN (:...leadIds)', { leadIds })
+        .select('m.id', 'id')
+        .addSelect('u.full_name', 'fullName')
+        .addSelect('u.email', 'email')
+        .addSelect('u.avatar_url', 'avatarUrl')
+        .getRawMany();
+      leadMap = new Map(leads.map((l) => [l.id, l]));
+    }
+
+    return departments.map((d) => ({
+      ...d,
+      memberCount: countMap.get(d.id) || 0,
+      leadMember: d.leadMemberId ? leadMap.get(d.leadMemberId) || null : null,
+    }));
   }
 
   listDepartmentMembers(orgId: string, departmentId: string) {
@@ -187,6 +286,11 @@ export class OrganizationService {
       .select('dm.org_member_id', 'memberId')
       .addSelect('user.full_name', 'fullName')
       .addSelect('user.email', 'email')
+      .addSelect('user.avatar_url', 'avatarUrl')
+      .addSelect('member.title', 'title')
+      .addSelect('dm.role_in_department', 'roleInDepartment')
+      .addSelect('dm.joined_at', 'joinedAt')
+      .orderBy('user.full_name', 'ASC')
       .getRawMany();
   }
 
@@ -444,14 +548,39 @@ export class OrganizationService {
 
   async createDepartment(orgId: string, input: CreateDepartmentDto) {
     if (input.parentDepartmentId && !await this.departments.exists({ where: { id: input.parentDepartmentId, orgId } })) throw new NotFoundException('Parent department not found');
-    return this.departments.save(this.departments.create({ orgId, name: input.name.trim(), parentDepartmentId: input.parentDepartmentId ?? null }));
+    if (input.leadMemberId && !await this.members.exists({ where: { id: input.leadMemberId, orgId, status: 'active' } })) throw new NotFoundException('Lead member not found in organization');
+    const dept = await this.departments.save(this.departments.create({
+      orgId,
+      name: input.name.trim(),
+      description: input.description?.trim() || null,
+      parentDepartmentId: input.parentDepartmentId ?? null,
+      leadMemberId: input.leadMemberId ?? null,
+    }));
+    if (input.leadMemberId) {
+      await this.departmentMembers.save(this.departmentMembers.create({
+        departmentId: dept.id,
+        orgMemberId: input.leadMemberId,
+        roleInDepartment: 'LEAD',
+      }));
+    }
+    return dept;
   }
 
   async addDepartmentMember(orgId: string, departmentId: string, input: AddMemberDto) {
     const department = await this.departments.findOne({ where: { id: departmentId, orgId } });
     const member = await this.members.findOne({ where: { id: input.memberId, orgId, status: 'active' } });
     if (!department || !member) throw new NotFoundException('Department or member not found');
-    return this.departmentMembers.save(this.departmentMembers.create({ departmentId, orgMemberId: input.memberId, roleInDepartment: null }));
+    const roleInDept = input.roleInDepartment?.trim() || 'MEMBER';
+    const existing = await this.departmentMembers.findOne({ where: { departmentId, orgMemberId: input.memberId } });
+    if (existing) {
+      existing.roleInDepartment = roleInDept;
+      return this.departmentMembers.save(existing);
+    }
+    return this.departmentMembers.save(this.departmentMembers.create({
+      departmentId,
+      orgMemberId: input.memberId,
+      roleInDepartment: roleInDept,
+    }));
   }
 
   async updateDepartment(orgId: string, departmentId: string, input: UpdateDepartmentDto) {
@@ -459,13 +588,31 @@ export class OrganizationService {
     if (!department) throw new NotFoundException('Department not found');
     if (input.parentDepartmentId === departmentId) throw new ConflictException('Department cannot be its own parent');
     if (input.parentDepartmentId && !await this.departments.exists({ where: { id: input.parentDepartmentId, orgId } })) throw new NotFoundException('Parent department not found');
-    if (input.parentDepartmentId !== undefined) {
+    if (input.leadMemberId && !await this.members.exists({ where: { id: input.leadMemberId, orgId, status: 'active' } })) throw new NotFoundException('Lead member not found in organization');
+    if (input.parentDepartmentId !== undefined && input.parentDepartmentId !== null) {
       const allDepartments = await this.departments.find({ where: { orgId } });
       const parentMap = buildParentMap(allDepartments.map((item) => ({ id: item.id, parentId: item.parentDepartmentId })));
       if (detectCycle(departmentId, input.parentDepartmentId, (id) => parentMap.get(id) ?? null)) throw new ConflictException('Department parent would create a cycle');
     }
     department.name = input.name.trim();
+    if (input.description !== undefined) department.description = input.description?.trim() || null;
     if (input.parentDepartmentId !== undefined) department.parentDepartmentId = input.parentDepartmentId;
+    if (input.leadMemberId !== undefined) {
+      department.leadMemberId = input.leadMemberId;
+      if (input.leadMemberId) {
+        const existing = await this.departmentMembers.findOne({ where: { departmentId, orgMemberId: input.leadMemberId } });
+        if (existing) {
+          existing.roleInDepartment = 'LEAD';
+          await this.departmentMembers.save(existing);
+        } else {
+          await this.departmentMembers.save(this.departmentMembers.create({
+            departmentId,
+            orgMemberId: input.leadMemberId,
+            roleInDepartment: 'LEAD',
+          }));
+        }
+      }
+    }
     return this.departments.save(department);
   }
 

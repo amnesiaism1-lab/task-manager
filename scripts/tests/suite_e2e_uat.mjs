@@ -3,8 +3,8 @@ export async function runE2eUatSuite(ctx) {
   console.log('▶ SUITE 8: System E2E & UAT Persona Verification (16 TCs)');
   console.log('------------------------------------------------------');
 
-  const orgId = ctx.activeOrgId;
-  const projectId = ctx.activeProjectId;
+  const _orgId = ctx.activeOrgId;
+  const _projectId = ctx.activeProjectId;
 
   // --- TC-E2E-001: From Zero to Agile Workspace ---
   const shotE2e1 = await ctx.capture('TC-E2E-001', 'zero_to_agile_workspace');

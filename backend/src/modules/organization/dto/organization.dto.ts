@@ -27,7 +27,9 @@ export class UpdateMemberStatusDto {
 
 export class CreateDepartmentDto {
   @IsString() @Length(1, 120) name!: string;
+  @IsOptional() @IsString() @Length(0, 2000) description?: string;
   @IsOptional() @IsUUID() parentDepartmentId?: string;
+  @IsOptional() @IsUUID() leadMemberId?: string;
 }
 
 export class CreateGroupDto {
@@ -37,11 +39,14 @@ export class CreateGroupDto {
 
 export class AddMemberDto {
   @IsUUID() memberId!: string;
+  @IsOptional() @IsString() roleInDepartment?: string;
 }
 
 export class UpdateDepartmentDto {
   @IsString() @Length(1, 120) name!: string;
+  @IsOptional() @IsString() @Length(0, 2000) description?: string | null;
   @IsOptional() @IsUUID() parentDepartmentId?: string | null;
+  @IsOptional() @IsUUID() leadMemberId?: string | null;
 }
 
 export class UpdateGroupDto {

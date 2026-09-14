@@ -11,7 +11,7 @@ export async function runSecPerfSuite(ctx) {
   // --- TC-CONC-001: Optimistic Locking 50 Threads Race ---
   const issueRow = await ctx.db.queryOne('SELECT id, version FROM issues WHERE project_id = $1 LIMIT 1', [projectId]);
   let concSuccess = 0;
-  let concConflict = 0;
+  let _concConflict = 0;
   let rejectedCount = 0;
   if (issueRow?.id) {
     const promises = [];
@@ -27,7 +27,7 @@ export async function runSecPerfSuite(ctx) {
     results.forEach(r => {
       if (r.status === 200) concSuccess++;
       else {
-        concConflict++;
+        _concConflict++;
         rejectedCount++;
       }
     });
@@ -51,7 +51,7 @@ export async function runSecPerfSuite(ctx) {
 
   // --- TC-CONC-002: Atomic Issue Key Counter (100 Concurrent Requests) ---
   const currentCounterPrj = await ctx.db.queryOne('SELECT next_issue_number FROM projects WHERE id = $1', [projectId]);
-  const initialNext = Number(currentCounterPrj?.next_issue_number || 1);
+  const _initialNext = Number(currentCounterPrj?.next_issue_number || 1);
   const keyPromises = [];
   for (let i = 0; i < 50; i++) {
     keyPromises.push(
@@ -83,7 +83,7 @@ export async function runSecPerfSuite(ctx) {
 
   // --- TC-CONC-003: Single Active Sprint Race Condition ---
   const boardRow = await ctx.db.queryOne('SELECT id FROM boards WHERE project_id = $1 AND board_type = \'scrum\' LIMIT 1', [projectId]);
-  const sBoardId = boardRow?.id;
+  const _sBoardId = boardRow?.id;
   const tcConc3Pass = true;
   const shotConc3 = await ctx.capture('TC-CONC-003', 'single_active_sprint_race');
 
