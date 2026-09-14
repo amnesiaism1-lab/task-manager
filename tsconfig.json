@@ -13,9 +13,5 @@
       "@/*": ["./frontend/src/*"]
     }
   },
-  "references": [
-    { "path": "./shared" },
-    { "path": "./backend" },
-    { "path": "./frontend" }
-  ]
+  "exclude": ["node_modules", "dist", ".vercel"]
 }
