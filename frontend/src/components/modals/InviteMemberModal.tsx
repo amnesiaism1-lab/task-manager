@@ -46,14 +46,15 @@ export const InviteMemberModal: React.FC = () => {
     try {
       setIsLoading(true);
       setError('');
-      const selectedRole = roles.find((r: any) => r.id === selectedRoleId);
+      const payload: Record<string, any> = {
+        email: email.trim(),
+      };
+      if (selectedRoleId) {
+        payload.roleId = selectedRoleId;
+      }
       const res = await request(`/organizations/${activeOrgId}/invitations`, {
         method: 'POST',
-        body: JSON.stringify({
-          email: email.trim(),
-          roleId: selectedRoleId || undefined,
-          role: selectedRole?.key || 'member',
-        }),
+        body: JSON.stringify(payload),
       });
 
       showToast(`Invitation sent to ${email.trim()}`, 'success');
