@@ -314,11 +314,21 @@ export class OrganizationService {
     const email = input.email.trim().toLowerCase();
     const user = await this.users.findOne({ where: { email } });
     if (user && await this.members.findOne({ where: { orgId, userId: user.id, status: 'active' } })) throw new ConflictException('User is already a member');
-    if (input.roleId && !await this.roles.exists({ where: { id: input.roleId, orgId } })) throw new ForbiddenException('Role does not belong to organization');
+    let resolvedRoleId: string | null = input.roleId ?? null;
+    if (resolvedRoleId) {
+      const exists = await this.roles.exists({ where: { id: resolvedRoleId, orgId } });
+      if (!exists) throw new ForbiddenException('Role does not belong to organization');
+    } else if (input.role) {
+      const roleKey = input.role.toLowerCase() === 'admin' ? 'org-admin' : input.role.toLowerCase();
+      const matchedRole = await this.roles.findOne({ where: [{ orgId, key: roleKey }, { orgId, name: input.role }] });
+      if (matchedRole) {
+        resolvedRoleId = matchedRole.id;
+      }
+    }
     const pending = await this.invitations.findOne({ where: { orgId, email, status: 'pending' } });
     if (pending && pending.expiresAt > new Date()) throw new ConflictException('Invitation already exists');
     const raw = generateSecureToken();
-    const invitation = await this.invitations.save(this.invitations.create({ orgId, email, invitedByMemberId: inviterMemberId, orgRoleId: input.roleId ?? null, tokenHash: raw.hash, status: 'pending', expiresAt: new Date(Date.now() + 7 * 86400000), acceptedByUserId: null, acceptedAt: null }));
+    const invitation = await this.invitations.save(this.invitations.create({ orgId, email, invitedByMemberId: inviterMemberId, orgRoleId: resolvedRoleId, tokenHash: raw.hash, status: 'pending', expiresAt: new Date(Date.now() + 7 * 86400000), acceptedByUserId: null, acceptedAt: null }));
 
     if (this.mail) {
       const org = await this.organizations.findOne({ where: { id: orgId } });

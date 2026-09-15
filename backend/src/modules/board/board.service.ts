@@ -9,6 +9,8 @@ import { Issue } from '../../database/entities/issue/issue.entity';
 import { WorkflowState } from '../../database/entities/workflow/workflow-state.entity';
 import { Project } from '../../database/entities/project/project.entity';
 import { Workflow } from '../../database/entities/workflow/workflow.entity';
+import { OrganizationMember } from '../../database/entities/identity/organization-member.entity';
+import { User } from '../../database/entities/identity/user.entity';
 import { DataSource } from 'typeorm';
 import { LexoRank } from '../../common/utils/lexorank.util';
 import { CreateBoardDto, CreateColumnDto, ReorderIssueDto, UpdateColumnDto } from './dto/board.dto';
@@ -115,6 +117,17 @@ export class BoardService {
       stateIds.length ? this.states.find({ where: { id: In(stateIds) } }) : Promise.resolve([]),
     ]);
 
+    const assigneeMemberIds = [...new Set(issues.map((i) => i.assigneeMemberId).filter(Boolean))];
+    const members = assigneeMemberIds.length
+      ? await this.dataSource.createQueryBuilder()
+          .from(OrganizationMember, 'om')
+          .innerJoin(User, 'user', 'user.id = om.user_id')
+          .where('om.id IN (:...assigneeMemberIds)', { assigneeMemberIds })
+          .select(['om.id AS id', 'user.id AS "userId"', 'user.full_name AS "fullName"', 'user.email AS email', 'user.avatar_url AS "avatarUrl"'])
+          .getRawMany()
+      : [];
+    const memberMap = new Map(members.map((m: any) => [m.id, { id: m.id, userId: m.userId, fullName: m.fullName, email: m.email, avatarUrl: m.avatarUrl }]));
+
     const rankByIssue = Object.fromEntries(positions.map((position) => [position.issueId, position.rank]));
     const columnByState = Object.fromEntries(mappings.map((mapping) => [mapping.workflowStateId, mapping.boardColumnId]));
     const stateById = Object.fromEntries(states.map((state) => [state.id, state]));
@@ -128,7 +141,16 @@ export class BoardService {
         issues: issues
           .filter((issue) => (columnByState[issue.stateId] ?? fallbackColumnId) === column.id)
           .sort((a, b) => (rankByIssue[a.id] ?? '~~').localeCompare(rankByIssue[b.id] ?? '~~'))
-          .map((issue) => ({ ...issue, rank: rankByIssue[issue.id] ?? null, state: stateById[issue.stateId] ?? null })),
+          .map((issue) => {
+            const assignee = issue.assigneeMemberId ? memberMap.get(issue.assigneeMemberId) || null : null;
+            return {
+              ...issue,
+              rank: rankByIssue[issue.id] ?? null,
+              state: stateById[issue.stateId] ?? null,
+              assignee,
+              assigneeMember: assignee,
+            };
+          }),
       })),
     };
   }

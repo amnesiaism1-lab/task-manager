@@ -7,5 +7,7 @@ import { OrganizationMember } from '../../database/entities/identity/organizatio
 import { AuthModule } from '../auth/auth.module';
 import { OrgMembershipGuard } from '../../common/guards/org-membership.guard';
 
-@Module({ imports: [TypeOrmModule.forFeature([BackgroundJob, OrganizationMember]), AuthModule], controllers: [JobController], providers: [JobService, OrgMembershipGuard], exports: [JobService] })
+import { PermissionModule } from '../permission/permission.module';
+
+@Module({ imports: [TypeOrmModule.forFeature([BackgroundJob, OrganizationMember]), AuthModule, PermissionModule], controllers: [JobController], providers: [JobService, OrgMembershipGuard], exports: [JobService] })
 export class JobModule {}

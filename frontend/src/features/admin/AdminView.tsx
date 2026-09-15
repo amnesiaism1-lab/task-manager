@@ -22,7 +22,11 @@ import {
   Calendar,
   Loader2,
   Trash2,
+  GitBranch,
+  ListOrdered,
 } from 'lucide-react';
+import { WorkflowsTab } from './components/WorkflowsTab';
+import { CatalogsTab } from './components/CatalogsTab';
 
 export const AdminView: React.FC = () => {
   const { activeOrgId } = useWorkspaceStore();
@@ -286,6 +290,30 @@ export const AdminView: React.FC = () => {
           <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-surface-surface text-text-secondary">
             {groups.length}
           </span>
+        </button>
+
+        <button
+          onClick={() => setAdminTab('workflows')}
+          className={`flex items-center gap-2 px-3.5 py-2 text-xs font-semibold rounded-xl transition-all ${
+            activeAdminTab === 'workflows'
+              ? 'bg-brand-500/15 text-brand-300 border border-brand-500/30 shadow-xs'
+              : 'text-text-muted hover:text-text-primary hover:bg-surface-hover/60 border border-transparent'
+          }`}
+        >
+          <GitBranch className="w-3.5 h-3.5" />
+          <span>Workflows</span>
+        </button>
+
+        <button
+          onClick={() => setAdminTab('catalogs')}
+          className={`flex items-center gap-2 px-3.5 py-2 text-xs font-semibold rounded-xl transition-all ${
+            activeAdminTab === 'catalogs'
+              ? 'bg-brand-500/15 text-brand-300 border border-brand-500/30 shadow-xs'
+              : 'text-text-muted hover:text-text-primary hover:bg-surface-hover/60 border border-transparent'
+          }`}
+        >
+          <ListOrdered className="w-3.5 h-3.5" />
+          <span>Priorities & Resolutions</span>
         </button>
       </div>
 
@@ -606,6 +634,10 @@ export const AdminView: React.FC = () => {
             )}
           </div>
         </div>
+      ) : activeAdminTab === 'workflows' ? (
+        <WorkflowsTab />
+      ) : activeAdminTab === 'catalogs' ? (
+        <CatalogsTab />
       ) : (
         <div className="bg-surface-card border border-border/80 rounded-2xl overflow-hidden shadow-card">
           <div className="px-6 py-4 border-b border-border/80 bg-surface-elevated/40 flex items-center justify-between text-xs">

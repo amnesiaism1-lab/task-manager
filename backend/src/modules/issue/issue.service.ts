@@ -5,6 +5,8 @@ import { Issue } from '../../database/entities/issue/issue.entity';
 import { Comment } from '../../database/entities/issue/comment.entity';
 import { WorkLog } from '../../database/entities/issue/work-log.entity';
 import { ProjectMember } from '../../database/entities/project/project-member.entity';
+import { OrganizationMember } from '../../database/entities/identity/organization-member.entity';
+import { User } from '../../database/entities/identity/user.entity';
 import { Label } from '../../database/entities/issue/label.entity';
 import { IssueLabel } from '../../database/entities/issue/issue-label.entity';
 import { IssueWatcher } from '../../database/entities/issue/issue-watcher.entity';
@@ -12,6 +14,7 @@ import { IssueLinkType } from '../../database/entities/issue/issue-link-type.ent
 import { IssueLink } from '../../database/entities/issue/issue-link.entity';
 import { WorkflowState } from '../../database/entities/workflow/workflow-state.entity';
 import { WorkflowTransition } from '../../database/entities/workflow/workflow-transition.entity';
+import { WorkflowTransitionGuard } from '../../database/entities/workflow/workflow-transition-guard.entity';
 import { IssueStateHistory } from '../../database/entities/issue/issue-state-history.entity';
 import { IssueType } from '../../database/entities/issue/issue-type.entity';
 import { ProjectComponent } from '../../database/entities/project/project-component.entity';
@@ -41,6 +44,7 @@ export class IssueService {
     @InjectRepository(IssueLink) private readonly links: Repository<IssueLink>,
     @InjectRepository(WorkflowState) private readonly states: Repository<WorkflowState>,
     @InjectRepository(WorkflowTransition) private readonly transitions: Repository<WorkflowTransition>,
+    @InjectRepository(WorkflowTransitionGuard) private readonly transitionGuards: Repository<WorkflowTransitionGuard>,
     @InjectRepository(IssueStateHistory) private readonly history: Repository<IssueStateHistory>,
     @InjectRepository(IssueType) private readonly issueTypes: Repository<IssueType>,
     @InjectRepository(ProjectComponent) private readonly components: Repository<ProjectComponent>,
@@ -146,7 +150,47 @@ export class IssueService {
       };
     }));
 
-    return { ...issue, state, issueType, component, fixVersion, customFields, labels, watchers, links, transitions, history };
+    let assignee: any = null;
+    if (issue.assigneeMemberId) {
+      const mem = await this.dataSource.createQueryBuilder()
+        .from(OrganizationMember, 'om')
+        .innerJoin(User, 'user', 'user.id = om.user_id')
+        .where('om.id = :memberId', { memberId: issue.assigneeMemberId })
+        .select(['om.id AS id', 'user.id AS "userId"', 'user.full_name AS "fullName"', 'user.email AS email', 'user.avatar_url AS "avatarUrl"'])
+        .getRawOne();
+      if (mem) {
+        assignee = {
+          id: mem.id,
+          userId: mem.userId,
+          fullName: mem.fullName,
+          email: mem.email,
+          avatarUrl: mem.avatarUrl,
+        };
+      }
+    }
+
+    const [subtasks, parentIssue] = await Promise.all([
+      this.issues.find({ where: { parentIssueId: issue.id, orgId, deletedAt: IsNull() }, order: { createdAt: 'ASC' } }),
+      issue.parentIssueId ? this.issues.findOne({ where: { id: issue.parentIssueId, orgId, deletedAt: IsNull() } }) : Promise.resolve(null),
+    ]);
+
+    return {
+      ...issue,
+      state,
+      issueType,
+      component,
+      fixVersion,
+      customFields,
+      labels,
+      watchers,
+      links,
+      transitions,
+      history,
+      assignee,
+      assigneeMember: assignee,
+      subtasks,
+      parentIssue: parentIssue ? { id: parentIssue.id, key: parentIssue.key, summary: parentIssue.summary, priority: parentIssue.priority } : null,
+    };
   }
 
   listLabels(orgId: string, issueId: string, memberId: string) {
@@ -197,14 +241,19 @@ export class IssueService {
 
   async addWorkLog(orgId: string, issueId: string, memberId: string, input: CreateWorkLogDto) {
     await this.accessibleIssue(orgId, issueId, memberId);
+    const timeSpentSeconds = input.timeSpentSeconds ?? (input.timeSpentMinutes ? input.timeSpentMinutes * 60 : 0);
+    if (!timeSpentSeconds || timeSpentSeconds <= 0) {
+      throw new BadRequestException('Time spent must be greater than 0');
+    }
+    const comment = input.comment?.trim() || input.description?.trim() || null;
     return this.dataSource.transaction(async (manager) => {
       const locked = await manager.findOne(Issue, { where: { id: issueId, orgId, deletedAt: IsNull() }, lock: { mode: 'pessimistic_write' } });
       if (!locked) throw new NotFoundException('Issue not found');
-      const workLog = await manager.save(WorkLog, manager.create(WorkLog, { issueId: locked.id, authorMemberId: memberId, timeSpentSeconds: input.timeSpentSeconds, startedAt: new Date(input.startedAt), comment: input.comment?.trim() || null, deletedAt: null }));
-      locked.timeSpentSeconds += input.timeSpentSeconds;
+      const workLog = await manager.save(WorkLog, manager.create(WorkLog, { issueId: locked.id, authorMemberId: memberId, timeSpentSeconds, startedAt: new Date(input.startedAt), comment, deletedAt: null }));
+      locked.timeSpentSeconds += timeSpentSeconds;
       locked.version += 1;
       await manager.save(locked);
-      const payload = { issueId: locked.id, workLogId: workLog.id, timeSpentSeconds: input.timeSpentSeconds, authorMemberId: memberId };
+      const payload = { issueId: locked.id, workLogId: workLog.id, timeSpentSeconds, authorMemberId: memberId };
       await manager.save(ActivityLog, manager.create(ActivityLog, { orgId, actorType: 'member', actorMemberId: memberId, projectId: locked.projectId, issueId: locked.id, eventType: EVENT_TYPES.WORKLOG_CREATED, payloadJson: payload }));
       await manager.save(OutboxEvent, manager.create(OutboxEvent, { orgId, aggregateType: 'issue', aggregateId: locked.id, eventType: EVENT_TYPES.WORKLOG_CREATED, payloadJson: payload, status: 'pending', idempotencyKey: `worklog-created:${workLog.id}`, publishedAt: null, retryCount: 0, lastError: null }));
       return workLog;
@@ -274,13 +323,31 @@ export class IssueService {
       if (input.summary !== undefined) locked.summary = input.summary.trim();
       if (input.description !== undefined) locked.description = input.description?.trim() || null;
       if (input.priority !== undefined) locked.priority = input.priority;
-      if (input.assigneeMemberId !== undefined) locked.assigneeMemberId = input.assigneeMemberId || null;
+      const newAssigneeId = input.assigneeMemberId !== undefined ? input.assigneeMemberId : input.assigneeId;
+      if (newAssigneeId !== undefined) locked.assigneeMemberId = newAssigneeId || null;
       if (input.sprintId !== undefined) locked.sprintId = input.sprintId || null;
       if (input.dueAt !== undefined) locked.dueAt = input.dueAt ? new Date(input.dueAt) : null;
       if (input.originalEstimateSeconds !== undefined) locked.originalEstimateSeconds = input.originalEstimateSeconds;
       if (input.remainingEstimateSeconds !== undefined) locked.remainingEstimateSeconds = input.remainingEstimateSeconds;
       if (input.componentId !== undefined) locked.componentId = input.componentId || null;
       if (input.fixVersionId !== undefined) locked.fixVersionId = input.fixVersionId || null;
+      if (input.parentIssueId !== undefined) {
+        if (input.parentIssueId === null || input.parentIssueId === '') {
+          locked.parentIssueId = null;
+        } else {
+          if (input.parentIssueId === locked.id) {
+            throw new ConflictException('An issue cannot be its own parent');
+          }
+          const parent = await manager.findOne(Issue, { where: { id: input.parentIssueId, orgId, projectId: locked.projectId, deletedAt: IsNull() } });
+          if (!parent) {
+            throw new NotFoundException('Parent issue not found in the same project');
+          }
+          if (parent.parentIssueId === locked.id) {
+            throw new ConflictException('Circular issue parent relationship detected');
+          }
+          locked.parentIssueId = parent.id;
+        }
+      }
       locked.version += 1;
       const saved = await manager.save(locked);
 
@@ -305,6 +372,11 @@ export class IssueService {
       await manager.save(OutboxEvent, manager.create(OutboxEvent, { orgId, aggregateType: 'issue', aggregateId: locked.id, eventType: EVENT_TYPES.ISSUE_DELETED, payloadJson: payload, status: 'pending', idempotencyKey: `issue-deleted:${locked.id}`, publishedAt: null, retryCount: 0, lastError: null }));
       return { success: true, id: issue.id, key: issue.key, deletedAt: locked.deletedAt };
     });
+  }
+
+  private hasIssueFieldValue(issue: Issue, field: string) {
+    const value = (issue as unknown as Record<string, unknown>)[field];
+    return value !== undefined && value !== null && value !== '';
   }
 
   async transition(orgId: string, issueId: string, memberId: string, input: any) {
@@ -357,10 +429,57 @@ export class IssueService {
     return this.dataSource.transaction(async (manager) => {
       const locked = await manager.findOne(Issue, { where: { id: issueId, orgId, deletedAt: IsNull() }, lock: { mode: 'pessimistic_write' } });
       if (!locked) throw new NotFoundException('Issue not found');
+
+      // 1. Optimistic Concurrency Control (NFR-REL-03)
+      const expectedVersion = input.expectedVersion !== undefined
+        ? Number(input.expectedVersion)
+        : (input.version !== undefined ? Number(input.version) : undefined);
+      if (expectedVersion !== undefined && (!Number.isInteger(expectedVersion) || expectedVersion !== locked.version)) {
+        throw new ConflictException('Issue version is stale. Please refresh and retry.');
+      }
+
+      // 2. Idempotency Check
+      if (input.idempotencyKey) {
+        const previous = await manager.findOne(IssueStateHistory, { where: { issueId, idempotencyKey: input.idempotencyKey } });
+        if (previous) return { ...locked, state: target };
+      }
+
+      // 3. Enforce Require Comment (BR-28)
+      if (transition?.requireComment && !input.comment?.trim()) {
+        throw new ConflictException('Comment is required for this transition');
+      }
+
+      // 4. Enforce Workflow Transition Guards (BR-27)
+      if (transition) {
+        const guards = await manager.find(WorkflowTransitionGuard, { where: { transitionId: transition.id } });
+        for (const guard of guards) {
+          if (guard.guardType === 'requires_fields') {
+            const requiredFields = Array.isArray(guard.configJson?.fields) ? guard.configJson.fields : [];
+            const missingField = requiredFields.find((f) => typeof f === 'string' && !this.hasIssueFieldValue(locked, f));
+            if (missingField) throw new ConflictException(`Transition guard requires field: ${missingField}`);
+          }
+        }
+      }
+
+      // 5. Save comment if provided
+      if (input.comment?.trim()) {
+        await manager.save(Comment, manager.create(Comment, {
+          orgId,
+          issueId: locked.id,
+          authorMemberId: memberId,
+          parentCommentId: null,
+          body: input.comment.trim(),
+          bodyFormat: 'plain',
+          deletedAt: null,
+        }));
+      }
+
+      const versionBefore = locked.version;
       locked.stateId = target!.id;
       locked.version += 1;
       locked.resolvedAt = target!.isTerminal ? new Date() : null;
       await manager.save(locked);
+
       await manager.save(IssueStateHistory, manager.create(IssueStateHistory, {
         orgId,
         issueId,
@@ -368,12 +487,20 @@ export class IssueService {
         toStateId: target!.id,
         transitionId: effectiveTransitionId,
         actorMemberId: memberId,
-        comment: input.comment || null,
+        comment: input.comment?.trim() || null,
         idempotencyKey: input.idempotencyKey || null,
-        versionBefore: locked.version - 1,
+        versionBefore,
         versionAfter: locked.version,
       }));
-      const payload = { issueId: locked.id, projectId: locked.projectId, fromStateId: transition ? transition.fromStateId : issue.stateId, toStateId: target!.id, version: locked.version };
+
+      const payload = {
+        issueId: locked.id,
+        projectId: locked.projectId,
+        fromStateId: transition ? transition.fromStateId : issue.stateId,
+        toStateId: target!.id,
+        versionBefore,
+        versionAfter: locked.version,
+      };
       await manager.save(ActivityLog, manager.create(ActivityLog, { orgId, actorType: 'member', actorMemberId: memberId, projectId: locked.projectId, issueId: locked.id, eventType: EVENT_TYPES.ISSUE_TRANSITIONED, payloadJson: payload }));
       await manager.save(OutboxEvent, manager.create(OutboxEvent, { orgId, aggregateType: 'issue', aggregateId: locked.id, eventType: EVENT_TYPES.ISSUE_TRANSITIONED, payloadJson: payload, status: 'pending', idempotencyKey: `issue-transition:${locked.id}:${locked.version}`, publishedAt: null, retryCount: 0, lastError: null }));
       return { ...locked, state: target };

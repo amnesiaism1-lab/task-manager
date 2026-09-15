@@ -18,11 +18,15 @@ import {
 } from 'lucide-react';
 
 export const WorkView: React.FC = () => {
-  const { activeOrgId, activeProjectId } = useWorkspaceStore();
+  const { activeOrgId, activeProjectId, members } = useWorkspaceStore();
   const { openModal } = useUIStore();
   const { user } = useAuthStore();
 
   const [filterTab, setFilterTab] = useState<'all' | 'progress' | 'done'>('all');
+
+  const currentMember = members.find((m) => m.userId === user?.id || (m as any).user?.id === user?.id);
+  const myMemberId = currentMember?.id;
+  const myUserId = user?.id;
 
   const { data: issues = [], isLoading } = useQuery<Issue[]>({
     queryKey: ['issues', activeOrgId, activeProjectId],
@@ -38,9 +42,12 @@ export const WorkView: React.FC = () => {
   });
 
   // Calculate work metrics
-  const myIssues = issues.filter((i) => {
+  const myIssues = issues.filter((i: any) => {
     if (!user) return true;
-    return i.assigneeId === user.id || i.assignee?.id === user.id || !i.assigneeId;
+    const isAssignedToMe =
+      (myMemberId && (i.assigneeMemberId === myMemberId || i.assigneeId === myMemberId)) ||
+      (myUserId && (i.assignee?.userId === myUserId || i.assignee?.id === myUserId || i.assigneeId === myUserId));
+    return Boolean(isAssignedToMe);
   });
 
   const inProgressIssues = myIssues.filter(

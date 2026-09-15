@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useUIStore } from '../../stores/useUIStore';
 import { useWorkspaceStore } from '../../stores/useWorkspaceStore';
+import { useAuthStore } from '../../stores/useAuthStore';
 import { Modal } from '../ui/Modal';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
@@ -18,11 +19,19 @@ import {
   Calendar,
   Layers,
   Box,
+  CornerDownRight,
+  GitFork,
+  Link2,
+  SlidersHorizontal,
 } from 'lucide-react';
 
 export const IssueDetailModal: React.FC = () => {
-  const { modals, modalData, closeModal, showToast } = useUIStore();
+  const { modals, modalData, closeModal, showToast, openModal } = useUIStore();
   const { activeOrgId, members } = useWorkspaceStore();
+  const { user } = useAuthStore();
+
+  const currentMember = members.find((m) => m.userId === user?.id || (m as any).user?.id === user?.id);
+  const myMemberId = currentMember?.id;
 
   const isOpen = !!modals['issueDetail'];
   const issueId = modalData['issueDetail']?.id || modalData['issueDetail'];
@@ -36,6 +45,9 @@ export const IssueDetailModal: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'comments' | 'worklog'>('comments');
   const [timeSpentMinutes, setTimeSpentMinutes] = useState('');
   const [worklogDesc, setWorklogDesc] = useState('');
+  const [linkTargetKeyOrId, setLinkTargetKeyOrId] = useState('');
+  const [selectedLinkTypeId, setSelectedLinkTypeId] = useState('');
+  const [isLinking, setIsLinking] = useState(false);
 
   const fetchIssue = async () => {
     if (!activeOrgId || !issueId) return;
@@ -82,6 +94,87 @@ export const IssueDetailModal: React.FC = () => {
     },
     enabled: !!activeOrgId && !!issue?.projectId,
   });
+
+  // Project Members for this issue's project
+  const { data: projectMembers = [] } = useQuery<any[]>({
+    queryKey: ['issueProjectMembers', activeOrgId, issue?.projectId],
+    queryFn: async () => {
+      if (!activeOrgId || !issue?.projectId) return [];
+      const res = await request(`/organizations/${activeOrgId}/projects/${issue.projectId}/members`).catch(() => []);
+      return Array.isArray(res) ? res : res?.data || [];
+    },
+    enabled: !!activeOrgId && !!issue?.projectId && isOpen,
+  });
+
+  const availableAssignees = projectMembers.length > 0 ? projectMembers : members;
+
+  // Link Types
+  const { data: linkTypes = [] } = useQuery<any[]>({
+    queryKey: ['linkTypes', activeOrgId],
+    queryFn: async () => {
+      if (!activeOrgId) return [];
+      const res = await request(`/organizations/${activeOrgId}/link-types`).catch(() => []);
+      return Array.isArray(res) ? res : res?.data || [];
+    },
+    enabled: !!activeOrgId && isOpen,
+  });
+
+  const handleUpdateCustomField = async (contextId: string, value: any) => {
+    if (!activeOrgId || !issue) return;
+    try {
+      await request(`/organizations/${activeOrgId}/custom-fields/issues/${issue.id}/value`, {
+        method: 'POST',
+        body: JSON.stringify({
+          customFieldContextId: contextId,
+          valueJson: value,
+        }),
+      });
+      setIssue((prev: any) => ({
+        ...prev,
+        customFields: (prev?.customFields || []).map((cf: any) =>
+          cf.contextId === contextId ? { ...cf, value } : cf
+        ),
+      }));
+      showToast('Custom field updated', 'success', 1200);
+    } catch (err: any) {
+      showToast(err.message || 'Failed to update custom field', 'error');
+    }
+  };
+
+  const handleCreateLink = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!activeOrgId || !issue || !selectedLinkTypeId || !linkTargetKeyOrId.trim()) return;
+    try {
+      setIsLinking(true);
+      await request(`/organizations/${activeOrgId}/issues/${issue.id}/links`, {
+        method: 'POST',
+        body: JSON.stringify({
+          linkTypeId: selectedLinkTypeId,
+          linkedIssueId: linkTargetKeyOrId.trim(),
+        }),
+      });
+      showToast('Issue linked successfully', 'success', 1500);
+      setLinkTargetKeyOrId('');
+      await fetchIssue();
+    } catch (err: any) {
+      showToast(err.message || 'Failed to link issue (ensure valid target issue ID)', 'error');
+    } finally {
+      setIsLinking(false);
+    }
+  };
+
+  const handleDeleteLink = async (linkId: string) => {
+    if (!activeOrgId || !issue) return;
+    try {
+      await request(`/organizations/${activeOrgId}/issues/${issue.id}/links/${linkId}`, {
+        method: 'DELETE',
+      });
+      showToast('Link removed', 'info', 1200);
+      await fetchIssue();
+    } catch (err: any) {
+      showToast(err.message || 'Failed to remove link', 'error');
+    }
+  };
 
   const handleUpdateField = async (patch: Record<string, any>) => {
     if (!activeOrgId || !issue) return;
@@ -143,10 +236,12 @@ export const IssueDetailModal: React.FC = () => {
     if (!activeOrgId || !issue || isNaN(mins) || mins <= 0) return;
 
     try {
-      await request(`/organizations/${activeOrgId}/issues/${issue.id}/worklogs`, {
+      await request(`/organizations/${activeOrgId}/issues/${issue.id}/work-logs`, {
         method: 'POST',
         body: JSON.stringify({
+          timeSpentSeconds: mins * 60,
           timeSpentMinutes: mins,
+          comment: worklogDesc.trim() || undefined,
           description: worklogDesc.trim() || undefined,
           startedAt: new Date().toISOString(),
         }),
@@ -223,6 +318,22 @@ export const IssueDetailModal: React.FC = () => {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Main Left Pane (2 cols) */}
             <div className="lg:col-span-2 space-y-5">
+              {/* Parent Issue Link */}
+              {issue.parentIssue && (
+                <div className="flex items-center gap-1.5 text-xs text-text-secondary bg-surface-surface/50 border border-border/60 rounded-lg px-3 py-1.5 w-fit">
+                  <CornerDownRight className="w-3.5 h-3.5 text-brand-400" />
+                  <span className="text-text-muted">Parent:</span>
+                  <button
+                    type="button"
+                    onClick={() => openModal('issueDetail', issue.parentIssue)}
+                    className="font-mono text-brand-400 hover:underline font-bold"
+                  >
+                    {issue.parentIssue.key}
+                  </button>
+                  <span className="truncate max-w-[250px] text-text-muted">· {issue.parentIssue.summary}</span>
+                </div>
+              )}
+
               {/* Title / Summary */}
               <div className="space-y-1">
                 <input
@@ -260,6 +371,107 @@ export const IssueDetailModal: React.FC = () => {
                   placeholder="Add a detailed description..."
                   className="w-full bg-surface-card/70 border border-border/80 text-sm text-text-primary rounded-lg p-2.5 focus:border-brand-500 focus:outline-none resize-y"
                 />
+              </div>
+
+              {/* Subtasks Section */}
+              {issue.subtasks && issue.subtasks.length > 0 && (
+                <div className="bg-surface-surface/60 border border-border/70 rounded-xl p-4 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-text-muted uppercase tracking-wider flex items-center gap-1.5">
+                      <GitFork className="w-3.5 h-3.5 text-brand-400" />
+                      Subtasks ({issue.subtasks.length})
+                    </span>
+                  </div>
+                  <div className="divide-y divide-border/40">
+                    {issue.subtasks.map((sub: any) => (
+                      <div
+                        key={sub.id}
+                        onClick={() => openModal('issueDetail', sub)}
+                        className="py-2 px-2 hover:bg-surface-hover/60 rounded-lg cursor-pointer flex items-center justify-between gap-3 transition-colors text-xs"
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="font-mono font-bold text-brand-400 shrink-0">{sub.key}</span>
+                          <span className="truncate text-text-primary">{sub.summary}</span>
+                        </div>
+                        <Badge variant="todo" size="xs">{formatStatus(sub.state || sub.status || 'Open')}</Badge>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Issue Links Section */}
+              <div className="bg-surface-surface/60 border border-border/70 rounded-xl p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold text-text-muted uppercase tracking-wider flex items-center gap-1.5">
+                    <Link2 className="w-3.5 h-3.5 text-indigo-400" />
+                    Issue Links ({(issue.links || []).length})
+                  </span>
+                </div>
+                <div className="space-y-1.5">
+                  {(issue.links || []).map((l: any) => {
+                    const relationLabel = l.isOutward ? (l.linkType?.outwardLabel || 'relates to') : (l.linkType?.inwardLabel || 'is related to');
+                    return (
+                      <div
+                        key={l.id}
+                        className="flex items-center justify-between py-1.5 px-2.5 bg-surface-surface/80 border border-border/60 rounded-lg text-xs"
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="text-text-muted italic">{relationLabel}</span>
+                          {l.targetIssue ? (
+                            <button
+                              type="button"
+                              onClick={() => openModal('issueDetail', l.targetIssue)}
+                              className="font-mono font-bold text-brand-400 hover:underline"
+                            >
+                              {l.targetIssue.key}
+                            </button>
+                          ) : (
+                            <span className="font-mono text-text-muted">{l.linkedIssueId?.slice(0, 8)}</span>
+                          )}
+                          <span className="truncate text-text-primary max-w-xs">{l.targetIssue?.summary}</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteLink(l.id)}
+                          title="Remove link"
+                          className="text-text-muted hover:text-rose-400 p-1 transition-colors"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    );
+                  })}
+                  {(!issue.links || issue.links.length === 0) && (
+                    <p className="text-xs text-text-muted italic">No linked issues.</p>
+                  )}
+                </div>
+                {linkTypes.length > 0 && (
+                  <form onSubmit={handleCreateLink} className="flex gap-2 pt-1">
+                    <select
+                      value={selectedLinkTypeId}
+                      onChange={(e) => setSelectedLinkTypeId(e.target.value)}
+                      className="bg-surface-surface text-text-primary text-xs rounded-lg px-2 py-1.5 border border-border/80 focus:border-brand-500 focus:outline-none"
+                    >
+                      <option value="">Relation...</option>
+                      {linkTypes.map((lt: any) => (
+                        <option key={lt.id} value={lt.id}>
+                          {lt.outwardLabel || lt.name || lt.key}
+                        </option>
+                      ))}
+                    </select>
+                    <input
+                      type="text"
+                      placeholder="Target issue ID or key..."
+                      value={linkTargetKeyOrId}
+                      onChange={(e) => setLinkTargetKeyOrId(e.target.value)}
+                      className="flex-1 bg-surface-surface text-text-primary text-xs rounded-lg px-2.5 py-1.5 border border-border/80 focus:border-brand-500 focus:outline-none"
+                    />
+                    <Button type="submit" size="xs" variant="secondary" isLoading={isLinking} disabled={!selectedLinkTypeId || !linkTargetKeyOrId.trim()}>
+                      Link
+                    </Button>
+                  </form>
+                )}
               </div>
 
               {/* Activity Tabs */}
@@ -436,20 +648,36 @@ export const IssueDetailModal: React.FC = () => {
 
               {/* Assignee */}
               <div className="space-y-1.5">
-                <label className="block text-xs font-semibold text-text-muted uppercase tracking-wider">
-                  Assignee
-                </label>
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-semibold text-text-muted uppercase tracking-wider">
+                    Assignee
+                  </label>
+                  {myMemberId && (
+                    <button
+                      type="button"
+                      onClick={() => handleUpdateField({ assigneeMemberId: myMemberId })}
+                      className="text-[10px] text-brand-400 hover:text-brand-300 font-medium transition-colors"
+                    >
+                      Assign to me
+                    </button>
+                  )}
+                </div>
                 <select
                   value={issue.assigneeMemberId || issue.assigneeId || ''}
                   onChange={(e) => handleUpdateField({ assigneeMemberId: e.target.value || null })}
                   className="w-full bg-surface-surface text-text-primary text-xs rounded-lg px-2.5 py-1.5 border border-border/80 focus:border-brand-500 focus:outline-none"
                 >
                   <option value="">Unassigned</option>
-                  {members.map((m) => (
-                    <option key={m.id} value={m.id}>
-                      {m.user?.fullName || m.user?.email || m.id}
-                    </option>
-                  ))}
+                  {availableAssignees.map((m: any) => {
+                    const memId = m.orgMemberId || m.id;
+                    const name = m.fullName || m.user?.fullName || m.email || m.user?.email || 'Member';
+                    const email = m.email || m.user?.email;
+                    return (
+                      <option key={memId} value={memId}>
+                        {name}{email && email !== name ? ` (${email})` : ''}
+                      </option>
+                    );
+                  })}
                 </select>
               </div>
 
@@ -527,6 +755,47 @@ export const IssueDetailModal: React.FC = () => {
                       </option>
                     ))}
                   </select>
+                </div>
+              )}
+
+              {/* Dynamic Custom Fields */}
+              {issue.customFields && issue.customFields.length > 0 && (
+                <div className="pt-2 border-t border-border/80 space-y-2.5">
+                  <span className="block text-xs font-semibold text-text-muted uppercase tracking-wider flex items-center gap-1.5">
+                    <SlidersHorizontal className="w-3.5 h-3.5 text-brand-400" />
+                    Custom Fields
+                  </span>
+                  {issue.customFields.map((cf: any) => (
+                    <div key={cf.contextId} className="space-y-1">
+                      <label className="block text-[11px] font-medium text-text-secondary">
+                        {cf.name} {cf.isRequired && <span className="text-rose-400">*</span>}
+                      </label>
+                      {cf.fieldType === 'select' ? (
+                        <select
+                          value={cf.value ?? ''}
+                          onChange={(e) => handleUpdateCustomField(cf.contextId, e.target.value || null)}
+                          className="w-full bg-surface-surface text-text-primary text-xs rounded-lg px-2.5 py-1.5 border border-border/80 focus:border-brand-500 focus:outline-none"
+                        >
+                          <option value="">-- None --</option>
+                          {(cf.options || []).map((opt: any) => (
+                            <option key={opt.id} value={opt.value}>
+                              {opt.label}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <input
+                          type={cf.fieldType === 'number' ? 'number' : cf.fieldType === 'date' ? 'date' : 'text'}
+                          defaultValue={cf.value ?? ''}
+                          onBlur={(e) => {
+                            const val = cf.fieldType === 'number' ? (e.target.value ? Number(e.target.value) : null) : (e.target.value || null);
+                            if (val !== cf.value) handleUpdateCustomField(cf.contextId, val);
+                          }}
+                          className="w-full bg-surface-surface text-text-primary text-xs rounded-lg px-2.5 py-1.5 border border-border/80 focus:border-brand-500 focus:outline-none"
+                        />
+                      )}
+                    </div>
+                  ))}
                 </div>
               )}
 

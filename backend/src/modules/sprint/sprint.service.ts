@@ -1,6 +1,6 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, IsNull, Repository } from 'typeorm';
+import { DataSource, In, IsNull, Repository } from 'typeorm';
 import { Board } from '../../database/entities/project/board.entity';
 import { Sprint } from '../../database/entities/project/sprint.entity';
 import { Issue } from '../../database/entities/issue/issue.entity';
@@ -102,10 +102,25 @@ export class SprintService {
     });
   }
 
-  list(orgId: string, projectId: string) {
-    return this.projects.exists({ where: { id: projectId, orgId, archivedAt: IsNull() } }).then((exists) => {
-      if (!exists) throw new NotFoundException('Project not found');
-      return this.sprints.find({ where: { projectId }, order: { createdAt: 'DESC' } });
+  async list(orgId: string, projectId: string) {
+    const exists = await this.projects.exists({ where: { id: projectId, orgId, archivedAt: IsNull() } });
+    if (!exists) throw new NotFoundException('Project not found');
+    const sprints = await this.sprints.find({ where: { projectId }, order: { createdAt: 'DESC' } });
+    if (!sprints.length) return [];
+    const sprintIds = sprints.map((s) => s.id);
+    const sprintIssues = await this.issues.find({
+      where: { sprintId: In(sprintIds), projectId, deletedAt: IsNull() },
+      order: { createdAt: 'ASC' },
     });
+    const issueMap = new Map<string, any[]>();
+    for (const issue of sprintIssues) {
+      const list = issueMap.get(issue.sprintId!) || [];
+      list.push(issue);
+      issueMap.set(issue.sprintId!, list);
+    }
+    return sprints.map((s) => ({
+      ...s,
+      issues: issueMap.get(s.id) || [],
+    }));
   }
 }

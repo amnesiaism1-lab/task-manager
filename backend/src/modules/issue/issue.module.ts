@@ -26,6 +26,7 @@ import { IssueSecurityGrant } from '../../database/entities/issue/issue-security
 import { IssueAccessService } from './issue-access.service';
 import { WorkflowState } from '../../database/entities/workflow/workflow-state.entity';
 import { WorkflowTransition } from '../../database/entities/workflow/workflow-transition.entity';
+import { WorkflowTransitionGuard } from '../../database/entities/workflow/workflow-transition-guard.entity';
 import { IssueStateHistory } from '../../database/entities/issue/issue-state-history.entity';
 import { IssueType } from '../../database/entities/issue/issue-type.entity';
 import { PermissionModule } from '../permission/permission.module';
@@ -58,6 +59,7 @@ import { OutboxEvent } from '../../database/entities/audit/outbox-event.entity';
 			IssueSecurityGrant,
 			WorkflowState,
 			WorkflowTransition,
+			WorkflowTransitionGuard,
 			IssueStateHistory,
 			IssueType,
 			ProjectComponent,

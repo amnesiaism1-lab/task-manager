@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useUIStore } from '../../stores/useUIStore';
 import { useWorkspaceStore } from '../../stores/useWorkspaceStore';
 import { Modal } from '../ui/Modal';
@@ -13,10 +14,30 @@ export const InviteMemberModal: React.FC = () => {
   const isOpen = !!modals['inviteMember'];
 
   const [email, setEmail] = useState('');
-  const [role, setRole] = useState('member');
+  const [selectedRoleId, setSelectedRoleId] = useState('');
   const [generatedToken, setGeneratedToken] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+
+  // Fetch real org roles
+  const { data: roles = [] } = useQuery<any[]>({
+    queryKey: ['orgRoles', activeOrgId],
+    queryFn: async () => {
+      if (!activeOrgId) return [];
+      const res = await request(`/organizations/${activeOrgId}/roles`).catch(() => []);
+      return Array.isArray(res) ? res : [];
+    },
+    enabled: !!activeOrgId && isOpen,
+  });
+
+  useEffect(() => {
+    if (roles.length > 0 && !selectedRoleId) {
+      const defaultRole = roles.find((r: any) => r.key === 'member') || roles[0];
+      if (defaultRole) {
+        setSelectedRoleId(defaultRole.id);
+      }
+    }
+  }, [roles, selectedRoleId]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -25,9 +46,14 @@ export const InviteMemberModal: React.FC = () => {
     try {
       setIsLoading(true);
       setError('');
+      const selectedRole = roles.find((r: any) => r.id === selectedRoleId);
       const res = await request(`/organizations/${activeOrgId}/invitations`, {
         method: 'POST',
-        body: JSON.stringify({ email: email.trim(), role }),
+        body: JSON.stringify({
+          email: email.trim(),
+          roleId: selectedRoleId || undefined,
+          role: selectedRole?.key || 'member',
+        }),
       });
 
       showToast(`Invitation sent to ${email.trim()}`, 'success');
@@ -49,7 +75,7 @@ export const InviteMemberModal: React.FC = () => {
       isOpen={isOpen}
       onClose={() => closeModal('inviteMember')}
       title="Invite Team Member"
-      description="Invite colleagues to collaborate in your organization."
+      description="Invite colleagues to collaborate in your organization with specific roles."
       maxWidth="sm"
     >
       <form onSubmit={handleSubmit} className="space-y-4">
@@ -64,15 +90,24 @@ export const InviteMemberModal: React.FC = () => {
         />
 
         <div className="space-y-1.5">
-          <label className="block text-xs font-medium text-text-secondary">Role</label>
+          <label className="block text-xs font-medium text-text-secondary">Organization Role</label>
           <select
-            value={role}
-            onChange={(e) => setRole(e.target.value)}
+            value={selectedRoleId}
+            onChange={(e) => setSelectedRoleId(e.target.value)}
             className="w-full bg-surface-surface text-text-primary text-sm rounded-lg px-3 py-2 border border-border focus:border-brand-500 focus:outline-none"
           >
-            <option value="member">Member</option>
-            <option value="admin">Admin</option>
-            <option value="viewer">Viewer</option>
+            {roles.length > 0 ? (
+              roles.map((r: any) => (
+                <option key={r.id} value={r.id}>
+                  {r.name} ({r.key})
+                </option>
+              ))
+            ) : (
+              <>
+                <option value="member">Member</option>
+                <option value="org-admin">Organization Administrator</option>
+              </>
+            )}
           </select>
         </div>
 

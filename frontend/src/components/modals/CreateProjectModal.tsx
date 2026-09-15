@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useUIStore } from '../../stores/useUIStore';
 import { useWorkspaceStore } from '../../stores/useWorkspaceStore';
 import { Modal } from '../ui/Modal';
@@ -14,11 +15,23 @@ export const CreateProjectModal: React.FC = () => {
   const [key, setKey] = useState('');
   const [projectType, setProjectType] = useState<'scrum' | 'kanban'>('scrum');
   const [visibility, setVisibility] = useState<'org' | 'private' | 'public'>('org');
+  const [departmentId, setDepartmentId] = useState('');
   const [description, setDescription] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
 
   const isOpen = !!modals['createProject'];
+
+  // Fetch departments for active organization
+  const { data: departments = [] } = useQuery<any[]>({
+    queryKey: ['createProjectDepts', activeOrgId],
+    queryFn: async () => {
+      if (!activeOrgId) return [];
+      const res = await request(`/organizations/${activeOrgId}/departments`).catch(() => []);
+      return Array.isArray(res) ? res : [];
+    },
+    enabled: !!activeOrgId && isOpen,
+  });
 
   const handleNameChange = (val: string) => {
     setName(val);
@@ -49,6 +62,7 @@ export const CreateProjectModal: React.FC = () => {
           key: key.trim().toUpperCase(),
           projectType,
           visibility,
+          departmentId: departmentId || undefined,
           description: description.trim() || undefined,
         }),
       });
@@ -58,6 +72,7 @@ export const CreateProjectModal: React.FC = () => {
       showToast(`Project "${newProj.name}" created successfully!`, 'success');
       setName('');
       setKey('');
+      setDepartmentId('');
       setDescription('');
       closeModal('createProject');
     } catch (err: any) {
@@ -128,6 +143,23 @@ export const CreateProjectModal: React.FC = () => {
               <option value="public">Public</option>
             </select>
           </div>
+        </div>
+
+        {/* Department Selection (SRS UC-ORG-08) */}
+        <div className="space-y-1.5">
+          <label className="block text-xs font-medium text-text-secondary">Owning Department (Optional)</label>
+          <select
+            value={departmentId}
+            onChange={(e) => setDepartmentId(e.target.value)}
+            className="w-full bg-surface-surface text-text-primary text-sm rounded-lg px-3 py-2 border border-border focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+          >
+            <option value="">-- No Department (Direct Org Ownership) --</option>
+            {departments.map((dept: any) => (
+              <option key={dept.id} value={dept.id}>
+                {dept.name}
+              </option>
+            ))}
+          </select>
         </div>
 
         <div className="space-y-1.5">

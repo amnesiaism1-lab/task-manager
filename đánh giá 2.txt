@@ -1,0 +1,476 @@
+PHÂN TÍCH KẾT NỐI ERD ↔ SRS ↔ CODEBASE & KẾ HOẠCH BỔ SUNG/NÂNG CẤP/KẾT NỐI CHI TIẾT (v2)
+Thuộc tính	Giá trị
+Phạm vi	TASK_MANAGER_ERD.puml (90 thực thể), SRS_TASK_MANAGER.md v1.7, toàn bộ service/controller/entity backend đã cung cấp
+Phương pháp	Đối chiếu trực tiếp: grep/kiểm tra nội dung thật trên các file trong /mnt/project (không suy đoán từ tên file) — mọi con số "đã kiểm chứng" dưới đây đều có lệnh kiểm tra kèm theo
+Quan hệ với tài liệu trước	Project đã có sẵn TASK_MANAGER_CONNECTIVITY_AUDIT_AND_UPGRADE_PLAN.md. Báo cáo này kiểm chứng lại độc lập các phát hiện cốt lõi của tài liệu đó (kết quả: tất cả đều đúng), đồng thời bổ sung: ma trận kết nối chức năng (function-to-function), thiết kế chuẩn hóa kết nối (Event Dispatcher), và kế hoạch triển khai ở mức method-signature/endpoint cụ thể hơn để dev có thể bắt tay vào làm ngay.
+0. Cách đọc báo cáo này
+Mục 2: bức tranh tổng — thực thể nào có, thực thể nào thiếu.
+Mục 3: KHÁC BIỆT so với tài liệu cũ — bức tranh "ai gọi ai", vì đây mới là câu hỏi thật của "kết nối" (không chỉ là "bảng có tồn tại" mà là "hai module có nói chuyện với nhau không").
+Mục 4: bằng chứng dòng lệnh cho từng phát hiện — để dev tự verify lại được.
+Mục 6: kế hoạch hành động theo giai đoạn, mỗi hạng mục có: entity/migration cần tạo, method/endpoint cụ thể, và Definition of Done đo được.
+1. Tóm tắt điều hành
+Hệ thống đã triển khai đúng 69/90 thực thể ERD (77%) với chất lượng cao ở lõi nghiệp vụ (Auth, RBAC 3 tầng, Issue/Workflow FSM, Sprint/Board, Custom Field). Tuy nhiên có 3 lớp vấn đề kết nối khiến nhiều tính năng "trông như có" trên UI/API nhưng không thực sự vận hành đúng vòng đời dữ liệu mô tả trong SRS:
+
+Đứt gãy chuỗi sự kiện (event chain). outbox_events — trục xương sống event-driven theo SRS §3.3/§14.2 — hiện chỉ có một nhánh tiêu thụ (tạo notification in-app cho issue). Hai nhánh còn lại (Webhook, Automation) có đầy đủ CRUD, ký HMAC, chặn SSRF, nhưng không bao giờ được kích hoạt bởi sự kiện thật — đây là "kết nối giả" (module tồn tại độc lập, không nằm trong luồng dữ liệu chính).
+Thiếu 13/13 thực thể "Configuration Schemes" — đúng 0% domain này được triển khai. Hệ quả dây chuyền: issues.priority là chuỗi tự do thay vì FK, issues.resolution_id là cột mồ côi không FK, không có tầng "issue-type/priority theo project" như SRS mô tả, phá vỡ giả định BR-42..44 của chính SRS.
+Không có API cấu hình Workflow (state/transition) sau khi tạo project — toàn bộ 90 entity ERD giả định workflow là cấu hình được (workflows/workflow_states/workflow_transitions + workflow_schemes), nhưng thực tế mỗi project chỉ có đúng 2 state cứng sinh tự động lúc tạo. Đây là khoảng cách lớn nhất giữa "ERD hứa hẹn" và "code thực thi".
+Các phần lõi được nối đúng chuẩn và nên giữ nguyên làm baseline: RBAC resolver (org role → permission; project role/group role → permission scheme), Issue transition → State History → Activity Log → Outbox (transactional), Sprint ↔ issue_sprint_history ↔ issues.sprint_id cache, Board ↔ workflow_state qua board_column_states, Issue Security access-check ở tầng đọc.
+
+2. Ma trận triển khai 90 thực thể ERD (đã kiểm chứng lại bằng grep trực tiếp)
+Lệnh kiểm chứng mẫu đã chạy: grep -l "ManyToOne\|OneToMany\|JoinColumn" *.ts (loại trừ file .d.ts của thư viện) → 0 kết quả trong entity thật; ls | grep -i "priorit\|resolution\|workflow-scheme\|screen\|field-scheme\|issue-type-scheme\|hierarch\|notification-scheme" → 0 file nào tồn tại.
+
+#	Domain (theo ERD)	Số thực thể	Đã triển khai	Thiếu	Trạng thái kết nối
+1	Identity & Org	11	11	0	✅ Kết nối đầy đủ: invite → accept → member.status; org role → org_member_roles → permission resolver
+2	Security & Authentication	3	3	0	✅ Session/reset/verify token hash-only, revoke-on-password-change đã nối
+3	Workspace	13	13	0	⚠️ Có entity đầy đủ nhưng thiếu API để sửa workflow (xem F5)
+4	Workflow (FSM)	8	5	3 (workflow_schemes, workflow_scheme_mappings, workflow_scheme_transition_permissions)	🔴 Issue tạo ra dùng project.workflowKey cứng, không qua scheme nào cả — vi phạm trực tiếp FR-WF-02/BR-12 của SRS
+5	Issues & Content	12	11	1 (resolutions)	🟠 issues.resolution_id tồn tại nhưng trỏ vào bảng không có
+6	Custom Fields	4	4	0	✅ Context → Field → Option → Value nối đúng, có validate type ở custom-field.service.ts
+7	Audit & Events	7	7 (schema)	0 (schema)	🔴 Về mặt kết nối vận hành: notification_deliveries không được đăng ký DI (dead code) — xem F6
+8	Configuration Schemes	13	0	13	🔴 Toàn bộ domain rỗng — xem F1
+9	Security & Notification Policies	5	3	2 (notification_schemes, notification_scheme_entries)	🟠 Issue security hoạt động; notification scheme thì không
+10	Search & Productivity	11	9	2 (issue_hierarchy_levels, issue_type_hierarchy_mappings)	🟠 parent_issue_id tự do, không có ràng buộc cấp bậc
+11	Integration Extensions	3	3	0	⚠️ Entity đủ, nhưng không có gì gọi tới (xem F3)
+Tổng	90	69 (77%)	21 (23%)	
+3. Ma trận kết nối chức năng thực tế (Connectivity Map) — điểm khác biệt chính của báo cáo này
+Đây là góc nhìn "ai thực sự gọi ai lúc runtime", quan trọng hơn việc "bảng có tồn tại hay không":
+
+[Issue/Sprint/Board/Comment/WorkLog Command]
+        │  (đúng, có transaction)
+        ▼
+  ActivityLog  +  OutboxEvent  (ghi cùng transaction — ĐÚNG CHUẨN)
+        │
+        ▼
+  OutboxService.publishPending()  ← polling mỗi 5s, CHỈ chạy khi RUN_WORKERS=true
+        │
+        ├──► notifyIssueParticipants()  ✅ ĐÃ NỐI — tạo Notification in-app cho reporter/assignee
+        │
+        ├──► WebhookService.enqueue()   ❌ CHƯA NỐI — 0 lời gọi trong toàn bộ codebase
+        │
+        ├──► AutomationService.execute() ❌ CHƯA NỐI — không có trigger tự động nào từ outbox
+        │
+        └──► MailService.send() + NotificationDelivery ❌ CHƯA NỐI — chỉ auth flow (verify/reset/invite) mới gửi mail thật
+
+Hệ quả trực tiếp cho người dùng cuối:
+
+Tạo Webhook Subscription qua POST /organizations/:orgId/webhooks → thành công, HMAC secret trả về đúng 1 lần → nhưng sẽ không bao giờ nhận được payload nào, kể cả khi issue được tạo/transition liên tục.
+Tạo Automation Rule với action "khi issue chuyển Done thì gửi thông báo" → activate() thành công → nhưng khi issue thật sự chuyển Done, không gì xảy ra (không ai gọi execute() tự động; execute() thủ công cũng chỉ ghi actions: 0).
+Bật notification_preferences.channel = 'email' → không có tác dụng vì không có nơi nào đọc preference này trước khi enqueue (chỉ có NotificationPreferenceService.list/upsert, không ai find nó trong OutboxService).
+Các nhánh kết nối ĐÃ ĐÚNG CHUẨN (giữ nguyên, dùng làm khuôn mẫu cho phần vá):
+
+Sprint.close() → tìm issue chưa Done → gỡ sprintId → cập nhật issue_sprint_history.removedAt   ✅
+Board.mapStates() → xóa mapping cũ trong transaction → ghi mapping mới → chống 1 state/2 column ✅
+Issue.transition() → check permission/guard → update state+version → insert history → activity+outbox ✅ (cùng 1 transaction)
+PermissionResolverService → org role permission ∪ (direct role ∪ group role qua project membership active) ✅
+IssueAccessService.canAccess() → project membership + issue_security_scheme + level + grant type  ✅
+
+4. Phát hiện chi tiết — có bằng chứng lệnh kiểm tra
+F1 — Domain "Configuration Schemes" 0% triển khai (🔴 Nghiêm trọng cao)
+$ ls /mnt/project | grep -iE "priorit|resolution|workflow-scheme|screen|field-scheme|issue-type-scheme|hierarch|notification-scheme"
+# → không có kết quả nào
+
+// issue_entity.ts
+@Column({ length: 32, default: 'Medium' }) priority!: string;         // KHÔNG phải FK
+@Column({ name: 'resolution_id', type: 'uuid', nullable: true }) resolutionId!: string | null; // FK "ma", không có bảng đích
+
+→ Không thể chuẩn hóa priority theo tổ chức, không thể giới hạn priority/type theo project (vi phạm BR-42, BR-43 SRS), không có danh mục resolution (Fixed/Won't Fix/Duplicate…).
+
+F2 — 0/70 entity dùng ORM relation (🟡 Trung bình — là lựa chọn kiến trúc, không phải bug, nhưng cần chuẩn hóa)
+$ grep -l "ManyToOne\|OneToMany\|JoinColumn" *.ts | grep -vi "_d.ts\|EntitySchema\|EntityMetadata"
+# → 0 kết quả trong entity nghiệp vụ thật
+
+Toàn bộ liên kết là cột xxx_id: string + innerJoin thủ công trong QueryBuilder, hoặc nhiều findOne() tuần tự. Hợp lệ về kỹ thuật nhưng đặt 100% trách nhiệm toàn vẹn tham chiếu lên kỷ luật thủ công từng service — không có cascade, dễ quên orgId/projectId filter khi domain phình to.
+
+F3 — Outbox không nối tới Webhook/Automation/Email-delivery (🔴 Nghiêm trọng cao)
+$ grep -n "webhook\|automation" outbox_service.ts
+# → 0 kết quả
+$ grep -rn "webhooks.enqueue\|WebhookService" *.ts | grep -v "webhook_service\|webhook_module\|webhook_controller"
+# → 0 kết quả — enqueue() không có nơi gọi nào ngoài chính định nghĩa
+
+Xem sơ đồ mục 3. WebhookService.enqueue() và AutomationService.execute() là "đảo cô lập" (island) — có API, có test unit, nhưng không nằm trong luồng dữ liệu chính.
+
+F4 — Automation "execute" là stub thật (🔴 Nghiêm trọng cao)
+$ sed -n '1,30p' automation_service.ts | grep "resultJson"
+resultJson: { actions: 0, note: 'Execution recorded; command actions require an approved action handler.' }
+
+Kể cả gọi tay POST /automation-rules/:id/execute, hệ thống chỉ ghi log "đã chạy" — không transition issue, không gán người, không gửi comment nào theo cấu hình automation_rule_components đã lưu.
+
+F5 — Không có API tạo/sửa Workflow state & transition sau khi project được tạo (🔴 Nghiêm trọng rất cao)
+$ grep -n "@Get\|@Post\|@Patch\|@Delete" workflow_controller.ts
+@Get() list(...)
+@Get(':workflowId') detail(...)
+@Post() create(...)          # chỉ tạo shell (key/name), không tạo state/transition
+@Post('guards') addGuard(...) # chỉ gắn guard cho transition ĐÃ có sẵn
+
+Toàn bộ WorkflowState/WorkflowTransition chỉ được sinh ở một chỗ duy nhất: project.service.ts::create() — hardcode 2 state (todo, done) + 1 transition (complete). Không có cách nào qua sản phẩm để Org Admin tự thiết kế quy trình 4-5 bước như SRS §16.3 mô tả.
+
+F6 — NotificationDelivery là dead code (🟠 Trung bình)
+$ grep -rl "NotificationDelivery" *.ts
+notification-delivery_entity.ts   # chỉ chính nó
+notification-delivery_entity_d.ts
+$ grep -n "forFeature" notification_module.ts
+imports: [TypeOrmModule.forFeature([Notification, NotificationPreference, OrganizationMember]), ...]
+# → NotificationDelivery KHÔNG có trong danh sách
+
+Không service nào ghi được entity này → không thể theo dõi trạng thái gửi email (SRS §16.7 "Worker ghi nhận kết quả gửi email" không có cách thực thi).
+
+F7 — Không có bất kỳ @OnEvent listener nào trong toàn bộ backend (🟠 xác nhận thêm cho F3/F4)
+$ grep -rl "@OnEvent" *.ts
+# → 0 kết quả, dù app.module.ts có import EventEmitterModule.forRoot()
+
+EventEmitterModule được cài đặt toàn cục nhưng không một module nghiệp vụ nào dùng nó — xác nhận rằng cơ chế lan tỏa sự kiện hiện tại chỉ còn polling outbox_events 5 giây/lần, và polling đó chỉ có 1 nhánh tiêu thụ.
+
+F8 — issue_hierarchy_levels/issue_type_hierarchy_mappings vắng mặt → parent_issue_id không ràng buộc cấp bậc (🟠 Trung bình)
+$ grep -n "parentIssueId" project_service.ts
+# chỉ check: không tự làm cha của chính nó (self), và cùng project — KHÔNG check level Epic/Story/Sub-task
+
+Vi phạm trực tiếp BR-48 (SRS): "Issue type map đúng một hierarchy level; parent phải ở level được phép ngay phía trên". Hiện tại parent có thể là bất kỳ issue nào cùng project, kể cả issue cùng type.
+
+F9 — Cache permission không có invalidation theo sự kiện (🟢 Thấp)
+$ grep -n "PermCache\|cachedAt" permission-resolver_service.ts
+# TTL 60s cứng, không có .delete(cacheKey) ở bất kỳ đâu khi assignRole/setPermissionScheme thay đổi
+
+Thu hồi quyền vẫn có hiệu lực trễ tối đa 60 giây.
+
+F10 — Điểm kết nối ĐÚNG CHUẨN đáng ghi nhận (không phải gap, dùng làm baseline)
+BoardService.mapStates(): xóa mapping cũ + validate "1 state chỉ ở 1 column/board" trong transaction (đúng BR-10).
+IssueService.transition()/ProjectService.transitionIssue(): version optimistic lock + state history + activity + outbox trong cùng transaction (đúng FR-TRANS-01, NFR-REL-01/03).
+IssueAccessService: browse project ∩ issue security grant, có cache ngắn hạn hợp lý (60-120s) cho hot path.
+OrganizationService.leaveOrganization(): chặn org-admin cuối cùng rời tổ chức + cascade revoke PAT (đúng BR theo UC-ORG-11).
+F11 — SRS mô tả notification_deliveries là "kênh email độc lập với in-app", nhưng code hiện dùng notifications.sentAt làm cả hai (🟡)
+OutboxService.notifyIssueParticipants() set sentAt: new Date() ngay khi tạo notification in-app — không phân biệt "đã hiển thị trong app" với "đã gửi email". Nếu sau này bật F6, cần tách rõ 2 khái niệm này (đúng DEC-05 trong SRS).
+
+5. Bảng ưu tiên xử lý
+#	Phát hiện	Mức độ	Vì sao ưu tiên	Effort
+F5	Không cấu hình được Workflow state/transition	🔴 P0	Khóa cứng tính năng lõi nhất của "task manager kiểu Jira"	4-6 ngày BE + 3-4 ngày FE
+F3+F4+F7	Outbox không nối Webhook/Automation; Automation là stub	🔴 P0	"Automation"/"Webhook" là tính năng quảng cáo nhưng không hoạt động	5-7 ngày
+F1 (priorities, resolutions)	Thiếu 2 danh mục nền tảng nhất	🟠 P1	Ảnh hưởng trực tiếp UI tạo/sửa issue mỗi ngày	2-3 ngày
+F1 (workflow_schemes 3 bảng)	Thiếu tầng map issue-type → workflow theo project	🟠 P1	Mọi issue type trong project bị ép dùng chung 1 workflow	3-4 ngày
+F6	NotificationDelivery chết	🟠 P1	Không chẩn đoán được email lỗi	1-2 ngày
+F8	Thiếu issue hierarchy	🟡 P2	Epic/Story/Sub-task không ràng buộc	2-3 ngày
+F1 (screen/field scheme)	Thiếu tùy biến form theo project/type	🟡 P2	Domain lớn nhất (6 bảng liên kết)	5-7 ngày
+F1 (notification_schemes)	Thiếu cấu hình ai nhận thông báo sự kiện nào	🟡 P2	Notification hiện cứng "reporter+assignee"	2 ngày
+F9	Cache permission không invalidate	🟢 P3	Rủi ro thấp, chỉ trễ 60s	0.5 ngày
+F2	Không có ORM relation	🟢 P3	Chọn kiến trúc hợp lệ, chỉ cần chuẩn hóa convention	Không bắt buộc code, chỉ cần tài liệu quy ước
+6. KẾ HOẠCH BỔ SUNG / NÂNG CẤP / KẾT NỐI CHI TIẾT
+GIAI ĐOẠN 0 (P0, 1.5–2 tuần): Dựng "Event Dispatcher" trung tâm — vá đứt gãy F3/F4/F7
+Mục tiêu: biến outbox_events thành trục kết nối thật cho cả 3 nhánh, theo đúng nguyên tắc SRS §12.2.3 (REL-03: claim bằng SELECT ... FOR UPDATE SKIP LOCKED hoặc conditional update, publish chỉ sau commit).
+
+0.1. Tạo OutboxDispatcherService (thay thế dần logic trong OutboxService.publishPending()):
+
+// Method signature đề xuất
+async dispatch(manager: EntityManager, event: OutboxEvent): Promise<void> {
+  await this.notifyInApp(manager, event);        // giữ logic hiện có
+  await this.dispatchWebhooks(manager, event);    // MỚI
+  await this.triggerAutomations(manager, event);  // MỚI
+  await this.enqueueEmailDeliveries(manager, event); // MỚI — dùng notification_preferences
+}
+
+dispatchWebhooks(event): SELECT * FROM webhook_subscriptions WHERE org_id=:orgId AND status='active' AND events @> [:eventType] AND (project_id IS NULL OR project_id=:projectId) → với mỗi dòng gọi WebhookService.enqueue(subscriptionId, event.id) (hàm đã có sẵn, chỉ cần gọi nó).
+triggerAutomations(event): SELECT rules WHERE status='active' AND EXISTS (component trigger có component_key khớp eventType) → gọi AutomationService.executeFromEvent(rule.id, event) — hàm mới, khác execute() cũ ở chỗ thực sự chạy action: đọc cây automation_rule_components, với mỗi node action gọi đúng command service tương ứng (IssueService.transition, IssueService.update, IssueService.addComment...) — không tự viết SQL trực tiếp, tái dùng toàn bộ validation/permission đã có trong các service đó.
+enqueueEmailDeliveries(event): với mỗi recipient trong notifyInApp, kiểm notification_preferences.channel='email' AND enabled=true → nếu có, gọi MailService.send() rồi manager.save(NotificationDelivery, {...}).
+0.2. Đăng ký NotificationDelivery vào DI (F6):
+
+// notification.module.ts
+TypeOrmModule.forFeature([Notification, NotificationPreference, NotificationDelivery, OrganizationMember])
+
+Tách rõ: notifications.sentAt = "đã hiển thị trong notification center"; notification_deliveries.sentAt = "đã gửi email thành công" (đúng DEC-05 SRS).
+
+0.3. Worker gửi Webhook thật:
+
+Thêm WebhookDispatcherWorker (interval riêng, ví dụ 10s): đọc webhook_deliveries WHERE status='pending' AND next_attempt_at<=NOW(), gọi fetch(url, {method:'POST', headers:{'X-Signature': sign(...)}, body}), cập nhật attempts/responseStatus/nextAttemptAt (backoff luỹ thừa: 30s, 2m, 10m, rồi failed).
+Definition of Done (DoD) Giai đoạn 0:
+
+[ ] Tạo issue → có webhook subscription khớp event → thấy webhook_deliveries.status='success' với response_status=2xx trong vòng 15s.
+[ ] Automation rule "issue chuyển Done → gán label 'released'" → issue chuyển Done thật → label được gán tự động, có automation_executions.status='completed' với resultJson.actions >= 1.
+[ ] Bật notification_preferences(channel='email', enabled=true) → nhận được email thật (hoặc log SMTP giả lập), có dòng notification_deliveries tương ứng.
+[ ] Retry outbox event 2 lần liên tiếp (giả lập lỗi) → không nhân đôi webhook delivery / automation execution (test theo idempotency key có sẵn).
+GIAI ĐOẠN 1 (P0, 2–3 tuần): Workflow Builder hoàn chỉnh — vá F5
+1.1. Endpoint mới trên WorkflowController:
+
+Method	Path	Việc làm	Validate
+POST	/organizations/:orgId/workflows/:workflowId/states	Tạo workflow_state	Đúng 1 isInitial=true/workflow; key unique trong workflow
+PATCH	.../states/:stateId	Sửa tên/category/vị trí	Không đổi isInitial nếu đã có transition trỏ tới
+DELETE	.../states/:stateId	Xóa state chưa dùng	Reject nếu có issue đang ở state này hoặc có transition tham chiếu
+POST	.../transitions	Tạo workflow_transition (from, to, requireComment)	2 state cùng workflow; key unique
+PATCH	.../transitions/:id	Sửa tên nút/sortOrder/requireComment	—
+DELETE	.../transitions/:id	Xóa transition	Reject nếu đang được workflow_scheme_transition_permissions tham chiếu
+POST	.../clone	Clone toàn bộ state+transition sang version mới	Version mới is_active=false cho tới khi admin activate
+POST	.../activate	Kích hoạt version, tắt version cũ (đúng UQ (org,key) WHERE is_active)	Phải có ≥1 state initial + tối thiểu 1 transition
+1.2. Bổ sung 3 bảng còn thiếu trong domain Workflow (đóng luôn F1 phần workflow):
+
+workflow_schemes(id, project_id, name, description, created_at)
+workflow_scheme_mappings(workflow_scheme_id, issue_type_id, workflow_id)  -- PK composite
+workflow_scheme_transition_permissions(workflow_scheme_id, transition_id, project_role_id, effect)
+
+Entity + migration mới, đăng ký vào WorkflowModule (cho quản trị) và ProjectModule (cho việc chọn scheme).
+Method mới: WorkflowSchemeService.resolveWorkflow(projectId, issueTypeId): Promise<{workflow, initialState}> — thay thế hoàn toàn đoạn code hiện tại trong project.service.ts::createIssue() đang dùng project.workflowKey cứng:
+// TRƯỚC (project.service.ts hiện tại)
+const workflow = await manager.findOne(Workflow, { where: { orgId, key: lockedProject.workflowKey ?? '', isActive: true } });
+
+// SAU
+const { workflow, initialState } = await this.workflowSchemeService.resolveWorkflow(projectId, issueType.id);
+
+Endpoint quyền transition: POST .../projects/:projectId/workflow-scheme/permissions với logic deny-overrides-allow — bổ sung 1 bước kiểm tra trong IssueService.transition()/ProjectService.transitionIssue(): sau khi guard pass, query thêm workflow_scheme_transition_permissions theo role hiệu lực của actor; nếu có effect='deny' khớp → 403 dù guard đã pass.
+DoD Giai đoạn 1:
+
+[ ] Org Admin tạo workflow 5 state (Backlog→ToDo→InProgress→Review→Done) qua API, không đụng code.
+[ ] 2 issue type trong cùng project dùng 2 workflow khác nhau qua workflow_scheme_mappings.
+[ ] Role "Viewer" bị deny transition "Complete" dù role "Member" (mà Viewer cũng thuộc group) được allow → request trả 403 (đúng BR-13).
+GIAI ĐOẠN 2 (P1/P2, 3–4 tuần, có thể chạy song song với Giai đoạn 1): Danh mục còn thiếu
+2.1. priorities + priority_schemes + priority_scheme_entries
+
+Migration: bảng mới theo đúng cột ERD (key, name, rank, color, archived_at; UQ(org_id,key), UQ(org_id,rank)).
+Seed mặc định khi tạo org: Highest/High/Medium/Low/Lowest (trong OrganizationService.create(), cùng transaction với seed role hiện có).
+Migration dữ liệu bắt buộc: issues.priority (varchar) → issues.priority_id (uuid FK). Quy trình an toàn:
+Thêm cột priority_id nullable song song.
+Script backfill map chuỗi cũ ('Highest'|'High'|'Medium'|'Low'|'Lowest') → id tương ứng theo org.
+Validate 100% issue có priority_id không null trước khi drop cột cũ.
+Đổi mọi nơi đọc/ghi issue.priority (list ở IssueService, ProjectService, IssueSearchService, dashboard widget) sang priorityId + join lấy tên khi trả về.
+Route mới trên CatalogController: GET/POST .../priorities.
+2.2. resolutions
+
+Tương tự: migration + entity + seed (Fixed/Won't Fix/Duplicate/Cannot Reproduce/Done) + gắn FK thật cho issues.resolution_id (hiện đang là cột mồ côi) + route GET/POST .../resolutions.
+Ràng buộc DEC-01 (SRS): chỉ set resolution_id khi state.isTerminal=true — thêm check trong IssueService.transition().
+2.3. notification_schemes + notification_scheme_entries
+
+Cho phép mỗi project cấu hình: sự kiện X → recipient type (member/group/project_role/reporter/assignee/watchers) → kênh.
+Nối trực tiếp vào OutboxDispatcherService.notifyInApp() (Giai đoạn 0): thay vì hardcode [reporter, assignee], resolve theo scheme; nếu project chưa chọn scheme → giữ hành vi mặc định hiện tại (không breaking change).
+2.4. issue_hierarchy_levels + issue_type_hierarchy_mappings (vá F8)
+
+Seed mặc định: Epic(rank=1) / Standard(rank=0) / Sub-task(rank=-1).
+Thêm check trong ProjectService.updateIssue()/createIssue() khi set parentIssueId: parent phải map level đúng "1 bậc trên" theo issue_type_hierarchy_mappings của parent.issueTypeId so với issue.issueTypeId.
+2.5. field_schemes/field_scheme_entries + screens/screen_fields/screen_schemes/screen_scheme_operations
+
+Domain lớn nhất (6 bảng) — tách thành epic riêng, khuyến nghị làm sau cùng trong Giai đoạn 2.
+Bản tối giản (MVP): chỉ field_schemes (map field required/hidden theo issue type), bỏ qua screens chi tiết ở bước đầu; IssueController/frontend đọc field_schemes để quyết định field nào bắt buộc, thay vì chỉ dựa vào custom_field_contexts.is_required như hiện tại.
+DoD Giai đoạn 2:
+
+[ ] Tạo issue mới không cho chọn priority ngoài priority_scheme của project.
+[ ] Đổi resolution trên issue chưa terminal → 422 với mã lỗi rõ ràng.
+[ ] Notification scheme project A định nghĩa "issue.created → gửi cho project_role=QA" → member có role QA nhận được, member khác thì không.
+[ ] Gán Sub-task làm cha của Epic → 422 (sai hướng hierarchy).
+GIAI ĐOẠN 3 (P2/P3, song song, không chặn release): Chuẩn hóa kỹ thuật
+3.1. Vá cache invalidation (F9): phát permission.changed (dùng EventEmitterModule đã cài sẵn nhưng chưa dùng — xem F7) từ assignRole, setPermissionScheme, revokeRole, updateMemberStatus; PermissionResolverService subscribe bằng @OnEvent('permission.changed') để evict đúng cache key thay vì chờ TTL 60s.
+
+3.2. Data-access convention (F2): không đổi sang @ManyToOne hàng loạt (rủi ro không cần thiết). Thay vào đó:
+
+Viết 1 tài liệu ngắn DATA_ACCESS_CONVENTION.md: mọi query mới bắt buộc lọc org_id (và project_id nếu có) ngay ở điều kiện đầu tiên, không lọc sau khi load.
+Tạo vài "read model" helper dùng chung (IssueWithRelationsQuery) để tránh lặp lại N+1 join thủ công như hiện tại ở IssueService.getDetail().
+3.3. Tách rõ sentAt (in-app) vs notification_deliveries.sentAt (email) — đã làm ở 0.2, chỉ cần review lại sau khi Giai đoạn 0 xong.
+
+GIAI ĐOẠN 4 (song song từ ngày 1): Đồng bộ traceability
+Sau mỗi giai đoạn, chạy lại đối chiếu: route Nest thực tế (@Controller/@Get/@Post...) ⇄ danh mục F-xxx/UC-xxx trong SRS §3.4/§12.4 ⇄ test case liên quan.
+Cập nhật bảng "Status" (E/P/X) trong SRS §3.4.1 cho từng mã đã đóng (ví dụ F-WF-02 chuyển từ "E" sang "E, đã map issue-type→workflow theo scheme" sau Giai đoạn 1).
+Đóng các Q-OPEN liên quan trực tiếp tới kế hoạch này: Q-OPEN-02 (issue key reuse — không đổi bởi kế hoạch này), Q-OPEN-23 (field registry — mở bởi Giai đoạn 2.5), Q-OPEN-25 (automation run-as/quota — mở bởi Giai đoạn 0.1, cần PO+Security chốt trước khi cho automation gọi action nhân danh actor nào).
+7. Thiết kế chuẩn hóa kết nối dài hạn (nguyên tắc kiến trúc)
+Một cổng vào duy nhất cho domain event. Sau Giai đoạn 0, quy tắc bắt buộc: bất kỳ hành vi nào cần lan tỏa sang module khác (notification, webhook, automation) phải đi qua outbox_events + OutboxDispatcherService, không module nghiệp vụ nào được phép gọi thẳng WebhookService/AutomationService từ command handler của mình.
+Checklist bắt buộc khi thêm entity mới (áp dụng từ Giai đoạn 1 trở đi, tránh tái diễn F1/F6):
+[ ] Migration có FK constraint thật (không phải cột uuid mồ côi như resolution_id hiện tại).
+[ ] Entity được đăng ký trong đúng TypeOrmModule.forFeature().
+[ ] Có ít nhất 1 API đọc/ghi thật (không tạo bảng "trưng bày").
+[ ] Có test case trace theo mã F-xxx/BR-xxx tương ứng trong SRS.
+Giữ quy ước "flat entity + manual join + tenant guard" hiện có (F2) nhưng viết thành văn bản chuẩn, không đổi ồ ạt sang ORM relation.
+Mọi automation action phải đi qua command service hiện có (IssueService, không viết SQL trực tiếp trong automation executor) — đảm bảo automation không bao giờ bypass permission/guard/optimistic-lock đã xây cho luồng người dùng thật.
+8. Tổng hợp file cần tạo/sửa
+Migration mới: Priorities, PriorityScheme(+Entries), Resolutions, WorkflowSchemes(+Mappings+TransitionPermissions), NotificationSchemes(+Entries), IssueHierarchy(Levels+Mappings), FieldSchemes(+Entries) — theo đúng cột đã có sẵn trong TASK_MANAGER_ERD.puml, không tự sáng tác thêm cột ngoài ERD.
+
+Entity mới: tương ứng 1-1 với migration ở trên, đặt cùng thư mục domain hiện có (workflow/, catalog/ hoặc issue/, audit/).
+
+Service cần sửa (kết nối):
+
+outbox.service.ts → refactor thành OutboxDispatcherService (Giai đoạn 0).
+webhook.service.ts → thêm WebhookDispatcherWorker (Giai đoạn 0).
+automation.service.ts → thêm executeFromEvent() thực thi action thật (Giai đoạn 0).
+notification.module.ts → đăng ký NotificationDelivery (Giai đoạn 0).
+workflow.controller.ts/workflow.service.ts → thêm route state/transition CRUD (Giai đoạn 1).
+project.service.ts::createIssue() → thay project.workflowKey bằng WorkflowSchemeService.resolveWorkflow() (Giai đoạn 1).
+issue.service.ts, project.service.ts, issue-search.service.ts → đổi priority: string sang priorityId (Giai đoạn 2).
+permission-resolver.service.ts → thêm @OnEvent('permission.changed') (Giai đoạn 3).
+Cấu hình bảo mật (ngoài phạm vi kết nối nhưng phát hiện trong lúc audit, khuyến nghị xử lý song song): rà soát mọi chuỗi kết nối DB/secret đang có fallback hardcode trong app.module.ts ở các bản deploy trước đây; chuyển hoàn toàn sang biến môi trường/secret manager và xoay vòng lại các khóa nếu từng bị commit vào source.
+
+9. Success Criteria tổng thể (dùng để nghiệm thu toàn bộ kế hoạch)
+Tiêu chí	Cách đo
+Không còn "kết nối giả"	Với mọi outbox_events.event_type, tồn tại ít nhất 1 test tích hợp chứng minh Webhook/Automation/Email nhận được sự kiện trong <30s
+Workflow cấu hình được 100% qua API	Tạo được 1 workflow 5 state + 4 transition + 2 guard hoàn toàn qua API, không sửa code
+Không còn cột FK "mồ côi"	grep toàn bộ entity: mọi cột *_id có bảng đích tồn tại và có migration FK tương ứng
+Traceability 100%	Mỗi mã F-xxx trạng thái "P" trong SRS §3.4.1 sau kế hoạch này chuyển thành "E" (đã triển khai đủ) hoặc có Q-OPEN còn hiệu lực kèm chủ sở hữu/ngày chốt
+Không regressions	Toàn bộ test hiện có (issue transition, sprint, board, permission) vẫn pass sau khi đổi priority→priorityId và thêm workflow-scheme layer
+Lịch sử phiên bản báo cáo này
+Version	Nội dung
+v2 (hiện tại)	Kiểm chứng độc lập lại toàn bộ phát hiện cốt lõi bằng lệnh grep trực tiếp trên source; bổ sung Ma trận kết nối chức năng (mục 3), thiết kế OutboxDispatcherService cụ thể ở mức method signature, endpoint chi tiết cho Workflow Builder, và Success Criteria đo được.
+đánh giá 2 
+Phân tích quan hệ chức năng: RBAC (Role/Department/Group) ↔ Nghiệp vụ chính (Issue) ↔ API ↔ Frontend
+
+Phần trước đã nhìn theo chiều ERD ↔ SRS ↔ Service layer. Phần này soi theo chiều ngang: cùng một chức năng có được nối xuyên suốt từ Frontend → Controller → Service → Entity một cách nhất quán không, hay có chỗ "gãy mạch" / "hai đường đi song song không khớp nhau".
+
+Kết luận trước: có ít nhất 2 lỗi wiring nghiêm trọng đang chạy thật trong luồng issue (transition + invite role), và toàn bộ khối RBAC nâng cao (Department/Group/Org Role) chỉ tồn tại ở backend, chưa chắc có mặt ở UI.
+
+1. RBAC: Org Role vs Project Role vs Department vs Group
+1.1 Sơ đồ quan hệ đã nối đúng theo ERD
+users ──< organization_members >── organizations
+              │
+              ├─ org_member_roles ──> org_roles ──> org_role_permission_entries
+              ├─ department_members ──> departments (self-parent tree)
+              └─ group_members ──> groups ──> project_group_roles ──> project_roles
+                                                      ▲
+project_members ──> project_member_roles ────────────┘
+
+Đối chiếu code: PermissionResolverService.hasProjectPermissions() đã hợp nhất đúng 2 nguồn quyền (direct role qua project_member_roles + role kế thừa qua group_members → project_group_roles), lấy projectRoleIds gộp rồi mới tra permission_scheme_entries. Đây là điểm kết nối tốt, đúng BR-08.
+
+IssueAccessService cũng gọi đúng memberHasProjectRole / memberInGroup khi resolve issue security grant → nối đúng với ProjectMemberRole/GroupMember.
+
+1.2 Chỗ gãy mạch: Department ↔ Project là quan hệ chết
+
+ERD định nghĩa projects.department_id (sở hữu phân cấp theo phòng ban — UC-ORG-08). Kiểm tra thực tế:
+
+project.entity.ts có field departmentId.
+CreateProjectDto (qua CreateProjectModal.tsx) chỉ gửi name, key, projectType, visibility, description — không có departmentId.
+ProjectService.create() không đọc/set departmentId ở bất kỳ đâu.
+Không có endpoint PATCH .../projects/:id nào cho phép gán lại department.
+
+→ Cột department_id tồn tại trong schema nhưng không bao giờ được set khác null trong toàn bộ vòng đời hiện tại. Chức năng "phòng ban sở hữu project" trong SRS (§UC-ORG-08) là hữu danh vô thực.
+
+1.3 Lỗi wiring cụ thể: Invite Member — field không khớp DTO
+
+InviteMemberModal.tsx:
+
+ts
+body: JSON.stringify({ email: email.trim(), role })  // role ∈ {'member','admin','viewer'}
+
+OrganizationService.invite():
+
+ts
+if (input.roleId && !await this.roles.exists({ where: { id: input.roleId, orgId } }))
+...
+orgRoleId: input.roleId ?? null,
+
+→ Backend đọc input.roleId (kỳ vọng UUID của org_roles.id), frontend gửi role (chuỗi cứng 'admin'/'viewer'). Hai vấn đề chồng nhau:
+
+Sai tên field: roleId vs role.
+main.ts bật new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }) — nếu InviteMemberDto không khai báo field role, request sẽ bị từ chối 400 ngay từ validation layer, chưa tới được service.
+Ngay cả khi sửa tên field, giá trị 'viewer' không tương ứng bất kỳ org_roles nào — vì lúc bootstrap org (OrganizationService.create()) chỉ seed 2 role: org-admin và member. Role 'admin'/'viewer' trong dropdown UI là ảo, không tồn tại trong DB.
+
+→ Đây không phải lỗi lý thuyết, mà là bug đang chạy: chức năng mời thành viên với vai trò cụ thể hiện tại thực chất luôn rơi về role mặc định (member, do invitation.orgRoleId ?? 'member' fallback trong accept()), bất kể người dùng chọn gì trên UI.
+
+Sửa: đồng bộ InviteMemberModal để (a) gọi API lấy danh sách org_roles thật của org (GET /organizations/:id/roles đã có sẵn), (b) render dropdown từ dữ liệu đó, (c) gửi đúng field roleId là UUID thật.
+
+1.4 Lỗ hổng phân quyền: Job Controller không phân biệt system vs member job
+ts
+@Post() create(..., @Body() body: { jobType: 'reconciliation' | 'import' | 'export'; ... })
+
+Guard chỉ có OrgMembershipGuard — bất kỳ member nào cũng enqueue được job reconciliation, trong khi BR-38/SRS quy định reconciliation là job hệ thống, member requester chỉ hợp lệ với job phạm vi họ sở hữu (import/export cá nhân). Cần thêm OrgPermissionGuard + permission MANAGE_JOBS cho riêng jobType='reconciliation'.
+
+2. Issue — nghiệp vụ trung tâm: có 2 đường đi song song không đồng bộ
+
+Đây là phát hiện quan trọng nhất. Có hai bộ controller/service cùng xử lý transition & update issue, nhưng độ hoàn thiện khác nhau:
+
+Thao tác	Route A (dùng bởi Frontend hiện tại)	Route B (song song, không dùng)
+Transition	IssueController POST .../issues/:id/transitions → IssueService.transition()	ProjectController POST .../projects/:pid/issues/:id/transition → ProjectService.transitionIssue()
+Update	IssueController PATCH .../issues/:id → IssueService.update()	ProjectController PATCH .../projects/:pid/issues/:id → ProjectService.updateIssue()
+2.1 IssueDetailModal.tsx gọi route A cho transition:
+ts
+await request(`/organizations/${activeOrgId}/issues/${issue.id}/transitions`, {
+  method: 'POST',
+  body: JSON.stringify({ transitionKey, version: issue.version }),
+});
+
+Nhưng IssueService.transition() hoàn toàn không dùng input.version để so sánh optimistic lock:
+
+ts
+async transition(orgId, issueId, memberId, input) {
+  ...
+  return this.dataSource.transaction(async (manager) => {
+    const locked = await manager.findOne(Issue, { where: {...}, lock: {...} });
+    locked.stateId = target!.id;
+    locked.version += 1;         // ← không hề check locked.version === input.version
+    ...
+
+So sánh với ProjectService.transitionIssue() (route B, không được frontend gọi):
+
+ts
+const expectedVersion = Number(input.expectedVersion);
+if (!Number.isInteger(expectedVersion) || expectedVersion !== issue.version)
+  throw new ConflictException('Issue version is stale');
+...
+if (transition.requireComment && !input.comment?.trim())
+  throw new ConflictException('Comment is required for this transition');
+const guards = await manager.find(WorkflowTransitionGuard, { where: { transitionId: transition.id } });
+for (const guard of guards) { /* enforce requires_fields */ }
+
+Hệ quả thực tế: UI issue detail — nơi người dùng thao tác transition hàng ngày — bỏ qua hoàn toàn:
+
+Kiểm tra optimistic concurrency (NFR-REL-03) → hai người transition đồng thời có thể ghi đè nhau âm thầm, không trả 409 như SRS yêu cầu.
+Enforce require_comment (BR-28) → transition bắt buộc comment vẫn đi qua được nếu gọi qua route A.
+Enforce workflow_transition_guards (BR-27) → guard requires_fields/json_logic bị vô hiệu hoá trên route A.
+
+Đây chính là ví dụ cụ thể nhất cho P0 mục 3.1 đã nêu ở lượt trước — không chỉ thiếu permission theo role, mà cả phần guard/version đã viết trong ProjectService cũng không được frontend chạm tới vì UI đi nhầm route.
+
+Sửa (2 lựa chọn):
+
+Ngắn hạn (khuyến nghị ngay): nâng cấp IssueService.transition() để có đầy đủ: check expectedVersion, requireComment, WorkflowTransitionGuard, và role-based transition permission (mục Phase A #2 ở lượt trước) — vì đây là route đang thực sự chạy.
+Dài hạn: hợp nhất 2 service thành 1 command duy nhất (IssueTransitionCommandService), cả IssueController và ProjectController đều gọi vào, tránh phân nhánh logic vĩnh viễn.
+2.2 Lỗi định danh route: Work Log
+
+IssueDetailModal.handleLogWork:
+
+ts
+await request(`/organizations/${activeOrgId}/issues/${issue.id}/worklogs`, { method: 'POST', ... });
+
+IssueController:
+
+ts
+@Post('work-logs') addWorkLog(...)   // có dấu gạch nối
+
+/worklogs (không gạch nối) ≠ /work-logs (có gạch nối) → request 404, tính năng "Log Work" trên UI hiện tại không hoạt động được dù backend đã implement đầy đủ transaction cập nhật cache timeSpentSeconds (BR-36) đúng chuẩn. Đây là lỗi tầm thường (typo route) nhưng chặn đứng một tính năng đã code xong ở backend.
+
+Sửa: đổi 1 dòng ở IssueDetailModal.tsx: worklogs → work-logs.
+
+2.3 Update issue: 2 route lệch field-set
+
+IssueService.update() (route A – đang dùng): hỗ trợ summary, description, priority, assigneeMemberId, sprintId, dueAt, originalEstimateSeconds, remainingEstimateSeconds, componentId, fixVersionId.
+
+ProjectService.updateIssue() (route B – không dùng): có thêm validate parentIssueId (chống self-parent + tồn tại trong project) mà route A hoàn toàn không có. IssueDetailModal hiện không có UI set parent, nên chưa lộ ra, nhưng nếu sau này thêm field "Parent issue" vào modal và vẫn gọi route A (IssueService.update), field parentIssueId sẽ không được validate (không check self-cycle, không check same-project) — vi phạm trực tiếp BR-18.
+
+3. Frontend đã hiển thị hết những gì Backend có chưa?
+3.1 Đối chiếu CreateIssueModal ↔ CreateIssueDto thực tế backend nhận
+Trường Backend hỗ trợ	Có trong CreateIssueModal.tsx?
+issueTypeKey, summary, description, priority, assigneeMemberId, sprintId, dueAt, originalEstimateSeconds, componentId, fixVersionId	✅ có đủ
+securityLevelId (issue security — ERD/BR-45)	❌ không có control nào chọn security level lúc tạo issue
+Custom field values (issue_custom_field_values)	❌ modal không render field tùy biến theo getContextsForProject dù API GET .../custom-fields/contexts/project/:id đã tồn tại
+parentIssueId	❌ không có ô chọn parent issue
+Label ngay lúc tạo	❌ chỉ gán được sau khi tạo (qua issue detail) — chấp nhận được vì đúng flow Jira thật
+
+→ Backend đã có API custom field theo context (CustomFieldController.projectContexts) nhưng frontend create-issue không gọi, nghĩa là dù Org Admin định nghĩa custom field bắt buộc (isRequired=true), người tạo issue trên UI không hề thấy field đó → vi phạm trực tiếp mục tiêu "required field phải được enforce ở cả client lẫn server" (FR-CONF-02), vì phía client hoàn toàn vắng mặt.
+
+3.2 Các module Backend đầy đủ nhưng chưa xác nhận có mặt ở UI nào
+
+Dựa trên Sidebar.tsx (7 view: work/boards/backlog/filters/dashboards/automation/integrations/jobs/notifications/admin) và Header.tsx (chỉ có nút "My Profile & Security" + "Organization Settings" → setView('admin')):
+
+Chức năng Backend (đã có full CRUD)	Route/API tồn tại	Xuất hiện trong Sidebar/Header?
+Quản lý Org Role + gán permission (OrganizationController /roles, /roles/:id/permissions)	✅	Không thấy mục riêng — có thể nằm trong view admin (không có trong tài liệu cung cấp để xác nhận)
+Quản lý Department (tree, lead)	✅	Không thấy mục riêng
+Quản lý Group	✅	Không thấy mục riêng
+Quản lý Custom Field (định nghĩa field/context/option)	✅	Không thấy mục riêng, không có trong Sidebar
+Quản lý Issue Security Scheme/Level/Grant	✅ (entity + IssueAccessService)	Không thấy control nào để Org/Project Admin tạo security level — chỉ có logic enforce khi đọc issue
+Quản lý Workflow (state/transition/guard)	✅ WorkflowController	Không thấy trong Sidebar
+System Admin (AdminController — UC-SYS-01/02)	✅	Không thấy view system-admin riêng trong AppView liệt kê ở Sidebar
+
+→ Đây là khoảng trống Frontend-API lớn nhất: rất nhiều nghiệp vụ (đặc biệt là toàn bộ nhóm quản trị — Role/Department/Group/CustomField/Workflow/SystemAdmin) đã có API hoàn chỉnh phía backend nhưng không chắc có màn hình tương ứng. Vì tôi không có file AdminView/SystemAdminView trong tài liệu, tôi không thể khẳng định 100% là thiếu, nhưng theo cấu trúc component đã cung cấp (WorkspaceLayout, Header, Sidebar, các Modal) thì không có bất kỳ tham chiếu nào đến các view này — cần bạn xác nhận file AdminView.tsx (nếu có) có thực sự bọc đủ 5 module trên hay chỉ là 1-2 form đơn giản (tên/plan tổ chức).
+
+4. Bảng tổng hợp mức độ nghiêm trọng (mở rộng, bổ sung lượt trước)
+#	Vấn đề	Loại	Priority	Bằng chứng
+1	IssueService.transition() (route đang dùng bởi UI) thiếu version check + guard + requireComment	Data integrity / Security	P0	So sánh trực tiếp với ProjectService.transitionIssue()
+2	Route /worklogs (FE) vs /work-logs (BE) lệch nhau	Bug chức năng	P0 (chặn tính năng)	IssueDetailModal.handleLogWork vs IssueController
+3	Invite Member: field role (FE) vs roleId (BE), giá trị không phải UUID thật	Bug chức năng	P0	InviteMemberModal.tsx vs OrganizationService.invite()
+4	department_id trên project không bao giờ được set (dead relation)	Thiếu wiring	P1	CreateProjectModal + ProjectService.create()
+5	Custom field required không được render ở Create Issue Modal	Thiếu enforce phía client	P1	CreateIssueModal.tsx không gọi projectContexts
+6	JobController không giới hạn quyền tạo job reconciliation	Lỗ hổng phân quyền	P1	job.controller.ts chỉ có OrgMembershipGuard
+7	2 service song song (IssueService vs ProjectService) cho transition/update, dễ tiếp tục lệch khi sửa 1 bên	Nợ kiến trúc	P1	Có thể gây tái diễn lỗi #1 trong tương lai
+8	Không xác nhận được UI cho Role/Department/Group/CustomField/Workflow/SystemAdmin	Cần xác minh	P1 (chờ xác nhận)	Không có trong Sidebar.tsx/Header.tsx cung cấp
+9	Issue Security Level không có UI tạo/gán ở phía admin	Thiếu UI	P2	Chỉ có enforce, không có management screen
+5. Khuyến nghị hành động ngay (chi phí thấp, giá trị cao)
+Sửa route worklogs → work-logs (1 dòng, unblock ngay 1 tính năng).
+Vá IssueService.transition() để có version/guard/requireComment giống ProjectService.transitionIssue() — đây là lỗ hổng đang ảnh hưởng dữ liệu thật, ưu tiên cao nhất.
+Sửa InviteMemberModal để lấy roleId thật từ GET /organizations/:id/roles thay vì hard-code chuỗi.
+Yêu cầu xác nhận (từ bạn hoặc từ mã nguồn AdminView/SystemAdminView nếu có) xem 5 module quản trị có thật sự đã có màn hình hay chưa — nếu chưa, đây là backlog frontend lớn cần lên kế hoạch riêng.

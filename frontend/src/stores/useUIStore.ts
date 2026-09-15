@@ -12,7 +12,7 @@ export type AppView =
   | 'admin'
   | 'notifications';
 
-export type AdminTab = 'org' | 'members' | 'roles' | 'departments' | 'groups' | 'project';
+export type AdminTab = 'org' | 'members' | 'roles' | 'departments' | 'groups' | 'project' | 'workflows' | 'catalogs';
 
 export interface ToastItem {
   id: string;

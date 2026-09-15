@@ -8,6 +8,7 @@ export class CreateOrganizationDto {
 export class InviteMemberDto {
   @IsEmail() email!: string;
   @IsOptional() @IsUUID() roleId?: string;
+  @IsOptional() @IsString() role?: string;
 }
 
 export class AcceptInvitationDto {

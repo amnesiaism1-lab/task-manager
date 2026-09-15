@@ -79,7 +79,7 @@ export const SearchView: React.FC = () => {
 
       // 4. Assignee filter
       if (assigneeFilter) {
-        const aId = issue.assigneeId || issue.assignee?.id || (issue as any).assigneeMember?.id;
+        const aId = issue.assigneeId || issue.assignee?.id || (issue as any).assigneeMember?.id || (issue as any).assigneeMemberId;
         if (aId !== assigneeFilter) return false;
       }
 
@@ -289,11 +289,15 @@ export const SearchView: React.FC = () => {
               className="w-full bg-surface-surface text-text-primary text-xs rounded-xl px-3 py-2 border border-border/80 focus:border-brand-500 focus:outline-none"
             >
               <option value="">All Assignees</option>
-              {members.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.user?.fullName || m.user?.email || m.id}
-                </option>
-              ))}
+              {members.map((m) => {
+                const name = m.fullName || m.user?.fullName || m.email || m.user?.email || 'Member';
+                const email = m.email || m.user?.email;
+                return (
+                  <option key={m.id} value={m.id}>
+                    {name}{email && email !== name ? ` (${email})` : ''}
+                  </option>
+                );
+              })}
             </select>
           </div>
         </div>

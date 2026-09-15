@@ -61,7 +61,18 @@ export class ProjectService {
     if (duplicate) throw new ConflictException('Project key already exists');
     return this.dataSource.transaction(async (manager) => {
       const workflowKey = `${key.toLowerCase()}-default`;
-      const project = await manager.save(Project, manager.create(Project, { orgId, key, name: input.name.trim(), description: input.description ?? null, visibility: input.visibility ?? 'private', createdByMemberId: creatorMemberId, workflowKey, nextIssueNumber: 1, archivedAt: null }));
+      const project = await manager.save(Project, manager.create(Project, {
+        orgId,
+        key,
+        name: input.name.trim(),
+        description: input.description ?? null,
+        visibility: input.visibility ?? 'private',
+        departmentId: input.departmentId ?? null,
+        createdByMemberId: creatorMemberId,
+        workflowKey,
+        nextIssueNumber: 1,
+        archivedAt: null,
+      }));
       const projectAdmin = await manager.save(ProjectRole, manager.create(ProjectRole, { projectId: project.id, key: 'project-admin', name: 'Project administrator', description: 'Project administration' }));
       const memberRole = await manager.save(ProjectRole, manager.create(ProjectRole, { projectId: project.id, key: 'member', name: 'Member', description: 'Project member' }));
       const projectMember = await manager.save(ProjectMember, manager.create(ProjectMember, { projectId: project.id, orgMemberId: creatorMemberId, status: 'active', joinedAt: new Date() }));
@@ -120,8 +131,20 @@ export class ProjectService {
       await manager.save(lockedProject);
       let assigneeMemberId: string | null = null;
       if (input.assigneeMemberId) {
-        const assignee = await manager.findOne(ProjectMember, { where: { projectId, orgMemberId: input.assigneeMemberId, status: 'active' } });
-        if (!assignee) throw new ForbiddenException('Assignee must be an active project member');
+        let assignee = await manager.findOne(ProjectMember, { where: { projectId, orgMemberId: input.assigneeMemberId, status: 'active' } });
+        if (!assignee) {
+          const orgMember = await manager.findOne(OrganizationMember, { where: { id: input.assigneeMemberId, orgId, status: 'active' } });
+          if (orgMember) {
+            assignee = await manager.save(ProjectMember, manager.create(ProjectMember, {
+              projectId,
+              orgMemberId: input.assigneeMemberId,
+              status: 'active',
+              joinedAt: new Date(),
+            }));
+          } else {
+            throw new ForbiddenException('Assignee must be an active project member');
+          }
+        }
         assigneeMemberId = input.assigneeMemberId;
       }
       let sprintId: string | null = null;
@@ -174,7 +197,32 @@ export class ProjectService {
     const membership = await this.projectMembers.findOne({ where: { projectId, orgMemberId: memberId, status: 'active' } });
     if (!membership) throw new ForbiddenException('Project membership required');
     const query = this.issues.createQueryBuilder('issue').where('issue.org_id = :orgId AND issue.project_id = :projectId AND issue.deleted_at IS NULL', { orgId, projectId }).orderBy('issue.created_at', 'DESC');
-    return paginate(query, pagination);
+    const result = await paginate(query, pagination);
+    if (!result.data.length) return result;
+    const assigneeIds = [...new Set(result.data.map((i: any) => i.assigneeMemberId).filter(Boolean))];
+    const stateIds = [...new Set(result.data.map((i: any) => i.stateId).filter(Boolean))];
+    const [states, members] = await Promise.all([
+      stateIds.length ? this.dataSource.getRepository(WorkflowState).find({ where: { id: In(stateIds) } }) : Promise.resolve([]),
+      assigneeIds.length
+        ? this.orgMembers.createQueryBuilder('om')
+            .innerJoin(User, 'user', 'user.id = om.user_id')
+            .where('om.id IN (:...assigneeIds)', { assigneeIds })
+            .select(['om.id AS id', 'user.id AS "userId"', 'user.full_name AS "fullName"', 'user.email AS email', 'user.avatar_url AS "avatarUrl"'])
+            .getRawMany()
+        : Promise.resolve([]),
+    ]);
+    const stateMap = new Map(states.map((s) => [s.id, s]));
+    const memberMap = new Map(members.map((m) => [m.id, { id: m.id, userId: m.userId, fullName: m.fullName, email: m.email, avatarUrl: m.avatarUrl }]));
+    result.data = result.data.map((issue: any) => {
+      const assignee = issue.assigneeMemberId ? memberMap.get(issue.assigneeMemberId) || null : null;
+      return {
+        ...issue,
+        state: stateMap.get(issue.stateId) || null,
+        assignee,
+        assigneeMember: assignee,
+      };
+    });
+    return result;
   }
 
   async transitionIssue(orgId: string, projectId: string, issueId: string, actorMemberId: string, input: TransitionIssueDto) {
@@ -237,6 +285,7 @@ export class ProjectService {
     project.name = input.name.trim();
     if (input.description !== undefined) project.description = input.description?.trim() || null;
     if (input.visibility) project.visibility = input.visibility;
+    if (input.departmentId !== undefined) project.departmentId = input.departmentId;
     return this.projects.save(project);
   }
 
@@ -357,7 +406,32 @@ export class ProjectService {
       .where('issue.org_id = :orgId AND issue.project_id = :projectId AND issue.deleted_at IS NULL', { orgId, projectId })
       .andWhere('(issue.sprint_id IS NULL OR sprint.state != :activeSprint)', { activeSprint: 'active' })
       .orderBy('issue.created_at', 'DESC');
-    return paginate(query, pagination);
+    const result = await paginate(query, pagination);
+    if (!result.data.length) return result;
+    const assigneeIds = [...new Set(result.data.map((i: any) => i.assigneeMemberId).filter(Boolean))];
+    const stateIds = [...new Set(result.data.map((i: any) => i.stateId).filter(Boolean))];
+    const [states, members] = await Promise.all([
+      stateIds.length ? this.dataSource.getRepository(WorkflowState).find({ where: { id: In(stateIds) } }) : Promise.resolve([]),
+      assigneeIds.length
+        ? this.orgMembers.createQueryBuilder('om')
+            .innerJoin(User, 'user', 'user.id = om.user_id')
+            .where('om.id IN (:...assigneeIds)', { assigneeIds })
+            .select(['om.id AS id', 'user.id AS "userId"', 'user.full_name AS "fullName"', 'user.email AS email', 'user.avatar_url AS "avatarUrl"'])
+            .getRawMany()
+        : Promise.resolve([]),
+    ]);
+    const stateMap = new Map(states.map((s) => [s.id, s]));
+    const memberMap = new Map(members.map((m) => [m.id, { id: m.id, userId: m.userId, fullName: m.fullName, email: m.email, avatarUrl: m.avatarUrl }]));
+    result.data = result.data.map((issue: any) => {
+      const assignee = issue.assigneeMemberId ? memberMap.get(issue.assigneeMemberId) || null : null;
+      return {
+        ...issue,
+        state: stateMap.get(issue.stateId) || null,
+        assignee,
+        assigneeMember: assignee,
+      };
+    });
+    return result;
   }
 
   async updateComponent(orgId: string, projectId: string, componentId: string, memberId: string, input: UpdateComponentDto) {

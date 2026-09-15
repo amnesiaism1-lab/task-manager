@@ -15,6 +15,9 @@
     "start:backend": "npm --prefix backend run start:dev",
     "start:frontend": "npm --prefix frontend run dev",
     "lint": "npx oxlint frontend/src backend/src",
+    "typecheck": "npm --prefix shared run build && npm --prefix backend exec tsc -- -p backend/tsconfig.json --noEmit && npm --prefix frontend run typecheck",
+    "doctor": "node scripts/doctor.mjs",
+    "db:fix-rls": "node scripts/fix_rls.mjs",
     "docker:up": "docker compose up -d",
     "docker:down": "docker compose down"
   },

@@ -26,7 +26,7 @@ import {
 } from 'lucide-react';
 
 export const BacklogView: React.FC = () => {
-  const { activeOrgId, activeProjectId, projects } = useWorkspaceStore();
+  const { activeOrgId, activeProjectId, projects, members } = useWorkspaceStore();
   const { openModal, showToast } = useUIStore();
   const queryClient = useQueryClient();
 
@@ -320,19 +320,29 @@ export const BacklogView: React.FC = () => {
                           </Badge>
 
                           {/* Assignee avatar */}
-                          {issue.assignee || issue.assigneeMember ? (
-                            <div
-                              className="w-5 h-5 rounded-full bg-gradient-to-tr from-brand-600 to-indigo-500 text-white font-bold flex items-center justify-center text-[9px] ring-1 ring-white/10"
-                              title={issue.assignee?.fullName || issue.assigneeMember?.fullName}
-                            >
-                              {getInitials(
-                                issue.assignee?.fullName || issue.assigneeMember?.fullName,
-                                issue.assignee?.email
-                              )}
-                            </div>
-                          ) : (
-                            <span className="text-[10px] text-text-muted italic">Unassigned</span>
-                          )}
+                          {(() => {
+                            const assignee =
+                              issue.assignee ||
+                              issue.assigneeMember ||
+                              members.find(
+                                (m) =>
+                                  m.id === issue.assigneeMemberId ||
+                                  m.id === issue.assigneeId
+                              );
+                            return assignee ? (
+                              <div
+                                className="w-5 h-5 rounded-full bg-gradient-to-tr from-brand-600 to-indigo-500 text-white font-bold flex items-center justify-center text-[9px] ring-1 ring-white/10"
+                                title={assignee.fullName || assignee.user?.fullName || assignee.email || assignee.user?.email}
+                              >
+                                {getInitials(
+                                  assignee.fullName || assignee.user?.fullName,
+                                  assignee.email || assignee.user?.email
+                                )}
+                              </div>
+                            ) : (
+                              <span className="text-[10px] text-text-muted italic">Unassigned</span>
+                            );
+                          })()}
 
                           <button
                             onClick={() => handleMoveToSprint(issue.id, null, issue.version)}
@@ -423,19 +433,29 @@ export const BacklogView: React.FC = () => {
                   </Badge>
 
                   {/* Assignee avatar */}
-                  {issue.assignee || issue.assigneeMember ? (
-                    <div
-                      className="w-5 h-5 rounded-full bg-gradient-to-tr from-brand-600 to-indigo-500 text-white font-bold flex items-center justify-center text-[9px] ring-1 ring-white/10"
-                      title={issue.assignee?.fullName || issue.assigneeMember?.fullName}
-                    >
-                      {getInitials(
-                        issue.assignee?.fullName || issue.assigneeMember?.fullName,
-                        issue.assignee?.email
-                      )}
-                    </div>
-                  ) : (
-                    <span className="text-[10px] text-text-muted italic">Unassigned</span>
-                  )}
+                  {(() => {
+                    const assignee =
+                      issue.assignee ||
+                      issue.assigneeMember ||
+                      members.find(
+                        (m) =>
+                          m.id === issue.assigneeMemberId ||
+                          m.id === issue.assigneeId
+                      );
+                    return assignee ? (
+                      <div
+                        className="w-5 h-5 rounded-full bg-gradient-to-tr from-brand-600 to-indigo-500 text-white font-bold flex items-center justify-center text-[9px] ring-1 ring-white/10"
+                        title={assignee.fullName || assignee.user?.fullName || assignee.email || assignee.user?.email}
+                      >
+                        {getInitials(
+                          assignee.fullName || assignee.user?.fullName,
+                          assignee.email || assignee.user?.email
+                        )}
+                      </div>
+                    ) : (
+                      <span className="text-[10px] text-text-muted italic">Unassigned</span>
+                    );
+                  })()}
 
                   {/* Dropdown to assign to a sprint */}
                   {sprints.filter((s) => s.state !== 'closed').length > 0 && (

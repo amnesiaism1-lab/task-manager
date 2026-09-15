@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { OnEvent } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { OrganizationMemberRole } from '../../database/entities/identity/org-member-role.entity';
@@ -30,6 +31,29 @@ export class PermissionResolverService {
     @InjectRepository(PermissionSchemeEntry) private readonly permissionEntries: Repository<PermissionSchemeEntry>,
     @InjectRepository(Project) private readonly projects: Repository<Project>,
   ) {}
+
+  @OnEvent('permission.changed')
+  handlePermissionChanged(payload?: { memberId?: string; projectId?: string }) {
+    if (payload?.memberId) {
+      orgPermCache.delete(`org:${payload.memberId}`);
+      if (payload?.projectId) {
+        projectPermCache.delete(`proj:${payload.memberId}:${payload.projectId}`);
+      } else {
+        for (const key of projectPermCache.keys()) {
+          if (key.startsWith(`proj:${payload.memberId}:`)) {
+            projectPermCache.delete(key);
+          }
+        }
+      }
+    } else {
+      orgPermCache.clear();
+      projectPermCache.clear();
+    }
+  }
+
+  clearCache(memberId?: string) {
+    this.handlePermissionChanged({ memberId });
+  }
 
   async hasOrgPermissions(memberId: string, permissions: string[]): Promise<boolean> {
     if (permissions.length === 0) return true;

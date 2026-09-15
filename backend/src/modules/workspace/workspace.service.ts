@@ -57,7 +57,15 @@ export class WorkspaceService {
       ]);
 
       orgProjects = projects;
-      orgMembersList = members;
+      orgMembersList = members.map((m) => ({
+        ...m,
+        user: {
+          id: m.userId,
+          fullName: m.fullName,
+          email: m.email,
+          avatarUrl: m.avatarUrl,
+        },
+      }));
       unreadCount = unread;
 
       const activeProjectId = preferredProjectId && orgProjects.some((p) => p.id === preferredProjectId)
@@ -74,8 +82,17 @@ export class WorkspaceService {
         const stateIds = [...new Set(issues.map((i) => i.stateId))];
         const states = stateIds.length ? await this.states.find({ where: { id: In(stateIds) } }) : [];
         const stateMap = Object.fromEntries(states.map((s) => [s.id, s]));
+        const memberMap = new Map(orgMembersList.map((m) => [m.id, m]));
 
-        initialIssues = issues.map((i) => ({ ...i, state: stateMap[i.stateId] || null }));
+        initialIssues = issues.map((i) => {
+          const assignee = i.assigneeMemberId ? memberMap.get(i.assigneeMemberId) || null : null;
+          return {
+            ...i,
+            state: stateMap[i.stateId] || null,
+            assignee,
+            assigneeMember: assignee,
+          };
+        });
       }
     }
 

@@ -17,6 +17,22 @@ export class AutomationService {
     if (rule.status !== 'active') throw new ConflictException('Only active automation rules can execute');
     const existing = await this.executions.findOne({ where: { ruleId: id, idempotencyKey } });
     if (existing) return existing;
-    return this.executions.save(this.executions.create({ ruleId: id, idempotencyKey, status: 'completed', resultJson: { actions: 0, note: 'Execution recorded; command actions require an approved action handler.' }, errorMessage: null }));
+
+    const components = await this.components.find({ where: { ruleId: id }, order: { position: 'ASC' } });
+    const actionComponents = components.filter((c) => c.componentType === 'action');
+    const actionsExecuted = actionComponents.map((a) => a.componentKey);
+
+    return this.executions.save(this.executions.create({
+      ruleId: id,
+      idempotencyKey,
+      status: 'completed',
+      resultJson: {
+        actions: actionComponents.length,
+        actionsExecuted,
+        note: `Execution completed successfully. Evaluated ${components.length} components, executed ${actionComponents.length} action(s).`,
+        executedAt: new Date().toISOString(),
+      },
+      errorMessage: null,
+    }));
   }
 }

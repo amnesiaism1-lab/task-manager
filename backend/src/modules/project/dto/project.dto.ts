@@ -7,6 +7,7 @@ export class CreateProjectDto {
   @IsOptional() @IsString() @MaxLength(2000) description?: string;
   @IsOptional() @IsIn(['private', 'org', 'public']) visibility?: 'private' | 'org' | 'public';
   @IsOptional() @IsIn(['kanban', 'scrum']) boardType?: 'kanban' | 'scrum';
+  @IsOptional() @IsUUID() departmentId?: string;
 }
 
 export class CreateIssueDto {
@@ -42,6 +43,7 @@ export class UpdateProjectDto {
   @IsString() @Length(1, 160) name!: string;
   @IsOptional() @IsString() @MaxLength(2000) description?: string | null;
   @IsOptional() @IsIn(['private', 'org', 'public']) visibility?: 'private' | 'org' | 'public';
+  @IsOptional() @IsUUID() departmentId?: string | null;
 }
 
 export class CreateProjectRoleDto {

@@ -30,7 +30,10 @@ export interface OrgMember {
   orgId: string;
   role: string;
   status: string;
-  user: User;
+  user?: User;
+  fullName?: string;
+  email?: string;
+  avatarUrl?: string;
   createdAt?: string;
 }
 

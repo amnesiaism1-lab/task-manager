@@ -4,8 +4,12 @@ const { Client } = pg;
 
 export class DbHelper {
   constructor() {
+    const connStr = process.env.DATABASE_URL;
+    if (!connStr) {
+      throw new Error('DATABASE_URL environment variable is required');
+    }
     this.client = new Client({
-      connectionString: 'postgresql://postgres.tocfpzzbvlviwdybyvzq:QTus%402405200@aws-0-ap-southeast-2.pooler.supabase.com:6543/postgres',
+      connectionString: connStr,
       ssl: { rejectUnauthorized: false }
     });
   }

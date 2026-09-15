@@ -6,9 +6,11 @@ export class CreateCommentDto {
 }
 
 export class CreateWorkLogDto {
-  @IsInt() @Min(1) @Max(864000) timeSpentSeconds!: number;
+  @IsOptional() @IsInt() @Min(1) @Max(864000) timeSpentSeconds?: number;
+  @IsOptional() @IsInt() @Min(1) @Max(14400) timeSpentMinutes?: number;
   @IsISO8601() startedAt!: string;
   @IsOptional() @IsString() @MaxLength(5000) comment?: string;
+  @IsOptional() @IsString() @MaxLength(5000) description?: string;
 }
 
 export class AddLabelDto {

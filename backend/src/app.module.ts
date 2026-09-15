@@ -45,8 +45,7 @@ import { WorkspaceModule } from './modules/workspace/workspace.module';
     TypeOrmModule.forRootAsync({
       inject: [ConfigService],
       useFactory: (config: ConfigService) => {
-        const supabasePoolerUrl = 'postgresql://postgres.tocfpzzbvlviwdybyvzq:QTus%402405200@aws-0-ap-southeast-2.pooler.supabase.com:6543/postgres';
-        let dbUrl = config.get<string>('DATABASE_URL') || (process.env.VERCEL || process.env.NODE_ENV === 'production' ? supabasePoolerUrl : undefined);
+        let dbUrl = config.get<string>('DATABASE_URL') || process.env.DATABASE_URL;
         const dbHost = config.get<string>('DATABASE_HOST', 'localhost');
         const isSsl = config.get('DATABASE_SSL') === 'true' ||
                       (dbUrl && (dbUrl.includes('supabase') || dbUrl.includes('pooler') || dbUrl.includes('sslmode=require'))) ||
