@@ -31,7 +31,7 @@ export const App: React.FC = () => {
     isBootstrapped,
     applyBootstrap,
   } = useWorkspaceStore();
-  const { currentView, setSyncing } = useUIStore();
+  const { currentView, setSyncing, openModal } = useUIStore();
 
   // Fast single roundtrip bootstrap
   useEffect(() => {
@@ -66,6 +66,20 @@ export const App: React.FC = () => {
       isMounted = false;
     };
   }, [token, activeOrgId, activeProjectId]);
+
+  // Handle invitationToken from URL if authenticated
+  useEffect(() => {
+    if (!token || typeof window === 'undefined') return;
+    const searchParams = new URLSearchParams(window.location.search);
+    const iToken = searchParams.get('invitationToken');
+    if (iToken) {
+      sessionStorage.setItem('pending_invitation_token', iToken);
+      openModal('joinOrg');
+      if (window.history?.replaceState) {
+        window.history.replaceState({}, document.title, window.location.pathname);
+      }
+    }
+  }, [token, openModal]);
 
   // 1. Not Authenticated -> Render AuthView
   if (!token) {

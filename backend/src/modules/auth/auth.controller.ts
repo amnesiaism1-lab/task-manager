@@ -12,7 +12,15 @@ export class AuthController {
   constructor(private readonly auth: AuthService) {}
 
   @Throttle({ default: { limit: 60, ttl: 60_000 } })
-  @Post('register') register(@Body() body: RegisterDto) { return this.auth.register(body); }
+  @Post('register') register(
+    @Body() body: RegisterDto,
+    @Ip() ip: string,
+    @Headers('user-agent') userAgent?: string,
+    @Headers('origin') origin?: string,
+    @Headers('referer') referer?: string,
+  ) {
+    return this.auth.register(body, { ip, userAgent, origin: origin || referer });
+  }
 
   @Throttle({ default: { limit: 60, ttl: 60_000 } })
   @Post('google') google(@Body() body: GoogleLoginDto, @Ip() ip: string, @Headers('user-agent') userAgent?: string) {
@@ -40,14 +48,34 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   @Patch('me') updateProfile(@Req() request: AuthenticatedRequest, @Body() body: UpdateProfileDto) { return this.auth.updateProfile(request.user.id, body); }
 
-  @Post('verify-email') verifyEmail(@Body() body: VerifyEmailDto) { return this.auth.verifyEmailWithToken(body.userId, body.token); }
+  @Post('verify-email') verifyEmail(
+    @Body() body: VerifyEmailDto,
+    @Ip() ip: string,
+    @Headers('user-agent') userAgent?: string,
+  ) {
+    return this.auth.verifyEmailWithToken(body, undefined, { ip, userAgent });
+  }
 
   @Throttle({ default: { limit: 30, ttl: 60_000 } })
-  @Post('request-verification') requestVerification(@Body() body: RequestVerificationDto) { return this.auth.requestEmailVerification(body.email); }
+  @Post('request-verification') requestVerification(
+    @Body() body: RequestVerificationDto,
+    @Headers('origin') origin?: string,
+    @Headers('referer') referer?: string,
+  ) {
+    return this.auth.requestEmailVerification(body.email, origin || referer);
+  }
 
-  @Post('forgot-password') forgotPassword(@Body() body: ForgotPasswordDto) { return this.auth.requestPasswordReset(body.email); }
+  @Post('forgot-password') forgotPassword(
+    @Body() body: ForgotPasswordDto,
+    @Headers('origin') origin?: string,
+    @Headers('referer') referer?: string,
+  ) {
+    return this.auth.requestPasswordReset(body.email, origin || referer);
+  }
 
-  @Post('reset-password') resetPassword(@Body() body: ResetPasswordDto) { return this.auth.resetPassword(body.userId, body.token, body.password); }
+  @Post('reset-password') resetPassword(@Body() body: ResetPasswordDto) {
+    return this.auth.resetPassword(body);
+  }
 
   @UseGuards(JwtAuthGuard)
   @Post('change-password') changePassword(@Req() request: AuthenticatedRequest, @Body() body: ChangePasswordDto) { return this.auth.changePassword(request.user.id, body.currentPassword, body.newPassword); }

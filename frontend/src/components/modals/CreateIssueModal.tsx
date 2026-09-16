@@ -292,8 +292,8 @@ export const CreateIssueModal: React.FC = () => {
             >
               <option value="">Unassigned</option>
               {availableAssignees.map((m: any) => {
-                const memId = m.orgMemberId || m.id;
-                const name = m.fullName || m.user?.fullName || m.email || m.user?.email || 'Member';
+                const memId = m.orgMemberId || m.orgmemberid || m.id;
+                const name = m.fullName || m.fullname || m.user?.fullName || m.email || m.user?.email || 'Member';
                 const email = m.email || m.user?.email;
                 return (
                   <option key={memId} value={memId}>

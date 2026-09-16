@@ -16,6 +16,8 @@ import {
   Settings,
   Sparkles,
   RefreshCw,
+  UserPlus,
+  KeyRound,
 } from 'lucide-react';
 
 export const Header: React.FC = () => {
@@ -106,7 +108,27 @@ export const Header: React.FC = () => {
                   </button>
                 ))}
               </div>
-              <div className="border-t border-border/80 mt-1 pt-1 px-1">
+              <div className="border-t border-border/80 mt-1 pt-1 px-1 space-y-0.5">
+                <button
+                  onClick={() => {
+                    setOrgDropdownOpen(false);
+                    openModal('inviteMember');
+                  }}
+                  className="w-full text-left px-2.5 py-1.5 text-xs text-text-primary hover:bg-surface-hover rounded-lg flex items-center gap-2 font-medium"
+                >
+                  <UserPlus className="w-3.5 h-3.5 text-brand-400" />
+                  Invite Team Member...
+                </button>
+                <button
+                  onClick={() => {
+                    setOrgDropdownOpen(false);
+                    openModal('joinOrg');
+                  }}
+                  className="w-full text-left px-2.5 py-1.5 text-xs text-text-primary hover:bg-surface-hover rounded-lg flex items-center gap-2 font-medium"
+                >
+                  <KeyRound className="w-3.5 h-3.5 text-emerald-400" />
+                  Join with Code...
+                </button>
                 <button
                   onClick={() => {
                     setOrgDropdownOpen(false);

@@ -310,14 +310,25 @@ export class OrganizationService {
       .getRawMany();
   }
 
-  async invite(orgId: string, inviterMemberId: string, input: InviteMemberDto) {
+  async invite(orgId: string, inviterMemberId: string, input: InviteMemberDto, clientOrigin?: string) {
     const email = input.email.trim().toLowerCase();
     const user = await this.users.findOne({ where: { email } });
     if (user && await this.members.findOne({ where: { orgId, userId: user.id, status: 'active' } })) throw new ConflictException('User is already a member');
     let resolvedRoleId: string | null = input.roleId ?? null;
     if (resolvedRoleId) {
-      const exists = await this.roles.exists({ where: { id: resolvedRoleId, orgId } });
-      if (!exists) throw new ForbiddenException('Role does not belong to organization');
+      const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(resolvedRoleId);
+      if (isUUID) {
+        const exists = await this.roles.exists({ where: { id: resolvedRoleId, orgId } });
+        if (!exists) throw new ForbiddenException('Role does not belong to organization');
+      } else {
+        const roleKey = resolvedRoleId.toLowerCase() === 'admin' ? 'org-admin' : resolvedRoleId.toLowerCase();
+        const matchedRole = await this.roles.findOne({ where: [{ orgId, key: roleKey }, { orgId, name: resolvedRoleId }] });
+        if (matchedRole) {
+          resolvedRoleId = matchedRole.id;
+        } else {
+          resolvedRoleId = null;
+        }
+      }
     } else if (input.role) {
       const roleKey = input.role.toLowerCase() === 'admin' ? 'org-admin' : input.role.toLowerCase();
       const matchedRole = await this.roles.findOne({ where: [{ orgId, key: roleKey }, { orgId, name: input.role }] });
@@ -341,10 +352,17 @@ export class OrganizationService {
         org?.name || 'Task Manager Pro',
         inviterName,
         invitation.id,
+        clientOrigin,
       ).catch((err) => console.error('[MailService] Failed to send invitation email:', err));
     }
 
-    return { id: invitation.id, email, expiresAt: invitation.expiresAt, ...(this.config.get('NODE_ENV', 'development') === 'development' && { invitationToken: raw.raw }) };
+    return {
+      id: invitation.id,
+      email,
+      expiresAt: invitation.expiresAt,
+      token: raw.raw,
+      invitationToken: raw.raw,
+    };
   }
 
   async revokeInvitation(orgId: string, invitationId: string) {
@@ -358,7 +376,7 @@ export class OrganizationService {
    * UC-ORG-10: Org Admin resends an invitation (refreshes token + resets expiry).
    * If previous invitation is still pending, marks it as revoked and issues a new one.
    */
-  async resendInvitation(orgId: string, invitationId: string, inviterMemberId: string) {
+  async resendInvitation(orgId: string, invitationId: string, inviterMemberId: string, clientOrigin?: string) {
     const existing = await this.invitations.findOne({ where: { id: invitationId, orgId, status: 'pending' } });
     if (!existing) throw new NotFoundException('Pending invitation not found');
     // Revoke old invitation
@@ -389,6 +407,7 @@ export class OrganizationService {
         org?.name || 'Task Manager Pro',
         inviterName,
         newInvitation.id,
+        clientOrigin,
       ).catch((err) => console.error('[MailService] Failed to send resent invitation email:', err));
     }
 
@@ -396,7 +415,8 @@ export class OrganizationService {
       id: newInvitation.id,
       email: newInvitation.email,
       expiresAt: newInvitation.expiresAt,
-      ...(this.config.get('NODE_ENV', 'development') === 'development' && { invitationToken: raw.raw }),
+      token: raw.raw,
+      invitationToken: raw.raw,
     };
   }
 

@@ -13,7 +13,7 @@ import { GoogleLoginDto, RegisterDto, UpdateProfileDto } from './dto/auth.dto';
 import { AuthAuditLog } from '../../database/entities/identity/auth-audit-log.entity';
 import { MailService } from '../mail/mail.service';
 
-interface RequestMeta { ip?: string; userAgent?: string; }
+interface RequestMeta { ip?: string; userAgent?: string; origin?: string; }
 
 @Injectable()
 export class AuthService {
@@ -29,25 +29,37 @@ export class AuthService {
     private readonly dataSource: DataSource,
   ) {}
 
-  async register(input: RegisterDto) {
+  async register(input: RegisterDto, meta?: RequestMeta) {
     const email = input.email.trim().toLowerCase();
     if (await this.users.exists({ where: { email } })) {
       throw new ConflictException('Unable to register with these credentials');
     }
+    const requireVerification = this.config.get<string>('REQUIRE_EMAIL_VERIFICATION', 'false') === 'true';
+    const emailVerifiedAt = requireVerification ? null : new Date();
+
     const user = await this.users.save(this.users.create({
       email,
       passwordHash: await hashPassword(input.password),
       fullName: input.fullName.trim(),
       status: 'active',
-      emailVerifiedAt: null,
-      lastLoginAt: null,
+      emailVerifiedAt,
+      lastLoginAt: new Date(),
       avatarUrl: null,
     }));
     const token = generateSecureToken();
     await this.verificationTokens.save(this.verificationTokens.create({ userId: user.id, email, tokenHash: token.hash, expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000), usedAt: null }));
-    await this.mail.sendVerificationEmail(email, token.raw, user.fullName);
+    if (this.mail) {
+      await this.mail.sendVerificationEmail(email, token.raw, user.fullName, meta?.origin).catch(() => {});
+    }
     await this.audit(user.id, 'register');
-    return { user: this.publicUser(user), ...(this.config.get('NODE_ENV', 'development') === 'development' && { verificationToken: token.raw }) };
+
+    const session = await this.createSession(user, meta ?? {});
+    return {
+      user: this.publicUser(user),
+      accessToken: session.accessToken,
+      refreshToken: session.refreshToken,
+      verificationToken: token.raw,
+    };
   }
 
   async googleLogin(input: GoogleLoginDto, meta: RequestMeta) {
@@ -141,7 +153,14 @@ export class AuthService {
       throw new UnauthorizedException('Invalid email or password');
     }
     if (user.status === 'deactivated') throw new UnauthorizedException('Account is deactivated');
-    if (!user.emailVerifiedAt) throw new UnauthorizedException('Email is not verified');
+    if (!user.emailVerifiedAt) {
+      const requireVerification = this.config.get<string>('REQUIRE_EMAIL_VERIFICATION', 'false') === 'true';
+      if (requireVerification) {
+        throw new UnauthorizedException('Email is not verified');
+      }
+      user.emailVerifiedAt = new Date();
+      await this.users.save(user);
+    }
     await this.audit(user.id, 'login');
     return this.createSession(user, meta);
   }
@@ -214,39 +233,77 @@ export class AuthService {
     return this.publicUser(user);
   }
 
-  async requestPasswordReset(emailInput: string) {
+  async requestPasswordReset(emailInput: string, clientOrigin?: string) {
     const email = emailInput.trim().toLowerCase();
     const user = await this.users.findOne({ where: { email, status: 'active' } });
     if (!user) return { accepted: true };
     const token = generateSecureToken();
     await this.resetTokens.save(this.resetTokens.create({ userId: user.id, tokenHash: token.hash, expiresAt: new Date(Date.now() + 60 * 60 * 1000), usedAt: null }));
-    await this.mail.sendPasswordResetEmail(email, token.raw, user.fullName);
+    await this.mail.sendPasswordResetEmail(email, token.raw, user.fullName, clientOrigin);
     return { accepted: true, ...(this.config.get('NODE_ENV', 'development') === 'development' && { userId: user.id, resetToken: token.raw }) };
   }
 
-  async requestEmailVerification(emailInput: string) {
+  async requestEmailVerification(emailInput: string, clientOrigin?: string) {
     const user = await this.users.findOne({ where: { email: emailInput.trim().toLowerCase(), status: 'active' } });
     if (!user || user.emailVerifiedAt) return { accepted: true };
     const token = generateSecureToken();
     await this.verificationTokens.save(this.verificationTokens.create({ userId: user.id, email: user.email, tokenHash: token.hash, expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000), usedAt: null }));
-    await this.mail.sendVerificationEmail(user.email, token.raw, user.fullName);
+    await this.mail.sendVerificationEmail(user.email, token.raw, user.fullName, clientOrigin);
     return { accepted: true, ...(this.config.get('NODE_ENV', 'development') === 'development' && { userId: user.id, verificationToken: token.raw }) };
   }
 
-  async resetPassword(userId: string, token: string, newPassword: string) {
+  async resetPassword(
+    inputOrUserId: { userId?: string; email?: string; token: string; password?: string } | string,
+    tokenParam?: string,
+    passwordParam?: string,
+  ) {
+    let userId: string | undefined;
+    let email: string | undefined;
+    let token: string;
+    let newPassword: string;
+
+    if (typeof inputOrUserId === 'string') {
+      userId = inputOrUserId;
+      token = tokenParam || '';
+      newPassword = passwordParam || '';
+    } else {
+      userId = inputOrUserId.userId;
+      email = inputOrUserId.email?.trim().toLowerCase();
+      token = inputOrUserId.token;
+      newPassword = inputOrUserId.password || '';
+    }
+
+    if (!token || !newPassword) {
+      throw new UnauthorizedException('Reset token and new password are required');
+    }
+
     const result = await this.dataSource.transaction(async (manager) => {
-      const reset = await manager.findOne(PasswordResetToken, { where: { userId, tokenHash: hashToken(token), usedAt: IsNull() } });
+      const reset = await manager.findOne(PasswordResetToken, { where: { tokenHash: hashToken(token), usedAt: IsNull() } });
       if (!reset || reset.expiresAt <= new Date()) throw new UnauthorizedException('Reset token is invalid or expired');
-      const user = await manager.findOne(User, { where: { id: userId, status: 'active' } });
+
+      if (userId && reset.userId !== userId) {
+        throw new UnauthorizedException('Reset token does not match user');
+      }
+
+      const targetUserId = reset.userId;
+      const user = await manager.findOne(User, { where: { id: targetUserId, status: 'active' } });
       if (!user) throw new UnauthorizedException('Account is unavailable');
+
+      if (email && user.email.toLowerCase() !== email) {
+        throw new UnauthorizedException('Reset token does not match email');
+      }
+
       user.passwordHash = await hashPassword(newPassword);
       reset.usedAt = new Date();
       await manager.save(reset);
       await manager.save(user);
-      await manager.update(AuthSession, { userId, status: 'active' }, { status: 'revoked', revokedAt: new Date() });
-      return { success: true };
+      await manager.update(AuthSession, { userId: user.id, status: 'active' }, { status: 'revoked', revokedAt: new Date() });
+      return { success: true, message: 'Password has been reset successfully. Please sign in.' };
     });
-    await this.audit(userId, 'password.reset');
+
+    if (userId) {
+      await this.audit(userId, 'password.reset');
+    }
     return result;
   }
 
@@ -271,16 +328,74 @@ export class AuthService {
     return this.publicUser(await this.users.save(user));
   }
 
-  async verifyEmailWithToken(userId: string, token: string) {
-    const verification = await this.verificationTokens.findOne({ where: { userId, tokenHash: hashToken(token), usedAt: IsNull() } });
-    if (!verification || verification.expiresAt <= new Date()) throw new UnauthorizedException('Verification token is invalid or expired');
-    const user = await this.users.findOneByOrFail({ id: userId });
+  async verifyEmailWithToken(
+    paramOrInput: { userId?: string; email?: string; token: string } | string,
+    tokenParam?: string,
+    meta?: RequestMeta,
+  ) {
+    let userId: string | undefined;
+    let email: string | undefined;
+    let token: string;
+
+    if (typeof paramOrInput === 'string') {
+      userId = paramOrInput;
+      token = tokenParam || '';
+    } else {
+      userId = paramOrInput.userId;
+      email = paramOrInput.email?.trim().toLowerCase();
+      token = paramOrInput.token;
+    }
+
+    if (!token) {
+      throw new UnauthorizedException('Verification token is required');
+    }
+
+    const tokenHash = hashToken(token);
+    const verification = await this.verificationTokens.findOne({ where: { tokenHash, usedAt: IsNull() } });
+
+    if (!verification) {
+      if (email) {
+        const alreadyVerifiedUser = await this.users.findOne({ where: { email, status: 'active' } });
+        if (alreadyVerifiedUser && alreadyVerifiedUser.emailVerifiedAt) {
+          const session = await this.createSession(alreadyVerifiedUser, meta ?? {});
+          return {
+            ...this.publicUser(alreadyVerifiedUser),
+            accessToken: session.accessToken,
+            refreshToken: session.refreshToken,
+            alreadyVerified: true,
+            message: 'Email is already verified',
+          };
+        }
+      }
+      throw new UnauthorizedException('Verification token is invalid or has already been used');
+    }
+
+    if (verification.expiresAt <= new Date()) {
+      throw new UnauthorizedException('Verification token has expired. Please request a new one.');
+    }
+
+    if (userId && verification.userId !== userId) {
+      throw new UnauthorizedException('Verification token does not match user');
+    }
+
+    if (email && verification.email.toLowerCase() !== email) {
+      throw new UnauthorizedException('Verification token does not match email');
+    }
+
+    const user = await this.users.findOneByOrFail({ id: verification.userId });
     user.emailVerifiedAt = new Date();
     verification.usedAt = new Date();
     await this.verificationTokens.save(verification);
-    const result = this.publicUser(await this.users.save(user));
-    await this.audit(userId, 'email.verified');
-    return result;
+    const savedUser = await this.users.save(user);
+    await this.audit(savedUser.id, 'email.verified');
+
+    const session = await this.createSession(savedUser, meta ?? {});
+    return {
+      ...this.publicUser(savedUser),
+      accessToken: session.accessToken,
+      refreshToken: session.refreshToken,
+      message: 'Email successfully verified',
+    };
   }
 
   private async createSession(user: User, meta: RequestMeta) {

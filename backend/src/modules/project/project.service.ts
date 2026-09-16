@@ -379,11 +379,12 @@ export class ProjectService {
       .innerJoin(User, 'user', 'user.id = member.user_id')
       .where('pm.project_id = :projectId AND member.org_id = :orgId', { projectId, orgId })
       .select('pm.id', 'id')
-      .addSelect('pm.org_member_id', 'orgMemberId')
+      .addSelect('pm.org_member_id', '"orgMemberId"')
       .addSelect('pm.status', 'status')
-      .addSelect('pm.joined_at', 'joinedAt')
-      .addSelect('user.full_name', 'fullName')
+      .addSelect('pm.joined_at', '"joinedAt"')
+      .addSelect('user.full_name', '"fullName"')
       .addSelect('user.email', 'email')
+      .addSelect('user.avatar_url', '"avatarUrl"')
       .orderBy('user.full_name', 'ASC')
       .getRawMany();
   }

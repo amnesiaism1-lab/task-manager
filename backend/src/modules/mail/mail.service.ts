@@ -35,7 +35,7 @@ export class MailService {
 
     this.configured = Boolean(host && user && password);
     this.from = config.get<string>('MAIL_FROM') || config.get<string>('SMTP_FROM') || user || 'no-reply@taskmanager.dev';
-    this.frontendUrl = config.get<string>('FRONTEND_URL', 'http://localhost:5173');
+    this.frontendUrl = this.resolveFrontendUrl();
 
     this.transporter = this.configured
       ? nodemailer.createTransport({
@@ -45,6 +45,33 @@ export class MailService {
           auth: { user, pass: password },
         })
       : null;
+  }
+
+  resolveFrontendUrl(clientOrigin?: string): string {
+    if (clientOrigin) {
+      try {
+        const parsed = new URL(clientOrigin);
+        if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+          return `${parsed.protocol}//${parsed.host}`;
+        }
+      } catch {}
+    }
+    const envUrl = this.config.get<string>('FRONTEND_URL');
+    if (envUrl && envUrl.trim() && !envUrl.includes('localhost')) {
+      return envUrl.replace(/\/$/, '');
+    }
+    const vercelProd = this.config.get<string>('VERCEL_PROJECT_PRODUCTION_URL');
+    if (vercelProd) {
+      return `https://${vercelProd.replace(/\/$/, '')}`;
+    }
+    const vercelUrl = this.config.get<string>('VERCEL_URL');
+    if (vercelUrl) {
+      return `https://${vercelUrl.replace(/\/$/, '')}`;
+    }
+    if (envUrl && envUrl.trim()) {
+      return envUrl.replace(/\/$/, '');
+    }
+    return 'https://task-manager-pqt2.vercel.app';
   }
 
   isConfigured(): boolean {
@@ -74,12 +101,22 @@ export class MailService {
     }
 
     try {
+      const mailUser = this.config.get<string>('MAIL_USER') || this.config.get<string>('SMTP_USER') || 'avinwo@gmail.com';
       await this.transporter!.sendMail({
         from: this.from,
         to: message.to,
+        replyTo: mailUser,
         subject: message.subject,
         text: message.text,
         html: message.html || this.generateDefaultHtml(message.subject, message.text),
+        headers: {
+          'X-Entity-Ref-ID': recordId,
+          'X-Mailer': 'Task Manager Pro Enterprise Mail Gateway',
+          'X-Priority': '3',
+          'Auto-Submitted': 'auto-generated',
+          'Feedback-ID': 'TMPRO:AUTH:TRANSACTIONAL',
+          'List-Unsubscribe': `<mailto:${mailUser}?subject=Unsubscribe>`,
+        },
       });
 
       const record: OutboxMailRecord = {
@@ -104,8 +141,9 @@ export class MailService {
     }
   }
 
-  async sendVerificationEmail(to: string, token: string, fullName?: string) {
-    const actionUrl = `${this.frontendUrl}/?verifyToken=${encodeURIComponent(token)}&email=${encodeURIComponent(to)}`;
+  async sendVerificationEmail(to: string, token: string, fullName?: string, clientOrigin?: string) {
+    const baseUrl = this.resolveFrontendUrl(clientOrigin);
+    const actionUrl = `${baseUrl}/?verifyToken=${encodeURIComponent(token)}&email=${encodeURIComponent(to)}`;
     const subject = 'Verify your Task Manager account';
     const text = `Hello ${fullName || 'there'},\n\nPlease verify your email address by opening the following link:\n${actionUrl}\n\nAlternatively, enter this verification token in the app: ${token}\n\nThis token expires in 24 hours.`;
     const html = this.renderEmailLayout({
@@ -122,8 +160,9 @@ export class MailService {
     return this.send({ to, subject, text, html, category: 'verification' });
   }
 
-  async sendPasswordResetEmail(to: string, token: string, fullName?: string) {
-    const actionUrl = `${this.frontendUrl}/?resetToken=${encodeURIComponent(token)}&email=${encodeURIComponent(to)}`;
+  async sendPasswordResetEmail(to: string, token: string, fullName?: string, clientOrigin?: string) {
+    const baseUrl = this.resolveFrontendUrl(clientOrigin);
+    const actionUrl = `${baseUrl}/?resetToken=${encodeURIComponent(token)}&email=${encodeURIComponent(to)}`;
     const subject = 'Reset your Task Manager password';
     const text = `Hello ${fullName || 'there'},\n\nWe received a request to reset your password. Open the link below to set a new password:\n${actionUrl}\n\nAlternatively, use this reset token: ${token}\n\nThis token expires in 1 hour.`;
     const html = this.renderEmailLayout({
@@ -140,12 +179,13 @@ export class MailService {
     return this.send({ to, subject, text, html, category: 'password_reset' });
   }
 
-  async sendInvitationEmail(to: string, token: string, orgName: string, inviterName?: string, invitationId?: string) {
+  async sendInvitationEmail(to: string, token: string, orgName: string, inviterName?: string, invitationId?: string, clientOrigin?: string) {
+    const baseUrl = this.resolveFrontendUrl(clientOrigin);
     const params = new URLSearchParams({ invitationToken: token, email: to });
     if (invitationId) {
       params.set('invitationId', invitationId);
     }
-    const actionUrl = `${this.frontendUrl}/?${params.toString()}`;
+    const actionUrl = `${baseUrl}/?${params.toString()}`;
     const subject = `You've been invited to join ${orgName} on Task Manager`;
     const text = `Hello,\n\n${inviterName || 'An administrator'} has invited you to join ${orgName} on Task Manager.\n\nAccept your invitation here:\n${actionUrl}\n\nInvitation token: ${token}\n\nThis invitation expires in 7 days.`;
     const html = this.renderEmailLayout({
@@ -162,7 +202,8 @@ export class MailService {
     return this.send({ to, subject, text, html, category: 'invitation' });
   }
 
-  async sendTestEmail(to: string, customSubject?: string) {
+  async sendTestEmail(to: string, customSubject?: string, clientOrigin?: string) {
+    const baseUrl = this.resolveFrontendUrl(clientOrigin);
     const subject = customSubject?.trim() || 'Task Manager Pro — SMTP Configuration Test';
     const text = `This is a test email sent from Task Manager Pro.\nTime: ${new Date().toISOString()}\nSMTP Configured: ${this.configured}`;
     const html = this.renderEmailLayout({
@@ -170,7 +211,7 @@ export class MailService {
       greeting: 'Hello Administrator,',
       intro: 'Your email delivery configuration is working properly! All verification emails, password resets, and organization invitations will be sent via this gateway.',
       buttonText: 'Open Task Manager',
-      buttonUrl: this.frontendUrl,
+      buttonUrl: baseUrl,
       footerNote: `Test dispatched on ${new Date().toLocaleString()} (UTC). Mode: ${this.configured ? 'Live SMTP Transport' : 'Simulated Development Outbox'}.`,
     });
 

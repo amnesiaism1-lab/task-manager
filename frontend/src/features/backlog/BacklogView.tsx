@@ -319,25 +319,34 @@ export const BacklogView: React.FC = () => {
                             {formatStatus(issue.status || issue.state || 'To Do')}
                           </Badge>
 
-                          {/* Assignee avatar */}
+                          {/* Assignee avatar & name */}
                           {(() => {
                             const assignee =
                               issue.assignee ||
                               issue.assigneeMember ||
                               members.find(
                                 (m) =>
-                                  m.id === issue.assigneeMemberId ||
-                                  m.id === issue.assigneeId
+                                  (m.orgMemberId || m.orgmemberid || m.id) ===
+                                  (issue.assigneeMemberId || issue.assigneeId)
                               );
-                            return assignee ? (
+                            const name =
+                              assignee?.fullName ||
+                              assignee?.fullname ||
+                              assignee?.user?.fullName ||
+                              assignee?.email ||
+                              assignee?.user?.email;
+
+                            return assignee && name ? (
                               <div
-                                className="w-5 h-5 rounded-full bg-gradient-to-tr from-brand-600 to-indigo-500 text-white font-bold flex items-center justify-center text-[9px] ring-1 ring-white/10"
-                                title={assignee.fullName || assignee.user?.fullName || assignee.email || assignee.user?.email}
+                                className="flex items-center gap-1.5 max-w-[120px]"
+                                title={name}
                               >
-                                {getInitials(
-                                  assignee.fullName || assignee.user?.fullName,
-                                  assignee.email || assignee.user?.email
-                                )}
+                                <div className="w-5 h-5 rounded-full bg-gradient-to-tr from-brand-600 to-indigo-500 text-white font-bold flex items-center justify-center text-[9px] ring-1 ring-white/10 shrink-0">
+                                  {getInitials(name, assignee?.email || assignee?.user?.email)}
+                                </div>
+                                <span className="text-[11px] font-medium text-text-secondary truncate">
+                                  {name}
+                                </span>
                               </div>
                             ) : (
                               <span className="text-[10px] text-text-muted italic">Unassigned</span>
@@ -432,25 +441,34 @@ export const BacklogView: React.FC = () => {
                     {formatStatus(issue.status || issue.state || 'To Do')}
                   </Badge>
 
-                  {/* Assignee avatar */}
+                  {/* Assignee avatar & name */}
                   {(() => {
                     const assignee =
                       issue.assignee ||
                       issue.assigneeMember ||
                       members.find(
                         (m) =>
-                          m.id === issue.assigneeMemberId ||
-                          m.id === issue.assigneeId
+                          (m.orgMemberId || m.orgmemberid || m.id) ===
+                          (issue.assigneeMemberId || issue.assigneeId)
                       );
-                    return assignee ? (
+                    const name =
+                      assignee?.fullName ||
+                      assignee?.fullname ||
+                      assignee?.user?.fullName ||
+                      assignee?.email ||
+                      assignee?.user?.email;
+
+                    return assignee && name ? (
                       <div
-                        className="w-5 h-5 rounded-full bg-gradient-to-tr from-brand-600 to-indigo-500 text-white font-bold flex items-center justify-center text-[9px] ring-1 ring-white/10"
-                        title={assignee.fullName || assignee.user?.fullName || assignee.email || assignee.user?.email}
+                        className="flex items-center gap-1.5 max-w-[120px]"
+                        title={name}
                       >
-                        {getInitials(
-                          assignee.fullName || assignee.user?.fullName,
-                          assignee.email || assignee.user?.email
-                        )}
+                        <div className="w-5 h-5 rounded-full bg-gradient-to-tr from-brand-600 to-indigo-500 text-white font-bold flex items-center justify-center text-[9px] ring-1 ring-white/10 shrink-0">
+                          {getInitials(name, assignee?.email || assignee?.user?.email)}
+                        </div>
+                        <span className="text-[11px] font-medium text-text-secondary truncate">
+                          {name}
+                        </span>
                       </div>
                     ) : (
                       <span className="text-[10px] text-text-muted italic">Unassigned</span>

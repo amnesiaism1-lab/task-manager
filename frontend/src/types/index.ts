@@ -34,6 +34,8 @@ export interface OrgMember {
   fullName?: string;
   email?: string;
   avatarUrl?: string;
+  orgMemberId?: string;
+  orgmemberid?: string;
   createdAt?: string;
 }
 

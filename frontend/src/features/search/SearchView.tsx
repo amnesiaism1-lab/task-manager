@@ -6,7 +6,7 @@ import { request } from '../../lib/api-client';
 import { Issue } from '../../types';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
-import { formatDate, formatStatus } from '../../lib/utils';
+import { formatDate, formatStatus, getInitials } from '../../lib/utils';
 import {
   Search,
   Filter,
@@ -376,6 +376,42 @@ export const SearchView: React.FC = () => {
                 <div className="flex items-center gap-3.5 shrink-0">
                   {renderPriorityIcon(issue.priority)}
 
+                  {/* Assignee Avatar & Name */}
+                  {(() => {
+                    const assignee =
+                      issue.assignee ||
+                      (issue as any).assigneeMember ||
+                      members.find(
+                        (m) =>
+                          (m.orgMemberId || m.orgmemberid || m.id) ===
+                          ((issue as any).assigneeMemberId || issue.assigneeId)
+                      );
+                    const name =
+                      assignee?.fullName ||
+                      assignee?.fullname ||
+                      assignee?.user?.fullName ||
+                      assignee?.email ||
+                      assignee?.user?.email;
+
+                    return assignee && name ? (
+                      <div
+                        className="hidden md:flex items-center gap-1.5 max-w-[130px]"
+                        title={name}
+                      >
+                        <div className="w-5 h-5 rounded-full bg-gradient-to-tr from-brand-600 to-indigo-500 text-white font-bold flex items-center justify-center text-[9px] shadow-sm ring-1 ring-white/10 shrink-0">
+                          {getInitials(name, assignee?.email || assignee?.user?.email)}
+                        </div>
+                        <span className="text-[11px] font-medium text-text-secondary truncate">
+                          {name}
+                        </span>
+                      </div>
+                    ) : (
+                      <span className="hidden md:inline text-[10px] text-text-muted italic">
+                        Unassigned
+                      </span>
+                    );
+                  })()}
+
                   <Badge
                     variant={
                       formatStatus(issue.status).toLowerCase().includes('done')
@@ -420,6 +456,31 @@ export const SearchView: React.FC = () => {
                   <Badge variant="subtle" size="xs">
                     {formatStatus(issue.status || (issue as any).state || 'Open')}
                   </Badge>
+                  {(() => {
+                    const assignee =
+                      issue.assignee ||
+                      (issue as any).assigneeMember ||
+                      members.find(
+                        (m) =>
+                          (m.orgMemberId || m.orgmemberid || m.id) ===
+                          ((issue as any).assigneeMemberId || issue.assigneeId)
+                      );
+                    const name =
+                      assignee?.fullName ||
+                      assignee?.fullname ||
+                      assignee?.user?.fullName ||
+                      assignee?.email ||
+                      assignee?.user?.email;
+
+                    return assignee && name ? (
+                      <div className="flex items-center gap-1 max-w-[110px]" title={name}>
+                        <div className="w-4 h-4 rounded-full bg-gradient-to-tr from-brand-600 to-indigo-500 text-white font-bold flex items-center justify-center text-[8px] shrink-0">
+                          {getInitials(name, assignee?.email || assignee?.user?.email)}
+                        </div>
+                        <span className="text-[10px] text-text-secondary truncate">{name}</span>
+                      </div>
+                    ) : null;
+                  })()}
                   <span className="font-mono">{formatDate(issue.updatedAt || issue.createdAt)}</span>
                 </div>
               </div>

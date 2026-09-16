@@ -15,6 +15,15 @@ export const JoinOrgModal: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
 
+  React.useEffect(() => {
+    if (isOpen) {
+      const pending = sessionStorage.getItem('pending_invitation_token');
+      if (pending) {
+        setToken(pending);
+      }
+    }
+  }, [isOpen]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!token.trim()) return;

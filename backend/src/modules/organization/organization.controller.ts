@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Headers, Param, Patch, Post, Req, UseGuards } from '@nestjs/common';
 import { Request } from 'express';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { OrgMembershipGuard } from '../../common/guards/org-membership.guard';
@@ -118,8 +118,14 @@ export class OrganizationController {
   @Post(':orgId/invitations')
   @UseGuards(OrgMembershipGuard, OrgPermissionGuard)
   @RequirePermissions('MANAGE_USERS')
-  invite(@Param('orgId') orgId: string, @CurrentMember('id') memberId: string, @Body() body: InviteMemberDto) {
-    return this.organizations.invite(orgId, memberId, body);
+  invite(
+    @Param('orgId') orgId: string,
+    @CurrentMember('id') memberId: string,
+    @Body() body: InviteMemberDto,
+    @Headers('origin') origin?: string,
+    @Headers('referer') referer?: string,
+  ) {
+    return this.organizations.invite(orgId, memberId, body, origin || referer);
   }
 
   @Delete(':orgId/invitations/:invitationId')
@@ -133,8 +139,14 @@ export class OrganizationController {
   @Post(':orgId/invitations/:invitationId/resend')
   @UseGuards(OrgMembershipGuard, OrgPermissionGuard)
   @RequirePermissions('MANAGE_USERS')
-  resendInvitation(@Param('orgId') orgId: string, @Param('invitationId') invitationId: string, @CurrentMember('id') memberId: string) {
-    return this.organizations.resendInvitation(orgId, invitationId, memberId);
+  resendInvitation(
+    @Param('orgId') orgId: string,
+    @Param('invitationId') invitationId: string,
+    @CurrentMember('id') memberId: string,
+    @Headers('origin') origin?: string,
+    @Headers('referer') referer?: string,
+  ) {
+    return this.organizations.resendInvitation(orgId, invitationId, memberId, origin || referer);
   }
 
   /** UC-ORG-11: Active member voluntarily leaves the organization. */

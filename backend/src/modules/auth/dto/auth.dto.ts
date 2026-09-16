@@ -21,8 +21,9 @@ export class UpdateProfileDto {
 }
 
 export class VerifyEmailDto {
-  @IsUUID() userId!: string;
-  @IsString() token!: string;
+  @IsOptional() @IsUUID() userId?: string;
+  @IsOptional() @IsEmail() email?: string;
+  @IsString() @MinLength(1) token!: string;
 }
 
 export class RequestVerificationDto {
@@ -34,8 +35,9 @@ export class ForgotPasswordDto {
 }
 
 export class ResetPasswordDto {
-  @IsUUID() userId!: string;
-  @IsString() token!: string;
+  @IsOptional() @IsUUID() userId?: string;
+  @IsOptional() @IsEmail() email?: string;
+  @IsString() @MinLength(1) token!: string;
   @IsString() @MinLength(8) @MaxLength(128) @Matches(/^(?=.*[A-Za-z])(?=.*\d).+$/, { message: 'password must contain letters and numbers' }) password!: string;
 }
 

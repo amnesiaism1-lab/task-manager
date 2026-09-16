@@ -57,9 +57,10 @@ export const InviteMemberModal: React.FC = () => {
         body: JSON.stringify(payload),
       });
 
+      const token = res?.token || res?.invitationToken;
       showToast(`Invitation sent to ${email.trim()}`, 'success');
-      if (res?.token) {
-        setGeneratedToken(res.token);
+      if (token) {
+        setGeneratedToken(token);
       } else {
         closeModal('inviteMember');
       }
@@ -113,9 +114,21 @@ export const InviteMemberModal: React.FC = () => {
         </div>
 
         {generatedToken && (
-          <div className="p-3 bg-brand-500/10 border border-brand-500/30 rounded-lg space-y-1">
-            <span className="text-[11px] font-semibold text-brand-300">Invitation Token Code:</span>
-            <p className="font-mono text-xs text-brand-200 select-all break-all">{generatedToken}</p>
+          <div className="p-3 bg-brand-500/10 border border-brand-500/30 rounded-lg space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-semibold text-brand-300">Invitation Token Code:</span>
+              <button
+                type="button"
+                onClick={() => {
+                  navigator.clipboard?.writeText(generatedToken);
+                  showToast('Invitation token copied to clipboard!', 'info', 1500);
+                }}
+                className="text-[10px] font-medium text-brand-300 hover:text-brand-200 underline"
+              >
+                Copy Code
+              </button>
+            </div>
+            <p className="font-mono text-xs text-brand-200 select-all break-all bg-black/20 p-2 rounded">{generatedToken}</p>
           </div>
         )}
 

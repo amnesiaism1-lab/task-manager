@@ -355,7 +355,30 @@ export class IssueService {
       await manager.save(ActivityLog, manager.create(ActivityLog, { orgId, actorType: 'member', actorMemberId: memberId, projectId: saved.projectId, issueId: saved.id, eventType: EVENT_TYPES.ISSUE_UPDATED, payloadJson: payload }));
       await manager.save(OutboxEvent, manager.create(OutboxEvent, { orgId, aggregateType: 'issue', aggregateId: saved.id, eventType: EVENT_TYPES.ISSUE_UPDATED, payloadJson: payload, status: 'pending', idempotencyKey: `issue-updated:${saved.id}:${saved.version}`, publishedAt: null, retryCount: 0, lastError: null }));
 
-      return saved;
+      let assignee: any = null;
+      if (saved.assigneeMemberId) {
+        const mem = await manager.createQueryBuilder()
+          .from(OrganizationMember, 'om')
+          .innerJoin(User, 'user', 'user.id = om.user_id')
+          .where('om.id = :memberId', { memberId: saved.assigneeMemberId })
+          .select(['om.id AS id', 'user.id AS "userId"', 'user.full_name AS "fullName"', 'user.email AS email', 'user.avatar_url AS "avatarUrl"'])
+          .getRawOne();
+        if (mem) {
+          assignee = {
+            id: mem.id,
+            userId: mem.userId,
+            fullName: mem.fullName,
+            email: mem.email,
+            avatarUrl: mem.avatarUrl,
+          };
+        }
+      }
+
+      return {
+        ...saved,
+        assignee,
+        assigneeMember: assignee,
+      };
     });
   }
 

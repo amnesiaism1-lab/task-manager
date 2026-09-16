@@ -662,6 +662,35 @@ export const IssueDetailModal: React.FC = () => {
                     </button>
                   )}
                 </div>
+
+                {(() => {
+                  const currentAssignee =
+                    issue.assignee ||
+                    issue.assigneeMember ||
+                    availableAssignees.find(
+                      (m: any) =>
+                        (m.orgMemberId || m.orgmemberid || m.id) ===
+                        (issue.assigneeMemberId || issue.assigneeId)
+                    );
+                  const currentAssigneeName =
+                    currentAssignee?.fullName ||
+                    currentAssignee?.fullname ||
+                    currentAssignee?.user?.fullName ||
+                    currentAssignee?.email ||
+                    currentAssignee?.user?.email;
+
+                  return currentAssignee ? (
+                    <div className="flex items-center gap-2 p-1.5 rounded-lg bg-surface-surface/80 border border-border/70 mb-1">
+                      <div className="w-5 h-5 rounded-full bg-gradient-to-tr from-brand-600 to-indigo-500 text-white font-bold flex items-center justify-center text-[9px] shadow-sm shrink-0">
+                        {getInitials(currentAssigneeName, currentAssignee?.email || currentAssignee?.user?.email)}
+                      </div>
+                      <span className="text-xs font-semibold text-text-primary truncate">
+                        {currentAssigneeName}
+                      </span>
+                    </div>
+                  ) : null;
+                })()}
+
                 <select
                   value={issue.assigneeMemberId || issue.assigneeId || ''}
                   onChange={(e) => handleUpdateField({ assigneeMemberId: e.target.value || null })}
@@ -669,8 +698,8 @@ export const IssueDetailModal: React.FC = () => {
                 >
                   <option value="">Unassigned</option>
                   {availableAssignees.map((m: any) => {
-                    const memId = m.orgMemberId || m.id;
-                    const name = m.fullName || m.user?.fullName || m.email || m.user?.email || 'Member';
+                    const memId = m.orgMemberId || m.orgmemberid || m.id;
+                    const name = m.fullName || m.fullname || m.user?.fullName || m.email || m.user?.email || 'Member';
                     const email = m.email || m.user?.email;
                     return (
                       <option key={memId} value={memId}>
