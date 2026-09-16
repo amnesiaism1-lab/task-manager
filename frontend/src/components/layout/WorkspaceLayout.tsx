@@ -1,8 +1,6 @@
 import React from 'react';
 import { Header } from './Header';
 import { Sidebar } from './Sidebar';
-import { ToastContainer } from '../ui/ToastContainer';
-import { ModalContainer } from '../modals/ModalContainer';
 import { ErrorBoundary } from '../ui/ErrorBoundary';
 
 export const WorkspaceLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -19,10 +17,6 @@ export const WorkspaceLayout: React.FC<{ children: React.ReactNode }> = ({ child
           </div>
         </main>
       </div>
-      <ErrorBoundary fallbackTitle="Modal System Error" fallbackMessage="Could not open the requested dialog.">
-        <ModalContainer />
-      </ErrorBoundary>
-      <ToastContainer />
     </div>
   );
 };

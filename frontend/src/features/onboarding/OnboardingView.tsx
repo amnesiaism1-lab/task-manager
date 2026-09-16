@@ -36,7 +36,16 @@ export const OnboardingView: React.FC = () => {
         setActiveOrgId(joinedOrgId);
       }
       queryClient.invalidateQueries({ queryKey: ['myPendingInvitations'] });
-      window.location.reload();
+      try {
+        const bootData = await request(`/workspace/bootstrap${joinedOrgId ? `?orgId=${joinedOrgId}` : ''}`);
+        if (bootData) {
+          useWorkspaceStore.getState().applyBootstrap(bootData);
+        } else {
+          window.location.reload();
+        }
+      } catch {
+        window.location.reload();
+      }
     } catch (err: any) {
       showToast(err.message || 'Failed to accept invitation', 'error');
     } finally {
@@ -135,31 +144,33 @@ export const OnboardingView: React.FC = () => {
         )}
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
-          <div
+          <button
+            type="button"
             onClick={() => openModal('createOrg')}
-            className="p-5 rounded-xl bg-surface-surface/60 border border-border/80 hover:border-brand-500/60 hover:bg-surface-surface cursor-pointer group transition-all text-left space-y-2 shadow-sm"
+            className="p-5 rounded-xl bg-surface-surface/60 border border-border/80 hover:border-brand-500/60 hover:bg-surface-surface cursor-pointer group transition-all text-left space-y-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-brand-500/40 active:scale-[0.98] w-full"
           >
             <div className="w-9 h-9 rounded-lg bg-brand-500/10 text-brand-400 flex items-center justify-center group-hover:scale-105 transition-transform">
               <Building2 className="w-5 h-5" />
             </div>
-            <h4 className="text-sm font-semibold text-text-primary">Create Organization</h4>
+            <h4 className="text-sm font-semibold text-text-primary group-hover:text-brand-400 transition-colors">Create Organization</h4>
             <p className="text-[11px] text-text-muted leading-snug">
               Set up a brand new company workspace and invite your teammates.
             </p>
-          </div>
+          </button>
 
-          <div
+          <button
+            type="button"
             onClick={() => openModal('joinOrg')}
-            className="p-5 rounded-xl bg-surface-surface/60 border border-border/80 hover:border-emerald-500/60 hover:bg-surface-surface cursor-pointer group transition-all text-left space-y-2 shadow-sm"
+            className="p-5 rounded-xl bg-surface-surface/60 border border-border/80 hover:border-emerald-500/60 hover:bg-surface-surface cursor-pointer group transition-all text-left space-y-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/40 active:scale-[0.98] w-full"
           >
             <div className="w-9 h-9 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center justify-center group-hover:scale-105 transition-transform">
               <KeyRound className="w-5 h-5" />
             </div>
-            <h4 className="text-sm font-semibold text-text-primary">Join Organization</h4>
+            <h4 className="text-sm font-semibold text-text-primary group-hover:text-emerald-400 transition-colors">Join Organization</h4>
             <p className="text-[11px] text-text-muted leading-snug">
               Enter an invitation code or token sent by your organization administrator.
             </p>
-          </div>
+          </button>
         </div>
 
         <div className="pt-4 border-t border-border/60 flex items-center justify-center">

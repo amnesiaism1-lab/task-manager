@@ -5,8 +5,11 @@ import { useUIStore } from '../stores/useUIStore';
 import { request } from '../lib/api-client';
 import { BootstrapResponse } from '../types';
 
-// Layout
+// Layout & Global Overlays
 import { WorkspaceLayout } from '../components/layout/WorkspaceLayout';
+import { ModalContainer } from '../components/modals/ModalContainer';
+import { ToastContainer } from '../components/ui/ToastContainer';
+import { ErrorBoundary } from '../components/ui/ErrorBoundary';
 
 // Views
 import { AuthView } from '../features/auth/AuthView';
@@ -81,17 +84,6 @@ export const App: React.FC = () => {
     }
   }, [token, openModal]);
 
-  // 1. Not Authenticated -> Render AuthView
-  if (!token) {
-    return <AuthView />;
-  }
-
-  // 2. Authenticated but has NO organizations -> Render OnboardingView
-  if (isBootstrapped && organizations.length === 0) {
-    return <OnboardingView />;
-  }
-
-  // 3. Authenticated & Has Workspaces -> Render Workspace View
   const renderCurrentView = () => {
     switch (currentView) {
       case 'boards':
@@ -118,5 +110,37 @@ export const App: React.FC = () => {
     }
   };
 
-  return <WorkspaceLayout>{renderCurrentView()}</WorkspaceLayout>;
+  const renderContent = () => {
+    // 1. Not Authenticated -> Render AuthView
+    if (!token) {
+      return <AuthView />;
+    }
+
+    // 2. Loading initial bootstrap state
+    if (!isBootstrapped) {
+      return (
+        <div className="min-h-screen bg-background flex flex-col items-center justify-center">
+          <div className="w-10 h-10 border-2 border-brand-500/20 border-t-brand-500 rounded-full animate-spin" />
+        </div>
+      );
+    }
+
+    // 3. Authenticated but has NO organizations -> Render OnboardingView
+    if (organizations.length === 0) {
+      return <OnboardingView />;
+    }
+
+    // 4. Authenticated & Has Workspaces -> Render Workspace View
+    return <WorkspaceLayout>{renderCurrentView()}</WorkspaceLayout>;
+  };
+
+  return (
+    <>
+      {renderContent()}
+      <ErrorBoundary fallbackTitle="Modal System Error" fallbackMessage="Could not open the requested dialog.">
+        <ModalContainer />
+      </ErrorBoundary>
+      <ToastContainer />
+    </>
+  );
 };

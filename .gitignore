@@ -19,6 +19,7 @@ uploads/
 .vscode/
 
 scratch/
+ISTQB copy/
 
 # Allow shared package dist for monorepo deployments
 !shared/dist/

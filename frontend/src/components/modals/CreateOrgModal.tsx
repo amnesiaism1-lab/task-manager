@@ -44,8 +44,16 @@ export const CreateOrgModal: React.FC = () => {
         body: JSON.stringify({ name: name.trim(), key: key.trim().toUpperCase() }),
       });
 
-      setOrganizations([...organizations, newOrg]);
       setActiveOrgId(newOrg.id);
+      setOrganizations([...organizations, newOrg]);
+      try {
+        const bootData = await request(`/workspace/bootstrap?orgId=${newOrg.id}`);
+        if (bootData) {
+          useWorkspaceStore.getState().applyBootstrap(bootData);
+        }
+      } catch {
+        // Continue with optimistic state
+      }
       showToast('Organization created successfully!', 'success');
       setName('');
       setKey('');

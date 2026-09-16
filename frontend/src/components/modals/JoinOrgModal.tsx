@@ -43,7 +43,16 @@ export const JoinOrgModal: React.FC = () => {
       }
       setToken('');
       closeModal('joinOrg');
-      window.location.reload();
+      try {
+        const bootData = await request(`/workspace/bootstrap${joinedOrgId ? `?orgId=${joinedOrgId}` : ''}`);
+        if (bootData) {
+          useWorkspaceStore.getState().applyBootstrap(bootData);
+        } else {
+          window.location.reload();
+        }
+      } catch {
+        window.location.reload();
+      }
     } catch (err: any) {
       setError(err.message || 'Failed to redeem invitation code');
     } finally {
