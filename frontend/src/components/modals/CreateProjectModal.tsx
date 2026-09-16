@@ -55,11 +55,12 @@ export const CreateProjectModal: React.FC = () => {
     try {
       setIsLoading(true);
       setError('');
-      const newProj = await request(`/organizations/${activeOrgId}/projects`, {
+      const res: any = await request(`/organizations/${activeOrgId}/projects`, {
         method: 'POST',
         body: JSON.stringify({
           name: name.trim(),
           key: key.trim().toUpperCase(),
+          boardType: projectType,
           projectType,
           visibility,
           departmentId: departmentId || undefined,
@@ -67,9 +68,20 @@ export const CreateProjectModal: React.FC = () => {
         }),
       });
 
-      setProjects([...projects, newProj]);
-      setActiveProjectId(newProj.id);
-      showToast(`Project "${newProj.name}" created successfully!`, 'success');
+      const createdProject = res?.project || res;
+      setProjects([...projects, createdProject]);
+      setActiveProjectId(createdProject.id);
+
+      try {
+        const bootData = await request(`/workspace/bootstrap?orgId=${activeOrgId}&projectId=${createdProject.id}`);
+        if (bootData) {
+          useWorkspaceStore.getState().applyBootstrap(bootData);
+        }
+      } catch {
+        // Ignore fallback
+      }
+
+      showToast(`Project "${createdProject.name || name}" created successfully!`, 'success');
       setName('');
       setKey('');
       setDepartmentId('');

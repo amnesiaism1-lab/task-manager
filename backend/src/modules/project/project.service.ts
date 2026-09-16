@@ -87,7 +87,8 @@ export class ProjectService {
         ...adminPermissions.map((permissionKey) => manager.create(PermissionSchemeEntry, { schemeId: permissionScheme.id, permissionKey, projectRoleId: projectAdmin.id })),
         ...memberPermissions.map((permissionKey) => manager.create(PermissionSchemeEntry, { schemeId: permissionScheme.id, permissionKey, projectRoleId: memberRole.id })),
       ]);
-      const board = await manager.save(Board, manager.create(Board, { projectId: project.id, boardType: input.boardType ?? 'kanban', name: `${project.name} board`, description: null }));
+      const boardType = input.boardType ?? input.projectType ?? 'kanban';
+      const board = await manager.save(Board, manager.create(Board, { projectId: project.id, boardType, name: `${project.name} board`, description: null }));
       const workflow = await manager.save(Workflow, manager.create(Workflow, { orgId, key: `${key.toLowerCase()}-default`, name: `${project.name} workflow`, version: 1, isActive: true }));
       const todo = await manager.save(WorkflowState, manager.create(WorkflowState, { workflowId: workflow.id, key: 'todo', name: 'To Do', category: 'todo', isInitial: true, isTerminal: false, position: 0 }));
       const done = await manager.save(WorkflowState, manager.create(WorkflowState, { workflowId: workflow.id, key: 'done', name: 'Done', category: 'done', isInitial: false, isTerminal: true, position: 1 }));
@@ -100,7 +101,7 @@ export class ProjectService {
       await manager.save(WorkflowTransition, manager.create(WorkflowTransition, { workflowId: workflow.id, key: 'complete', name: 'Complete', fromStateId: todo.id, toStateId: done.id, requireComment: false, sortOrder: 0 }));
       let issueType = await manager.findOne(IssueType, { where: { orgId, key: 'task' } });
       if (!issueType) issueType = await manager.save(IssueType, manager.create(IssueType, { orgId, key: 'task', name: 'Task', description: 'Default task' }));
-      return { project, projectAdminRole: projectAdmin, board, workflow, initialState: todo, issueType };
+      return { ...project, project, projectAdminRole: projectAdmin, board, workflow, initialState: todo, issueType };
     });
   }
 

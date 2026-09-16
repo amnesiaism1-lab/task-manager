@@ -7,6 +7,7 @@ export class CreateProjectDto {
   @IsOptional() @IsString() @MaxLength(2000) description?: string;
   @IsOptional() @IsIn(['private', 'org', 'public']) visibility?: 'private' | 'org' | 'public';
   @IsOptional() @IsIn(['kanban', 'scrum']) boardType?: 'kanban' | 'scrum';
+  @IsOptional() @IsIn(['kanban', 'scrum']) projectType?: 'kanban' | 'scrum';
   @IsOptional() @IsUUID() departmentId?: string;
 }
 
