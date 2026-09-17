@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { OrganizationMember } from '../../database/entities/identity/organization-member.entity';
 import { OrganizationMemberRole } from '../../database/entities/identity/org-member-role.entity';
 import { OrganizationRolePermission } from '../../database/entities/identity/org-role-permission.entity';
 import { GroupMember } from '../../database/entities/identity/group-member.entity';
@@ -12,5 +13,6 @@ import { PermissionSchemeEntry } from '../../database/entities/project/permissio
 import { Project } from '../../database/entities/project/project.entity';
 import { PermissionResolverService } from './permission-resolver.service';
 
-@Module({ imports: [TypeOrmModule.forFeature([OrganizationMemberRole, OrganizationRolePermission, GroupMember, ProjectMember, ProjectMemberRole, ProjectGroupRole, ProjectRole, PermissionScheme, PermissionSchemeEntry, Project])], providers: [PermissionResolverService], exports: [PermissionResolverService] })
+@Module({ imports: [TypeOrmModule.forFeature([OrganizationMember, OrganizationMemberRole, OrganizationRolePermission, GroupMember, ProjectMember, ProjectMemberRole, ProjectGroupRole, ProjectRole, PermissionScheme, PermissionSchemeEntry, Project])], providers: [PermissionResolverService], exports: [PermissionResolverService] })
 export class PermissionModule {}
+

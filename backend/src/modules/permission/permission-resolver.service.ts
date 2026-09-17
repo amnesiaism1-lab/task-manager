@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
+import { OrganizationMember } from '../../database/entities/identity/organization-member.entity';
 import { OrganizationMemberRole } from '../../database/entities/identity/org-member-role.entity';
 import { OrganizationRolePermission } from '../../database/entities/identity/org-role-permission.entity';
 import { GroupMember } from '../../database/entities/identity/group-member.entity';
@@ -20,6 +21,7 @@ const PERM_CACHE_TTL_MS = 60 * 1000;
 @Injectable()
 export class PermissionResolverService {
   constructor(
+    @InjectRepository(OrganizationMember) private readonly orgMembers: Repository<OrganizationMember>,
     @InjectRepository(OrganizationMemberRole) private readonly memberRoles: Repository<OrganizationMemberRole>,
     @InjectRepository(OrganizationRolePermission) private readonly rolePermissions: Repository<OrganizationRolePermission>,
     @InjectRepository(GroupMember) private readonly groupMembers: Repository<GroupMember>,
@@ -88,13 +90,38 @@ export class PermissionResolverService {
       return permissions.every((p) => cached.permissions.has(p));
     }
 
-    const [membership, project, scheme] = await Promise.all([
+    let [membership, project, scheme] = await Promise.all([
       this.projectMembers.findOne({ where: { orgMemberId: memberId, projectId, status: 'active' } }),
       this.projects.findOne({ where: { id: projectId } }),
       this.permissionSchemes.findOne({ where: { projectId } }),
     ]);
 
-    if (!membership || !project || !scheme) return false;
+    if (!project || !scheme) return false;
+
+    if (!membership) {
+      const orgMember = await this.orgMembers.findOne({ where: { id: memberId, status: 'active' } });
+      if (orgMember && orgMember.orgId === project.orgId) {
+        membership = await this.projectMembers.save(
+          this.projectMembers.create({
+            orgMemberId: memberId,
+            projectId,
+            status: 'active',
+          }),
+        );
+        const memberRole = await this.projectRoles.findOne({ where: { projectId, name: 'Member' } })
+          || await this.projectRoles.findOne({ where: { projectId } });
+        if (memberRole) {
+          await this.projectMemberRoles.save(
+            this.projectMemberRoles.create({
+              projectMemberId: membership.id,
+              projectRoleId: memberRole.id,
+            }),
+          );
+        }
+      } else {
+        return false;
+      }
+    }
 
     const [directRoles, groupMemberships] = await Promise.all([
       this.projectMemberRoles.find({ where: { projectMemberId: membership.id } }),
