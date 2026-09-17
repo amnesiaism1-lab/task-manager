@@ -9,6 +9,7 @@ import { AutomationRule } from '../../database/entities/automation/automation-ru
 import { AutomationComponent } from '../../database/entities/automation/automation-component.entity';
 import { AutomationExecution } from '../../database/entities/automation/automation-execution.entity';
 import { Issue } from '../../database/entities/issue/issue.entity';
+import { Sprint } from '../../database/entities/project/sprint.entity';
 import { OutboxService } from './outbox.service';
 
 @Module({
@@ -23,6 +24,7 @@ import { OutboxService } from './outbox.service';
 			AutomationComponent,
 			AutomationExecution,
 			Issue,
+			Sprint,
 		]),
 	],
 	providers: [OutboxService],

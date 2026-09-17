@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Put, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Put, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { OrgMembershipGuard } from '../../common/guards/org-membership.guard';
 import { CurrentMember } from '../../common/decorators/current-member.decorator';
@@ -10,7 +10,9 @@ import { NotificationPreferenceService } from './notification.service';
 export class NotificationController {
   constructor(private readonly outbox: OutboxService, private readonly preferences: NotificationPreferenceService) {}
   @Get() list(@Param('orgId') orgId: string, @CurrentMember('id') memberId: string) { return this.outbox.list(orgId, memberId); }
+  @Patch('read-all') markAllRead(@Param('orgId') orgId: string, @CurrentMember('id') memberId: string) { return this.outbox.markAllRead(orgId, memberId); }
   @Patch(':notificationId/read') markRead(@Param('orgId') orgId: string, @Param('notificationId') notificationId: string, @CurrentMember('id') memberId: string) { return this.outbox.markRead(orgId, memberId, notificationId); }
+  @Delete(':notificationId') delete(@Param('orgId') orgId: string, @Param('notificationId') notificationId: string, @CurrentMember('id') memberId: string) { return this.outbox.deleteNotification(orgId, memberId, notificationId); }
   @Get('preferences') listPreferences(@Param('orgId') orgId: string, @CurrentMember('id') memberId: string) { return this.preferences.list(orgId, memberId); }
   @Put('preferences') setPreference(@Param('orgId') orgId: string, @CurrentMember('id') memberId: string, @Body() body: { notificationType: string; channel: 'in_app' | 'email'; enabled: boolean }) { return this.preferences.upsert(orgId, memberId, body); }
 }

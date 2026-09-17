@@ -1,4 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { request } from '../../lib/api-client';
 import { useAuthStore } from '../../stores/useAuthStore';
 import { useWorkspaceStore } from '../../stores/useWorkspaceStore';
 import { useUIStore } from '../../stores/useUIStore';
@@ -56,6 +58,18 @@ export const Header: React.FC = () => {
 
   const activeOrg = organizations.find((o) => o.id === activeOrgId) || organizations[0];
   const activeProj = projects.find((p) => p.id === activeProjectId) || projects[0];
+
+  const { data: notifications = [] } = useQuery<any[]>({
+    queryKey: ['notifications', activeOrgId],
+    queryFn: async () => {
+      if (!activeOrgId) return [];
+      const res = await request(`/organizations/${activeOrgId}/notifications`);
+      return Array.isArray(res) ? res : res?.data || [];
+    },
+    enabled: !!activeOrgId,
+  });
+
+  const unreadCount = notifications.filter((n) => !n.readAt && !n.read).length;
 
   return (
     <header className="h-[60px] border-b border-border/80 bg-surface-surface/90 backdrop-blur-md px-4 flex items-center justify-between gap-4 sticky top-0 z-30 select-none">
@@ -251,14 +265,19 @@ export const Header: React.FC = () => {
           <span className="hidden sm:inline">{isSyncing ? 'Syncing' : 'Connected'}</span>
         </div>
 
-        {/* Notifications Icon Button with Unread Badge */}
+        {/* Notifications Icon Button with Dynamic Unread Badge */}
         <button
           onClick={() => setView('notifications')}
           className="p-2 rounded-xl text-text-muted hover:text-text-primary hover:bg-surface-hover transition-colors relative"
           aria-label="Notifications"
+          title={unreadCount > 0 ? `${unreadCount} unread notifications` : 'Notification Center'}
         >
           <Bell className="w-4 h-4" />
-          <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-brand-500 rounded-full ring-2 ring-surface-surface animate-pulse" />
+          {unreadCount > 0 && (
+            <span className="absolute -top-0.5 -right-0.5 min-w-[17px] h-[17px] px-1 bg-brand-500 text-white rounded-full text-[10px] font-bold flex items-center justify-center ring-2 ring-surface-surface shadow-sm animate-pulse">
+              {unreadCount > 99 ? '99+' : unreadCount}
+            </span>
+          )}
         </button>
 
         {/* User Profile Avatar Dropdown */}

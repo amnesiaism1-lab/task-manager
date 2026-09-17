@@ -37,6 +37,26 @@ export const SearchView: React.FC = () => {
 
   const currentProjectId = activeProjectId || projects[0]?.id;
 
+  const dedupedMembers = React.useMemo(() => {
+    const map = new Map<string, { id: string; fullName: string; email: string }>();
+    for (const m of (members as any[]) || []) {
+      const email = (m.email || m.user?.email || '').trim().toLowerCase();
+      const id = m.id;
+      const key = email || id;
+      if (!key) continue;
+      const rawName = (m.fullName || m.fullname || m.user?.fullName || m.user?.fullname || '').trim();
+      const existing = map.get(key);
+      if (!existing) {
+        map.set(key, { id, fullName: rawName || email || 'Member', email });
+      } else {
+        if ((!existing.fullName || existing.fullName === existing.email) && rawName) {
+          existing.fullName = rawName;
+        }
+      }
+    }
+    return Array.from(map.values()).sort((a, b) => (a.fullName || '').localeCompare(b.fullName || ''));
+  }, [members]);
+
   const { data: rawIssues = [], isLoading, refetch, isFetching } = useQuery<Issue[]>({
     queryKey: ['searchRawIssues', activeOrgId, currentProjectId],
     queryFn: async () => {
@@ -289,12 +309,12 @@ export const SearchView: React.FC = () => {
               className="w-full bg-surface-surface text-text-primary text-xs rounded-xl px-3 py-2 border border-border/80 focus:border-brand-500 focus:outline-none"
             >
               <option value="">All Assignees</option>
-              {members.map((m) => {
-                const name = m.fullName || m.user?.fullName || m.email || m.user?.email || 'Member';
-                const email = m.email || m.user?.email;
+              {dedupedMembers.map((m) => {
+                const hasName = m.fullName && m.fullName !== m.email;
+                const label = hasName ? `${m.fullName} (${m.email})` : m.email;
                 return (
                   <option key={m.id} value={m.id}>
-                    {name}{email && email !== name ? ` (${email})` : ''}
+                    {label}
                   </option>
                 );
               })}

@@ -190,14 +190,14 @@ export class OrganizationService {
       .innerJoin(User, 'user', 'user.id = member.user_id')
       .where('member.org_id = :orgId', { orgId })
       .select('member.id', 'id')
-      .addSelect('member.user_id', 'userId')
+      .addSelect('member.user_id', '"userId"')
       .addSelect('member.status', 'status')
       .addSelect('member.title', 'title')
-      .addSelect('member.joined_at', 'joinedAt')
-      .addSelect('member.created_at', 'createdAt')
+      .addSelect('member.joined_at', '"joinedAt"')
+      .addSelect('member.created_at', '"createdAt"')
       .addSelect('user.email', 'email')
-      .addSelect('user.full_name', 'fullName')
-      .addSelect('user.avatar_url', 'avatarUrl')
+      .addSelect('user.full_name', '"fullName"')
+      .addSelect('user.avatar_url', '"avatarUrl"')
       .orderBy('user.full_name', 'ASC')
       .getRawMany();
 
@@ -207,19 +207,19 @@ export class OrganizationService {
     const deptRows = await this.departmentMembers.createQueryBuilder('dm')
       .innerJoin(Department, 'dept', 'dept.id = dm.department_id')
       .where('dm.org_member_id IN (:...memberIds)', { memberIds })
-      .select('dm.org_member_id', 'memberId')
-      .addSelect('dept.id', 'departmentId')
-      .addSelect('dept.name', 'departmentName')
-      .addSelect('dm.role_in_department', 'roleInDepartment')
+      .select('dm.org_member_id', '"memberId"')
+      .addSelect('dept.id', '"departmentId"')
+      .addSelect('dept.name', '"departmentName"')
+      .addSelect('dm.role_in_department', '"roleInDepartment"')
       .getRawMany();
 
     const roleRows = await this.memberRoles.createQueryBuilder('mr')
       .innerJoin(OrganizationRole, 'role', 'role.id = mr.role_id')
       .where('mr.org_member_id IN (:...memberIds)', { memberIds })
-      .select('mr.org_member_id', 'memberId')
-      .addSelect('role.id', 'roleId')
-      .addSelect('role.key', 'roleKey')
-      .addSelect('role.name', 'roleName')
+      .select('mr.org_member_id', '"memberId"')
+      .addSelect('role.id', '"roleId"')
+      .addSelect('role.key', '"roleKey"')
+      .addSelect('role.name', '"roleName"')
       .getRawMany();
 
     const deptMap = new Map<string, any[]>();

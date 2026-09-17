@@ -105,37 +105,60 @@ export const CreateIssueModal: React.FC = () => {
   });
 
   const availableAssignees = React.useMemo(() => {
-    const map = new Map<string, any>();
-    const sourceOrg = orgMembersList.length > 0 ? orgMembersList : members;
-    (sourceOrg || []).forEach((m: any) => {
-      const id = m.id || m.orgMemberId;
-      if (id) {
-        map.set(id, {
-          id,
-          orgMemberId: id,
-          fullName: m.fullName || m.user?.fullName || m.email || m.user?.email || 'Member',
-          email: m.email || m.user?.email,
-          avatarUrl: m.avatarUrl || m.user?.avatarUrl,
+    const allCandidates = [
+      ...(orgMembersList || []),
+      ...(members || []),
+      ...(projectMembers || []),
+    ];
+
+    const map = new Map<string, {
+      id: string;
+      orgMemberId: string;
+      fullName: string;
+      email: string;
+      avatarUrl?: string;
+    }>();
+
+    for (const m of allCandidates) {
+      if (!m) continue;
+      const email = (m.email || m.user?.email || '').trim().toLowerCase();
+      const orgMemberId = m.orgMemberId || m.org_member_id || m.orgmemberid || m.orgMember?.id || m.id;
+      const userId = m.userId || m.userid || m.user?.id;
+      const key = email || userId || orgMemberId;
+      if (!key) continue;
+
+      const rawName = (m.fullName || m.fullname || m.user?.fullName || m.user?.fullname || '').trim();
+      const fallbackName = rawName || email || 'Member';
+
+      const existing = map.get(key);
+      if (!existing) {
+        map.set(key, {
+          id: orgMemberId,
+          orgMemberId,
+          fullName: fallbackName,
+          email,
+          avatarUrl: m.avatarUrl || m.avatarurl || m.user?.avatarUrl,
         });
+      } else {
+        if ((!existing.fullName || existing.fullName === existing.email) && rawName) {
+          existing.fullName = rawName;
+        }
+        if (m.orgMemberId || m.org_member_id) {
+          existing.orgMemberId = m.orgMemberId || m.org_member_id;
+          existing.id = existing.orgMemberId;
+        }
+        if (!existing.avatarUrl && (m.avatarUrl || m.avatarurl || m.user?.avatarUrl)) {
+          existing.avatarUrl = m.avatarUrl || m.avatarurl || m.user?.avatarUrl;
+        }
       }
+    }
+
+    return Array.from(map.values()).sort((a, b) => {
+      if (myMemberId && a.orgMemberId === myMemberId) return -1;
+      if (myMemberId && b.orgMemberId === myMemberId) return 1;
+      return (a.fullName || '').localeCompare(b.fullName || '');
     });
-    (projectMembers || []).forEach((pm: any) => {
-      const id = pm.orgMemberId || pm.id;
-      if (id) {
-        const existing = map.get(id) || {};
-        map.set(id, {
-          ...existing,
-          ...pm,
-          id,
-          orgMemberId: id,
-          fullName: pm.fullName || existing.fullName || pm.user?.fullName || pm.email || 'Member',
-          email: pm.email || existing.email || pm.user?.email,
-          avatarUrl: pm.avatarUrl || existing.avatarUrl || pm.user?.avatarUrl,
-        });
-      }
-    });
-    return Array.from(map.values()).sort((a, b) => (a.fullName || '').localeCompare(b.fullName || ''));
-  }, [orgMembersList, members, projectMembers]);
+  }, [orgMembersList, members, projectMembers, myMemberId]);
 
   // Query Custom Field Contexts configured for this project (FR-CONF-02)
   const { data: customFieldContexts = [] } = useQuery<any[]>({
@@ -333,13 +356,15 @@ export const CreateIssueModal: React.FC = () => {
               className="w-full bg-surface-surface text-text-primary text-xs rounded-xl px-3 py-2 border border-border/80 focus:border-brand-500 focus:outline-none"
             >
               <option value="">Unassigned</option>
-              {availableAssignees.map((m: any) => {
-                const memId = m.orgMemberId || m.orgmemberid || m.id;
-                const name = m.fullName || m.fullname || m.user?.fullName || m.email || m.user?.email || 'Member';
-                const email = m.email || m.user?.email;
+              {availableAssignees.map((m) => {
+                const isMe = myMemberId && m.orgMemberId === myMemberId;
+                const hasName = m.fullName && m.fullName !== m.email;
+                const label = hasName
+                  ? `${m.fullName} (${m.email})${isMe ? ' — You' : ''}`
+                  : `${m.email}${isMe ? ' — You' : ''}`;
                 return (
-                  <option key={memId} value={memId}>
-                    {name}{email && email !== name ? ` (${email})` : ''}
+                  <option key={m.orgMemberId} value={m.orgMemberId}>
+                    {label}
                   </option>
                 );
               })}

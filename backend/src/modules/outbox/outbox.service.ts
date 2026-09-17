@@ -11,6 +11,7 @@ import { AutomationRule } from '../../database/entities/automation/automation-ru
 import { AutomationComponent } from '../../database/entities/automation/automation-component.entity';
 import { AutomationExecution } from '../../database/entities/automation/automation-execution.entity';
 import { Issue } from '../../database/entities/issue/issue.entity';
+import { Sprint } from '../../database/entities/project/sprint.entity';
 
 @Injectable()
 export class OutboxService implements OnModuleInit, OnModuleDestroy {
@@ -21,6 +22,7 @@ export class OutboxService implements OnModuleInit, OnModuleDestroy {
     @InjectRepository(OutboxEvent) private readonly events: Repository<OutboxEvent>,
     @InjectRepository(Notification) private readonly notifications: Repository<Notification>,
     @InjectRepository(Issue) private readonly issues: Repository<Issue>,
+    @InjectRepository(Sprint) private readonly sprints: Repository<Sprint>,
     private readonly dataSource: DataSource,
     private readonly config: ConfigService,
   ) {}
@@ -35,8 +37,10 @@ export class OutboxService implements OnModuleInit, OnModuleDestroy {
     if (this.timer) clearInterval(this.timer);
   }
 
-  async publishPending() {
-    const pending = await this.events.find({ where: { status: 'pending' }, order: { occurredAt: 'ASC' }, take: 20 });
+  async publishPending(orgId?: string) {
+    const whereClause: any = { status: 'pending' };
+    if (orgId) whereClause.orgId = orgId;
+    const pending = await this.events.find({ where: whereClause, order: { occurredAt: 'ASC' }, take: 50 });
     for (const event of pending) {
       try {
         await this.dataSource.transaction(async (manager) => {
@@ -45,6 +49,8 @@ export class OutboxService implements OnModuleInit, OnModuleDestroy {
 
           if (claimed.aggregateType === 'issue') {
             await this.notifyIssueParticipants(manager, claimed);
+          } else if (claimed.aggregateType === 'sprint') {
+            await this.notifySprintParticipants(manager, claimed);
           }
           await this.dispatchWebhooks(manager, claimed);
           await this.triggerAutomations(manager, claimed);
@@ -63,24 +69,120 @@ export class OutboxService implements OnModuleInit, OnModuleDestroy {
   private async notifyIssueParticipants(manager: ReturnType<DataSource['createQueryRunner']>['manager'], event: OutboxEvent) {
     const issue = await manager.findOne(Issue, { where: { id: event.aggregateId } });
     if (!issue) return;
-    const recipients = [...new Set([issue.reporterMemberId, issue.assigneeMemberId].filter((id): id is string => Boolean(id)))];
+
+    // Collect participants: Assignee, Reporter, Watchers, and Project Members
+    const watcherRows = await manager.query(
+      'SELECT org_member_id FROM issue_watchers WHERE issue_id = $1',
+      [issue.id]
+    ).catch(() => []);
+    const watcherMemberIds = watcherRows.map((r: any) => r.org_member_id);
+
+    const projectMemberRows = await manager.query(
+      'SELECT org_member_id FROM project_members WHERE project_id = $1 AND status = $2',
+      [issue.projectId, 'active']
+    ).catch(() => []);
+    const projectMemberIds = projectMemberRows.map((r: any) => r.org_member_id);
+
+    const recipients = [...new Set([
+      issue.assigneeMemberId,
+      issue.reporterMemberId,
+      ...watcherMemberIds,
+      ...projectMemberIds,
+    ].filter((id): id is string => Boolean(id)))];
+
+    let title = `Issue ${issue.key} updated`;
+    let body = issue.summary;
+    const payload = (event.payloadJson as Record<string, any>) || {};
+
+    if (event.eventType === 'issue.created') {
+      title = `Issue ${issue.key} created`;
+      body = `New issue created: "${issue.summary}" (Priority: ${issue.priority})`;
+    } else if (event.eventType === 'issue.transitioned') {
+      title = `Issue ${issue.key} transitioned`;
+      body = payload.toState ? `Moved to ${payload.toState}: "${issue.summary}"` : `Status updated: "${issue.summary}"`;
+    } else if (event.eventType === 'comment.created') {
+      title = `New comment on ${issue.key}`;
+      body = payload.body ? `Comment: "${String(payload.body).slice(0, 100)}..."` : `A new comment was posted on "${issue.summary}".`;
+    } else if (event.eventType === 'worklog.created') {
+      title = `Work log added to ${issue.key}`;
+      body = `Work logged towards "${issue.summary}".`;
+    } else if (event.eventType === 'issue.linked') {
+      title = `Issue ${issue.key} linked`;
+      body = `Issue dependency linked: "${issue.summary}".`;
+    } else if (event.eventType === 'issue.deleted') {
+      title = `Issue ${issue.key} deleted`;
+      body = `Issue "${issue.summary}" was removed.`;
+    }
+
     for (const recipientMemberId of recipients) {
+      const existing = await manager.findOne(Notification, {
+        where: { outboxEventId: event.id, recipientMemberId, notificationType: event.eventType },
+      });
+      if (existing) continue;
+
       const notification = await manager.save(Notification, manager.create(Notification, {
         orgId: issue.orgId,
         recipientMemberId,
         outboxEventId: event.id,
         notificationType: event.eventType,
-        title: event.eventType === 'issue.created' ? `Issue ${issue.key} created` : `Issue ${issue.key} transitioned`,
-        body: issue.summary,
-        dataJson: { issueId: issue.id, issueKey: issue.key },
+        title,
+        body,
+        dataJson: { issueId: issue.id, issueKey: issue.key, projectId: issue.projectId, ...payload },
         sentAt: new Date(),
         readAt: null,
       }));
 
-      // Record NotificationDelivery to unify audit & delivery tracking
       await manager.save(NotificationDelivery, manager.create(NotificationDelivery, {
         notificationId: notification.id,
-        channel: 'email',
+        channel: 'in_app',
+        status: 'sent',
+        destination: recipientMemberId,
+        attempts: 1,
+        sentAt: new Date(),
+        lastError: null,
+      }));
+    }
+  }
+
+  private async notifySprintParticipants(manager: ReturnType<DataSource['createQueryRunner']>['manager'], event: OutboxEvent) {
+    const sprint = await manager.findOne(Sprint, { where: { id: event.aggregateId } });
+    if (!sprint) return;
+
+    const projectMemberRows = await manager.query(
+      'SELECT org_member_id FROM project_members WHERE project_id = $1 AND status = $2',
+      [sprint.projectId, 'active']
+    ).catch(() => []);
+    const recipients: string[] = Array.from(new Set<string>(projectMemberRows.map((r: any) => String(r.org_member_id)).filter((id: string) => Boolean(id))));
+
+    const isStarted = event.eventType === 'sprint.started';
+    const title = isStarted ? `Sprint "${sprint.name}" started` : `Sprint "${sprint.name}" completed`;
+    const body = isStarted
+      ? `Sprint "${sprint.name}" has officially started. Review active tasks on the Scrum board.`
+      : `Sprint "${sprint.name}" has been completed. Remaining open issues rolled over.`;
+
+    const payload = (event.payloadJson as Record<string, any>) || {};
+
+    for (const recipientMemberId of recipients) {
+      const existing = await manager.findOne(Notification, {
+        where: { outboxEventId: event.id, recipientMemberId, notificationType: event.eventType },
+      });
+      if (existing) continue;
+
+      const notification = await manager.save(Notification, manager.create(Notification, {
+        orgId: event.orgId,
+        recipientMemberId,
+        outboxEventId: event.id,
+        notificationType: event.eventType,
+        title,
+        body,
+        dataJson: { sprintId: sprint.id, projectId: sprint.projectId, sprintName: sprint.name, ...payload },
+        sentAt: new Date(),
+        readAt: null,
+      }));
+
+      await manager.save(NotificationDelivery, manager.create(NotificationDelivery, {
+        notificationId: notification.id,
+        channel: 'in_app',
         status: 'sent',
         destination: recipientMemberId,
         attempts: 1,
@@ -167,6 +269,11 @@ export class OutboxService implements OnModuleInit, OnModuleDestroy {
   }
 
   async list(orgId: string, memberId: string) {
+    try {
+      await this.publishPending(orgId);
+    } catch (err: any) {
+      this.logger.warn(`On-demand publishPending error: ${err?.message}`);
+    }
     return this.notifications.find({ where: { orgId, recipientMemberId: memberId }, order: { createdAt: 'DESC' }, take: 100 });
   }
 
@@ -175,5 +282,18 @@ export class OutboxService implements OnModuleInit, OnModuleDestroy {
     if (!notification) return null;
     notification.readAt = new Date();
     return this.notifications.save(notification);
+  }
+
+  async markAllRead(orgId: string, memberId: string) {
+    await this.notifications.update(
+      { orgId, recipientMemberId: memberId, readAt: IsNull() },
+      { readAt: new Date() }
+    );
+    return { success: true };
+  }
+
+  async deleteNotification(orgId: string, memberId: string, notificationId: string) {
+    await this.notifications.delete({ id: notificationId, orgId, recipientMemberId: memberId });
+    return { success: true };
   }
 }
