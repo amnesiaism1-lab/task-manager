@@ -34,12 +34,49 @@ export class BoardService {
     const colTodo = await this.columns.save(this.columns.create({ boardId: board.id, name: 'To Do', position: 0, wipLimit: null }));
     const colProg = await this.columns.save(this.columns.create({ boardId: board.id, name: 'In Progress', position: 1, wipLimit: 10 }));
     const colDone = await this.columns.save(this.columns.create({ boardId: board.id, name: 'Done', position: 2, wipLimit: null }));
+
+    const project = await this.projects.findOne({ where: { id: projectId } });
+    const workflow = project?.workflowKey
+      ? await this.workflows.findOne({ where: { orgId: project.orgId, key: project.workflowKey, isActive: true } })
+      : null;
+    const wfStates = workflow
+      ? await this.states.find({ where: { workflowId: workflow.id }, order: { position: 'ASC' } })
+      : [];
+
+    if (wfStates.length > 0) {
+      const initial = wfStates.find((s) => s.isInitial || s.category === 'todo' || s.name.toLowerCase().includes('todo') || s.name.toLowerCase().includes('open')) || wfStates[0];
+      const terminal = wfStates.find((s) => s.isTerminal || s.category === 'done' || s.name.toLowerCase().includes('done') || s.name.toLowerCase().includes('closed')) || wfStates[wfStates.length - 1];
+      const intermediate = wfStates.filter((s) => s.id !== initial.id && s.id !== terminal.id);
+
+      const newMappings: BoardColumnState[] = [];
+      if (initial) newMappings.push(this.columnStates.create({ boardColumnId: colTodo.id, workflowStateId: initial.id }));
+      if (terminal && terminal.id !== initial.id) newMappings.push(this.columnStates.create({ boardColumnId: colDone.id, workflowStateId: terminal.id }));
+      if (intermediate.length > 0) {
+        newMappings.push(this.columnStates.create({ boardColumnId: colProg.id, workflowStateId: intermediate[0].id }));
+      }
+      if (newMappings.length) {
+        await this.columnStates.save(newMappings);
+      }
+    }
+
     return Object.assign(board, { columns: [colTodo, colProg, colDone] });
   }
 
   async list(projectId: string) {
-    const boards = await this.boards.find({ where: { projectId }, order: { createdAt: 'ASC' } });
-    if (boards.length === 0) return [];
+    let boards = await this.boards.find({ where: { projectId }, order: { createdAt: 'ASC' } });
+    if (boards.length === 0) {
+      const project = await this.projects.findOne({ where: { id: projectId } });
+      if (project) {
+        const defaultBoard = await this.createBoard(projectId, {
+          boardType: 'kanban',
+          name: `${project.name} Board`,
+          description: 'Default project board',
+        });
+        boards = [defaultBoard];
+      } else {
+        return [];
+      }
+    }
     const boardIds = boards.map((b) => b.id);
     const columns = await this.columns.find({ where: { boardId: In(boardIds) }, order: { position: 'ASC' } });
     const columnsByBoard = new Map<string, BoardColumn[]>();

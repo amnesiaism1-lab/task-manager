@@ -7,7 +7,7 @@ import { useUIStore } from '../../stores/useUIStore';
 import { request } from '../../lib/api-client';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
-import { getInitials } from '../../lib/utils';
+import { getInitials, toSafeString } from '../../lib/utils';
 import {
   Plus,
   Loader2,
@@ -154,16 +154,16 @@ export const BoardView: React.FC = () => {
     return 'bg-slate-400 shadow-slate-500/50';
   };
 
-  const renderIssueTypeIcon = (type?: string) => {
-    const lower = (type || '').toLowerCase();
+  const renderIssueTypeIcon = (type?: any) => {
+    const lower = toSafeString(type).toLowerCase();
     if (lower.includes('bug')) return <span title="Bug" className="inline-flex items-center"><Bug className="w-3.5 h-3.5 text-rose-400 shrink-0" /></span>;
     if (lower.includes('story')) return <span title="User Story" className="inline-flex items-center"><Bookmark className="w-3.5 h-3.5 text-emerald-400 shrink-0" /></span>;
     if (lower.includes('epic')) return <span title="Epic" className="inline-flex items-center"><Zap className="w-3.5 h-3.5 text-purple-400 shrink-0" /></span>;
     return <span title="Task" className="inline-flex items-center"><CheckSquare className="w-3.5 h-3.5 text-blue-400 shrink-0" /></span>;
   };
 
-  const renderPriorityIcon = (priority?: string) => {
-    const lower = (priority || '').toLowerCase();
+  const renderPriorityIcon = (priority?: any) => {
+    const lower = toSafeString(priority).toLowerCase();
     if (lower === 'highest') return <span title="Highest Priority" className="inline-flex items-center"><ChevronsUp className="w-3.5 h-3.5 text-rose-500 shrink-0" /></span>;
     if (lower === 'high') return <span title="High Priority" className="inline-flex items-center"><ChevronUp className="w-3.5 h-3.5 text-amber-400 shrink-0" /></span>;
     if (lower === 'low' || lower === 'lowest') return <span title="Low Priority" className="inline-flex items-center"><ChevronDown className="w-3.5 h-3.5 text-blue-400 shrink-0" /></span>;
@@ -263,22 +263,32 @@ export const BoardView: React.FC = () => {
               variant="secondary"
               onClick={async () => {
                 try {
-                  await request(`/organizations/${activeOrgId}/projects/${activeProjectId}/boards/${activeBoardId}/columns`, {
-                    method: 'POST',
-                    body: JSON.stringify({ name: 'To Do', wipLimit: null }),
-                  });
-                  await request(`/organizations/${activeOrgId}/projects/${activeProjectId}/boards/${activeBoardId}/columns`, {
-                    method: 'POST',
-                    body: JSON.stringify({ name: 'In Progress', wipLimit: 10 }),
-                  });
-                  await request(`/organizations/${activeOrgId}/projects/${activeProjectId}/boards/${activeBoardId}/columns`, {
-                    method: 'POST',
-                    body: JSON.stringify({ name: 'Done', wipLimit: null }),
-                  });
-                  showToast('Default columns created successfully', 'success');
+                  let targetBoardId = activeBoardId;
+                  if (!targetBoardId) {
+                    const newBoard = await request(`/organizations/${activeOrgId}/projects/${activeProjectId}/boards`, {
+                      method: 'POST',
+                      body: JSON.stringify({ name: 'Project Board', boardType: 'kanban' }),
+                    });
+                    targetBoardId = newBoard?.id;
+                  } else {
+                    await request(`/organizations/${activeOrgId}/projects/${activeProjectId}/boards/${targetBoardId}/columns`, {
+                      method: 'POST',
+                      body: JSON.stringify({ name: 'To Do', wipLimit: null }),
+                    }).catch(() => null);
+                    await request(`/organizations/${activeOrgId}/projects/${activeProjectId}/boards/${targetBoardId}/columns`, {
+                      method: 'POST',
+                      body: JSON.stringify({ name: 'In Progress', wipLimit: 10 }),
+                    }).catch(() => null);
+                    await request(`/organizations/${activeOrgId}/projects/${activeProjectId}/boards/${targetBoardId}/columns`, {
+                      method: 'POST',
+                      body: JSON.stringify({ name: 'Done', wipLimit: null }),
+                    }).catch(() => null);
+                  }
+                  showToast('Board & columns initialized successfully', 'success');
+                  queryClient.invalidateQueries({ queryKey: ['boards'] });
                   queryClient.invalidateQueries({ queryKey: ['boardData'] });
                 } catch (err: any) {
-                  showToast(err.message || 'Failed to initialize columns', 'error');
+                  showToast(err.message || 'Failed to initialize board & columns', 'error');
                 }
               }}
             >

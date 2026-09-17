@@ -76,3 +76,11 @@ export function formatIssueType(type: any): string {
   return String(type).toUpperCase();
 }
 
+export function toSafeString(val: any): string {
+  if (val === undefined || val === null) return '';
+  if (typeof val === 'string') return val;
+  if (typeof val === 'object') return val.key || val.name || val.label || val.value || '';
+  return String(val);
+}
+
+

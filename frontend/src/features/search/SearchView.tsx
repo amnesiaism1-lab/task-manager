@@ -6,7 +6,7 @@ import { request } from '../../lib/api-client';
 import { Issue } from '../../types';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
-import { formatDate, formatStatus, getInitials } from '../../lib/utils';
+import { formatDate, formatStatus, getInitials, toSafeString } from '../../lib/utils';
 import {
   Search,
   Filter,
@@ -73,7 +73,7 @@ export const SearchView: React.FC = () => {
 
       // 3. Priority filter
       if (priorityFilter) {
-        const p = (issue.priority || '').toLowerCase();
+        const p = toSafeString(issue.priority).toLowerCase();
         if (!p.includes(priorityFilter.toLowerCase())) return false;
       }
 
@@ -118,16 +118,16 @@ export const SearchView: React.FC = () => {
     showToast('Exported issues to CSV!', 'success', 2000);
   };
 
-  const renderIssueTypeIcon = (type?: string) => {
-    const lower = (type || '').toLowerCase();
+  const renderIssueTypeIcon = (type?: any) => {
+    const lower = toSafeString(type).toLowerCase();
     if (lower.includes('bug')) return <span title="Bug" className="inline-flex items-center"><Bug className="w-3.5 h-3.5 text-rose-400 shrink-0" /></span>;
     if (lower.includes('story')) return <span title="Story" className="inline-flex items-center"><Bookmark className="w-3.5 h-3.5 text-emerald-400 shrink-0" /></span>;
     if (lower.includes('epic')) return <span title="Epic" className="inline-flex items-center"><Zap className="w-3.5 h-3.5 text-purple-400 shrink-0" /></span>;
     return <span title="Task" className="inline-flex items-center"><CheckSquare className="w-3.5 h-3.5 text-blue-400 shrink-0" /></span>;
   };
 
-  const renderPriorityIcon = (priority?: string) => {
-    const lower = (priority || '').toLowerCase();
+  const renderPriorityIcon = (priority?: any) => {
+    const lower = toSafeString(priority).toLowerCase();
     if (lower === 'highest') return <span title="Highest" className="inline-flex items-center"><ChevronsUp className="w-3.5 h-3.5 text-rose-500 shrink-0" /></span>;
     if (lower === 'high') return <span title="High" className="inline-flex items-center"><ChevronUp className="w-3.5 h-3.5 text-amber-400 shrink-0" /></span>;
     if (lower === 'low' || lower === 'lowest') return <span title="Low" className="inline-flex items-center"><ChevronDown className="w-3.5 h-3.5 text-blue-400 shrink-0" /></span>;

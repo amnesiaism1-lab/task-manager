@@ -8,7 +8,7 @@ import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/ui/Modal';
 import { Input } from '../../components/ui/Input';
 import { Badge } from '../../components/ui/Badge';
-import { formatDate, formatStatus } from '../../lib/utils';
+import { formatDate, formatStatus, toSafeString } from '../../lib/utils';
 import {
   BarChart3,
   Plus,
@@ -93,12 +93,12 @@ export const DashboardView: React.FC = () => {
   // Priority counts
   const highPriority = issues.filter(
     (i) =>
-      (i.priority || '').toLowerCase() === 'high' || (i.priority || '').toLowerCase() === 'highest'
+      toSafeString(i.priority).toLowerCase() === 'high' || toSafeString(i.priority).toLowerCase() === 'highest'
   ).length;
-  const medPriority = issues.filter((i) => (i.priority || '').toLowerCase() === 'medium').length;
+  const medPriority = issues.filter((i) => toSafeString(i.priority).toLowerCase() === 'medium').length;
   const lowPriority = issues.filter(
     (i) =>
-      (i.priority || '').toLowerCase() === 'low' || (i.priority || '').toLowerCase() === 'lowest'
+      toSafeString(i.priority).toLowerCase() === 'low' || toSafeString(i.priority).toLowerCase() === 'lowest'
   ).length;
 
   const totalPoints = issues.reduce((acc, cur) => acc + (Number((cur as any).storyPoints) || 0), 0);
