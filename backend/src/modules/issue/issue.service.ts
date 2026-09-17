@@ -325,7 +325,24 @@ export class IssueService {
       if (input.description !== undefined) locked.description = input.description?.trim() || null;
       if (input.priority !== undefined) locked.priority = input.priority;
       const newAssigneeId = input.assigneeMemberId !== undefined ? input.assigneeMemberId : input.assigneeId;
-      if (newAssigneeId !== undefined) locked.assigneeMemberId = newAssigneeId || null;
+      if (newAssigneeId !== undefined) {
+        if (newAssigneeId) {
+          const assignee = await manager.findOne(ProjectMember, { where: { projectId: locked.projectId, orgMemberId: newAssigneeId, status: 'active' } });
+          if (!assignee) {
+            const orgMember = await manager.findOne(OrganizationMember, { where: { id: newAssigneeId, orgId, status: 'active' } });
+            if (!orgMember) throw new BadRequestException('Assignee is not an active organization member');
+            await manager.save(
+              ProjectMember,
+              manager.create(ProjectMember, {
+                orgMemberId: newAssigneeId,
+                projectId: locked.projectId,
+                status: 'active',
+              }),
+            );
+          }
+        }
+        locked.assigneeMemberId = newAssigneeId || null;
+      }
       if (input.sprintId !== undefined) {
         const targetSprintId = input.sprintId || null;
         if (locked.sprintId !== targetSprintId) {

@@ -29,7 +29,13 @@ export class BoardService {
     private readonly dataSource: DataSource,
   ) {}
 
-  async createBoard(projectId: string, input: CreateBoardDto) { return this.boards.save(this.boards.create({ projectId, boardType: input.boardType, name: input.name.trim(), description: input.description?.trim() ?? null })); }
+  async createBoard(projectId: string, input: CreateBoardDto) {
+    const board = await this.boards.save(this.boards.create({ projectId, boardType: input.boardType, name: input.name.trim(), description: input.description?.trim() ?? null }));
+    const colTodo = await this.columns.save(this.columns.create({ boardId: board.id, name: 'To Do', position: 0, wipLimit: null }));
+    const colProg = await this.columns.save(this.columns.create({ boardId: board.id, name: 'In Progress', position: 1, wipLimit: 10 }));
+    const colDone = await this.columns.save(this.columns.create({ boardId: board.id, name: 'Done', position: 2, wipLimit: null }));
+    return Object.assign(board, { columns: [colTodo, colProg, colDone] });
+  }
 
   async list(projectId: string) {
     const boards = await this.boards.find({ where: { projectId }, order: { createdAt: 'ASC' } });
@@ -100,7 +106,7 @@ export class BoardService {
   }
 
   async getBoardIssues(projectId: string, boardId: string) {
-    const [board, columns, issues, positions] = await Promise.all([
+    const [board, initialColumns, issues, positions] = await Promise.all([
       this.boards.findOne({ where: { id: boardId, projectId } }),
       this.columns.find({ where: { boardId }, order: { position: 'ASC' } }),
       this.issues.find({ where: { projectId, deletedAt: IsNull() }, order: { createdAt: 'DESC' } }),
@@ -108,6 +114,51 @@ export class BoardService {
     ]);
 
     if (!board) throw new NotFoundException('Board not found');
+
+    let columns = initialColumns;
+    if (columns.length === 0) {
+      const project = await this.projects.findOne({ where: { id: projectId } });
+      const workflow = project?.workflowKey
+        ? await this.workflows.findOne({ where: { orgId: project.orgId, key: project.workflowKey, isActive: true } })
+        : null;
+      let wfStates = workflow
+        ? await this.states.find({ where: { workflowId: workflow.id }, order: { position: 'ASC' } })
+        : [];
+
+      if (wfStates.length === 0 && issues.length > 0) {
+        const issueStateIds = [...new Set(issues.map((i) => i.stateId).filter(Boolean))];
+        if (issueStateIds.length) {
+          wfStates = await this.states.find({ where: { id: In(issueStateIds) } });
+        }
+      }
+
+      const colTodo = await this.columns.save(this.columns.create({ boardId, name: 'To Do', position: 0, wipLimit: null }));
+      const colProg = await this.columns.save(this.columns.create({ boardId, name: 'In Progress', position: 1, wipLimit: 10 }));
+      const colRev = await this.columns.save(this.columns.create({ boardId, name: 'In Review', position: 2, wipLimit: 10 }));
+      const colDone = await this.columns.save(this.columns.create({ boardId, name: 'Done', position: 3, wipLimit: null }));
+      columns = [colTodo, colProg, colRev, colDone];
+
+      if (wfStates.length > 0) {
+        const initial = wfStates.find((s) => s.isInitial || s.category === 'todo' || s.name.toLowerCase().includes('todo') || s.name.toLowerCase().includes('open')) || wfStates[0];
+        const terminal = wfStates.find((s) => s.isTerminal || s.category === 'done' || s.name.toLowerCase().includes('done') || s.name.toLowerCase().includes('closed')) || wfStates[wfStates.length - 1];
+        const intermediate = wfStates.filter((s) => s.id !== initial.id && s.id !== terminal.id);
+
+        const newMappings: BoardColumnState[] = [];
+        if (initial) newMappings.push(this.columnStates.create({ boardColumnId: colTodo.id, workflowStateId: initial.id }));
+        if (terminal && terminal.id !== initial.id) newMappings.push(this.columnStates.create({ boardColumnId: colDone.id, workflowStateId: terminal.id }));
+        if (intermediate.length === 1) {
+          newMappings.push(this.columnStates.create({ boardColumnId: colProg.id, workflowStateId: intermediate[0].id }));
+        } else if (intermediate.length >= 2) {
+          newMappings.push(this.columnStates.create({ boardColumnId: colProg.id, workflowStateId: intermediate[0].id }));
+          for (let i = 1; i < intermediate.length; i++) {
+            newMappings.push(this.columnStates.create({ boardColumnId: colRev.id, workflowStateId: intermediate[i].id }));
+          }
+        }
+        if (newMappings.length) {
+          await this.columnStates.save(newMappings);
+        }
+      }
+    }
 
     const columnIds = columns.map((column) => column.id);
     const stateIds = [...new Set(issues.map((issue) => issue.stateId))];

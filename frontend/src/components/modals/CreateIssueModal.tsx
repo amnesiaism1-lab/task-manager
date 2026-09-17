@@ -93,7 +93,49 @@ export const CreateIssueModal: React.FC = () => {
     enabled: !!activeOrgId && !!selectedProj && isOpen,
   });
 
-  const availableAssignees = projectMembers.length > 0 ? projectMembers : members;
+  // Query all Organization Members so newly joined members appear immediately
+  const { data: orgMembersList = [] } = useQuery<any[]>({
+    queryKey: ['orgMembersList', activeOrgId],
+    queryFn: async () => {
+      if (!activeOrgId) return [];
+      const res = await request(`/organizations/${activeOrgId}/members`).catch(() => []);
+      return Array.isArray(res) ? res : res?.data || [];
+    },
+    enabled: !!activeOrgId && isOpen,
+  });
+
+  const availableAssignees = React.useMemo(() => {
+    const map = new Map<string, any>();
+    const sourceOrg = orgMembersList.length > 0 ? orgMembersList : members;
+    (sourceOrg || []).forEach((m: any) => {
+      const id = m.id || m.orgMemberId;
+      if (id) {
+        map.set(id, {
+          id,
+          orgMemberId: id,
+          fullName: m.fullName || m.user?.fullName || m.email || m.user?.email || 'Member',
+          email: m.email || m.user?.email,
+          avatarUrl: m.avatarUrl || m.user?.avatarUrl,
+        });
+      }
+    });
+    (projectMembers || []).forEach((pm: any) => {
+      const id = pm.orgMemberId || pm.id;
+      if (id) {
+        const existing = map.get(id) || {};
+        map.set(id, {
+          ...existing,
+          ...pm,
+          id,
+          orgMemberId: id,
+          fullName: pm.fullName || existing.fullName || pm.user?.fullName || pm.email || 'Member',
+          email: pm.email || existing.email || pm.user?.email,
+          avatarUrl: pm.avatarUrl || existing.avatarUrl || pm.user?.avatarUrl,
+        });
+      }
+    });
+    return Array.from(map.values()).sort((a, b) => (a.fullName || '').localeCompare(b.fullName || ''));
+  }, [orgMembersList, members, projectMembers]);
 
   // Query Custom Field Contexts configured for this project (FR-CONF-02)
   const { data: customFieldContexts = [] } = useQuery<any[]>({

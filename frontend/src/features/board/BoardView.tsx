@@ -257,13 +257,41 @@ export const BoardView: React.FC = () => {
           <p className="text-xs text-text-secondary max-w-md mx-auto">
             This project does not have columns configured yet. You can create issues or add columns in project settings.
           </p>
-          <Button
-            size="sm"
-            variant="primary"
-            onClick={() => openModal('createIssue')}
-          >
-            Create First Issue
-          </Button>
+          <div className="flex items-center justify-center gap-3">
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={async () => {
+                try {
+                  await request(`/organizations/${activeOrgId}/projects/${activeProjectId}/boards/${activeBoardId}/columns`, {
+                    method: 'POST',
+                    body: JSON.stringify({ name: 'To Do', wipLimit: null }),
+                  });
+                  await request(`/organizations/${activeOrgId}/projects/${activeProjectId}/boards/${activeBoardId}/columns`, {
+                    method: 'POST',
+                    body: JSON.stringify({ name: 'In Progress', wipLimit: 10 }),
+                  });
+                  await request(`/organizations/${activeOrgId}/projects/${activeProjectId}/boards/${activeBoardId}/columns`, {
+                    method: 'POST',
+                    body: JSON.stringify({ name: 'Done', wipLimit: null }),
+                  });
+                  showToast('Default columns created successfully', 'success');
+                  queryClient.invalidateQueries({ queryKey: ['boardData'] });
+                } catch (err: any) {
+                  showToast(err.message || 'Failed to initialize columns', 'error');
+                }
+              }}
+            >
+              Initialize Default Columns
+            </Button>
+            <Button
+              size="sm"
+              variant="primary"
+              onClick={() => openModal('createIssue')}
+            >
+              Create First Issue
+            </Button>
+          </div>
         </div>
       ) : (
         <DragDropContext onDragEnd={onDragEnd}>
