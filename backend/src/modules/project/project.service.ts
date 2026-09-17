@@ -106,8 +106,10 @@ export class ProjectService {
   }
 
   async list(orgId: string, memberId: string, pagination: PaginationDto) {
+    const isOrgMember = await this.orgMembers.exists({ where: { id: memberId, orgId, status: 'active' } });
+    if (!isOrgMember) throw new ForbiddenException('Organization membership required');
+
     const query = this.projects.createQueryBuilder('project')
-      .innerJoin(ProjectMember, 'membership', 'membership.project_id = project.id AND membership.org_member_id = :memberId AND membership.status = :status', { memberId, status: 'active' })
       .where('project.org_id = :orgId', { orgId })
       .andWhere('project.archived_at IS NULL')
       .orderBy('project.key', 'ASC');
@@ -263,7 +265,23 @@ export class ProjectService {
     let membership = await this.projectMembers.findOne({ where: { projectId, orgMemberId: memberId, status: 'active' } });
     if (!membership) {
       const isOrgMember = await this.orgMembers.exists({ where: { id: memberId, orgId, status: 'active' } });
-      if (!isOrgMember) throw new ForbiddenException('Project membership required');
+      if (!isOrgMember) throw new ForbiddenException('Organization membership required');
+      membership = await this.projectMembers.save(this.projectMembers.create({
+        projectId,
+        orgMemberId: memberId,
+        status: 'active',
+        joinedAt: new Date(),
+      }));
+      const memberRole = await this.dataSource.getRepository(ProjectRole).findOne({ where: { projectId, name: 'Member' } })
+        || await this.dataSource.getRepository(ProjectRole).findOne({ where: { projectId, key: 'member' } })
+        || await this.dataSource.getRepository(ProjectRole).findOne({ where: { projectId } });
+      if (memberRole) {
+        await this.projectMemberRoles.save(this.projectMemberRoles.create({
+          projectMemberId: membership.id,
+          projectRoleId: memberRole.id,
+          grantedByMemberId: memberId,
+        }));
+      }
     }
     const query = this.issues.createQueryBuilder('issue').where('issue.org_id = :orgId AND issue.project_id = :projectId AND issue.deleted_at IS NULL', { orgId, projectId }).orderBy('issue.created_at', 'DESC');
     const result = await paginate(query, pagination);
@@ -277,7 +295,7 @@ export class ProjectService {
         ? this.orgMembers.createQueryBuilder('om')
             .innerJoin(User, 'user', 'user.id = om.user_id')
             .where('om.id IN (:...assigneeIds)', { assigneeIds })
-            .select(['om.id AS id', 'user.id AS "userId"', 'user.full_name AS "fullName"', 'user.email AS email', 'user.avatar_url AS "avatarUrl"'])
+            .select(['om.id AS id', 'om.org_id AS "orgId"', 'om.user_id AS "userId"', 'om.status AS status', 'user.email AS email', 'user.full_name AS "fullName"', 'user.avatar_url AS "avatarUrl"'])
             .getRawMany()
         : Promise.resolve([]),
       issueTypeIds.length ? this.dataSource.getRepository(IssueType).find({ where: { id: In(issueTypeIds) } }) : Promise.resolve([]),
@@ -303,7 +321,23 @@ export class ProjectService {
     let membership = await this.projectMembers.findOne({ where: { projectId, orgMemberId: memberId, status: 'active' } });
     if (!membership) {
       const isOrgMember = await this.orgMembers.exists({ where: { id: memberId, orgId, status: 'active' } });
-      if (!isOrgMember) throw new ForbiddenException('Project membership required');
+      if (!isOrgMember) throw new ForbiddenException('Organization membership required');
+      membership = await this.projectMembers.save(this.projectMembers.create({
+        projectId,
+        orgMemberId: memberId,
+        status: 'active',
+        joinedAt: new Date(),
+      }));
+      const memberRole = await this.dataSource.getRepository(ProjectRole).findOne({ where: { projectId, name: 'Member' } })
+        || await this.dataSource.getRepository(ProjectRole).findOne({ where: { projectId, key: 'member' } })
+        || await this.dataSource.getRepository(ProjectRole).findOne({ where: { projectId } });
+      if (memberRole) {
+        await this.projectMemberRoles.save(this.projectMemberRoles.create({
+          projectMemberId: membership.id,
+          projectRoleId: memberRole.id,
+          grantedByMemberId: memberId,
+        }));
+      }
     }
     const query = this.issues.createQueryBuilder('issue')
       .where('issue.org_id = :orgId AND issue.project_id = :projectId AND issue.sprint_id IS NULL AND issue.deleted_at IS NULL', { orgId, projectId })

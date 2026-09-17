@@ -21,7 +21,15 @@ export class IssueSearchService {
       where: { orgMemberId: memberId, status: 'active' },
       select: { projectId: true },
     });
-    const allowedProjectIds = userMemberships.map((m) => m.projectId);
+    let allowedProjectIds = userMemberships.map((m) => m.projectId);
+    if (allowedProjectIds.length === 0) {
+      const orgProjects = await this.issues.manager.createQueryBuilder()
+        .from('projects', 'p')
+        .where('p.org_id = :orgId AND p.archived_at IS NULL', { orgId })
+        .select('p.id', 'id')
+        .getRawMany();
+      allowedProjectIds = orgProjects.map((p) => p.id);
+    }
     if (allowedProjectIds.length === 0) {
       return paginate(this.issues.createQueryBuilder('issue').where('1 = 0'), input);
     }

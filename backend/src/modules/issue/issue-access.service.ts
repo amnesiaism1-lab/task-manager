@@ -37,6 +37,17 @@ export class IssueAccessService {
       membership = cachedMem.val;
     } else {
       membership = await this.members.findOne({ where: { projectId: issue.projectId, orgMemberId: memberId, status: 'active' } });
+      if (!membership) {
+        const orgMember = await this.grants.query('SELECT 1 FROM organization_members WHERE id = $1 AND org_id = $2 AND status = $3 LIMIT 1', [memberId, issue.orgId, 'active']);
+        if (orgMember && orgMember.length > 0) {
+          membership = await this.members.save(this.members.create({
+            projectId: issue.projectId,
+            orgMemberId: memberId,
+            status: 'active',
+            joinedAt: new Date(),
+          }));
+        }
+      }
       this.memberCache.set(memKey, { val: membership, exp: Date.now() + 60_000 });
     }
     if (!membership) return false;

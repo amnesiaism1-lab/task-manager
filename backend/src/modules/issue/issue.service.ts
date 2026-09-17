@@ -91,8 +91,17 @@ export class IssueService {
   private async accessibleIssue(orgId: string, issueId: string, memberId: string) {
     const issue = await this.issues.findOne({ where: { id: issueId, orgId, deletedAt: IsNull() } });
     if (!issue) throw new NotFoundException('Issue not found');
-    const membership = await this.projectMembers.findOne({ where: { projectId: issue.projectId, orgMemberId: memberId, status: 'active' } });
-    if (!membership) throw new ForbiddenException('Project membership required');
+    let membership = await this.projectMembers.findOne({ where: { projectId: issue.projectId, orgMemberId: memberId, status: 'active' } });
+    if (!membership) {
+      const isOrgMember = await this.dataSource.getRepository(OrganizationMember).exists({ where: { id: memberId, orgId, status: 'active' } });
+      if (!isOrgMember) throw new ForbiddenException('Project membership required');
+      membership = await this.projectMembers.save(this.projectMembers.create({
+        projectId: issue.projectId,
+        orgMemberId: memberId,
+        status: 'active',
+        joinedAt: new Date(),
+      }));
+    }
     return issue;
   }
 
