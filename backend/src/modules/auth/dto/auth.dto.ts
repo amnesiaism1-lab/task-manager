@@ -51,6 +51,7 @@ export class AccountPasswordDto {
 }
 
 export class GoogleLoginDto {
+  @IsOptional() @IsString() accessToken?: string;
   @IsOptional() @IsString() idToken?: string;
   @IsOptional() @IsString() credential?: string;
   @IsOptional() @IsEmail() demoEmail?: string;

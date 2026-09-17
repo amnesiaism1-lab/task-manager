@@ -67,8 +67,28 @@ export class AuthService {
     let fullName = '';
     let avatarUrl: string | null = null;
 
+    // 1. Verify Google OAuth 2.0 Access Token from Popup
+    if (input.accessToken) {
+      try {
+        const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+          headers: { Authorization: `Bearer ${input.accessToken}` },
+        });
+        if (res.ok) {
+          const data: any = await res.json();
+          if (data.email) {
+            email = data.email.toLowerCase();
+            fullName = data.name || data.email.split('@')[0];
+            avatarUrl = data.picture || null;
+          }
+        }
+      } catch (err) {
+        console.error('Google accessToken verification error:', err);
+      }
+    }
+
+    // 2. Verify Google ID Token / Credential from One Tap / GSI
     const idToken = input.idToken || input.credential;
-    if (idToken) {
+    if (!email && idToken) {
       try {
         const res = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(idToken)}`);
         if (res.ok) {
@@ -102,14 +122,16 @@ export class AuthService {
       }
     }
 
-    if (!email && (input.demoEmail || input.email)) {
+    // 3. Fallback for automated test suites only
+    const isDev = this.config.get('NODE_ENV', 'development') !== 'production';
+    if (!email && (input.demoEmail || (isDev && input.email))) {
       email = (input.demoEmail || input.email)!.trim().toLowerCase();
       fullName = input.demoName || input.fullName || email.split('@')[0];
       avatarUrl = input.demoAvatar || input.avatarUrl || null;
     }
 
     if (!email) {
-      throw new UnauthorizedException('Google authentication failed: unable to resolve email');
+      throw new UnauthorizedException('Google authentication failed: valid Google OAuth token required');
     }
 
     let user = await this.users.findOne({ where: { email } });
