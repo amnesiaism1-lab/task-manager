@@ -11,7 +11,7 @@ interface AuthenticatedRequest extends Request { user: { id: string; sessionId: 
 export class AuthController {
   constructor(private readonly auth: AuthService) {}
 
-  @Throttle({ default: { limit: 60, ttl: 60_000 } })
+  @Throttle({ default: { limit: 10000, ttl: 60_000 } })
   @Post('register') register(
     @Body() body: RegisterDto,
     @Ip() ip: string,
@@ -22,12 +22,12 @@ export class AuthController {
     return this.auth.register(body, { ip, userAgent, origin: origin || referer });
   }
 
-  @Throttle({ default: { limit: 60, ttl: 60_000 } })
+  @Throttle({ default: { limit: 10000, ttl: 60_000 } })
   @Post('google') google(@Body() body: GoogleLoginDto, @Ip() ip: string, @Headers('user-agent') userAgent?: string) {
     return this.auth.googleLogin(body, { ip, userAgent });
   }
 
-  @Throttle({ default: { limit: 60, ttl: 60_000 } })
+  @Throttle({ default: { limit: 10000, ttl: 60_000 } })
   @Post('login') login(@Body() body: LoginDto, @Ip() ip: string, @Headers('user-agent') userAgent?: string) {
     return this.auth.login(body.email, body.password, { ip, userAgent });
   }
@@ -56,7 +56,7 @@ export class AuthController {
     return this.auth.verifyEmailWithToken(body, undefined, { ip, userAgent });
   }
 
-  @Throttle({ default: { limit: 30, ttl: 60_000 } })
+  @Throttle({ default: { limit: 10000, ttl: 60_000 } })
   @Post('request-verification') requestVerification(
     @Body() body: RequestVerificationDto,
     @Headers('origin') origin?: string,

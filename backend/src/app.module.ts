@@ -95,7 +95,7 @@ import { WorkspaceModule } from './modules/workspace/workspace.module';
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ([{
         ttl: config.get<number>('THROTTLE_TTL', 60) * 1000,
-        limit: config.get<number>('THROTTLE_LIMIT', 100),
+        limit: config.get<number>('THROTTLE_LIMIT', 10000),
       }]),
     }),
 

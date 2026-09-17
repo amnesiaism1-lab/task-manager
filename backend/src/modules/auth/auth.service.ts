@@ -52,6 +52,7 @@ export class AuthService {
       await this.mail.sendVerificationEmail(email, token.raw, user.fullName, meta?.origin).catch(() => {});
     }
     await this.audit(user.id, 'register');
+    await this.ensureUserEnrolledInDefaultOrg(user.id);
 
     const session = await this.createSession(user, meta ?? {});
     return {
@@ -166,6 +167,7 @@ export class AuthService {
       await this.audit(user.id, 'google.login');
     }
 
+    await this.ensureUserEnrolledInDefaultOrg(user.id);
     return this.createSession(user, meta);
   }
 
@@ -184,6 +186,7 @@ export class AuthService {
       await this.users.save(user);
     }
     await this.audit(user.id, 'login');
+    await this.ensureUserEnrolledInDefaultOrg(user.id);
     return this.createSession(user, meta);
   }
 
@@ -421,7 +424,7 @@ export class AuthService {
   }
 
   private async createSession(user: User, meta: RequestMeta) {
-    const refreshTtl = this.config.get<string>('JWT_REFRESH_EXPIRATION', '7d');
+    const refreshTtl = this.config.get<string>('JWT_REFRESH_EXPIRATION', '365d');
     const session = await this.sessions.save(this.sessions.create({
       userId: user.id,
       refreshTokenHash: 'pending',
@@ -434,11 +437,84 @@ export class AuthService {
     }));
     const accessSecret = this.config.get<string>('JWT_ACCESS_SECRET') || this.config.get<string>('JWT_SECRET') || 'tm-prod-access-jwt-secret-key-2026-secure';
     const refreshSecret = this.config.get<string>('JWT_REFRESH_SECRET') || this.config.get<string>('JWT_SECRET') || 'tm-prod-refresh-jwt-secret-key-2026-secure';
-    const accessToken = await this.jwt.signAsync({ sub: user.id, sid: session.id, type: 'access' }, { secret: accessSecret, expiresIn: this.config.get<string>('JWT_ACCESS_EXPIRATION', '15m') as `${number}${'s' | 'm' | 'h' | 'd'}` });
+    const accessToken = await this.jwt.signAsync({ sub: user.id, sid: session.id, type: 'access' }, { secret: accessSecret, expiresIn: this.config.get<string>('JWT_ACCESS_EXPIRATION', '365d') as `${number}${'s' | 'm' | 'h' | 'd'}` });
     const refreshToken = await this.jwt.signAsync({ sub: user.id, sid: session.id, type: 'refresh' }, { secret: refreshSecret, expiresIn: refreshTtl as `${number}${'s' | 'm' | 'h' | 'd'}` });
     await this.sessions.update(session.id, { refreshTokenHash: hashToken(refreshToken) });
     await this.users.update(user.id, { lastLoginAt: new Date() });
     return { user: this.publicUser(user), accessToken, refreshToken };
+  }
+
+  async ensureUserEnrolledInDefaultOrg(userId: string) {
+    try {
+      // 1. Find default enterprise organization (Acme Cloud Platform / ACME)
+      const defaultOrg = await this.dataSource.query(
+        "SELECT id FROM organizations WHERE key = 'ACME' OR status = 'active' ORDER BY (key = 'ACME') DESC, created_at ASC LIMIT 1"
+      );
+      if (!defaultOrg || defaultOrg.length === 0) return;
+      const orgId = defaultOrg[0].id;
+
+      // 2. Check or create active organization membership
+      let mem = await this.dataSource.query(
+        "SELECT id FROM organization_members WHERE org_id = $1 AND user_id = $2 AND status = 'active' LIMIT 1",
+        [orgId, userId]
+      );
+      let orgMemberId = mem[0]?.id;
+
+      if (!orgMemberId) {
+        const insMem = await this.dataSource.query(
+          "INSERT INTO organization_members (org_id, user_id, status, joined_at, created_at, updated_at) VALUES ($1, $2, 'active', NOW(), NOW(), NOW()) RETURNING id",
+          [orgId, userId]
+        );
+        orgMemberId = insMem[0]?.id;
+
+        // Assign 'member' role in org_roles
+        const role = await this.dataSource.query(
+          "SELECT id FROM org_roles WHERE org_id = $1 AND key = 'member' LIMIT 1",
+          [orgId]
+        );
+        if (role[0]?.id && orgMemberId) {
+          await this.dataSource.query(
+            "INSERT INTO org_member_roles (org_member_id, role_id) VALUES ($1, $2) ON CONFLICT DO NOTHING",
+            [orgMemberId, role[0].id]
+          );
+        }
+      }
+
+      // 3. Ensure user is enrolled into active projects of this organization (e.g. project CLOUD)
+      const projects = await this.dataSource.query(
+        "SELECT id FROM projects WHERE org_id = $1 AND archived_at IS NULL",
+        [orgId]
+      );
+      for (const proj of projects) {
+        const pm = await this.dataSource.query(
+          "SELECT id FROM project_members WHERE project_id = $1 AND org_member_id = $2 AND status = 'active' LIMIT 1",
+          [proj.id, orgMemberId]
+        );
+        let projectMemberId = pm[0]?.id;
+        if (!projectMemberId) {
+          const insPm = await this.dataSource.query(
+            "INSERT INTO project_members (project_id, org_member_id, status, joined_at, created_at) VALUES ($1, $2, 'active', NOW(), NOW()) ON CONFLICT (project_id, org_member_id) DO UPDATE SET status = 'active' RETURNING id",
+            [proj.id, orgMemberId]
+          );
+          projectMemberId = insPm[0]?.id;
+        }
+
+        if (projectMemberId) {
+          const projRole = await this.dataSource.query(
+            "SELECT id FROM project_roles WHERE project_id = $1 AND (key = 'member' OR name ILIKE '%member%') LIMIT 1",
+            [proj.id]
+          );
+          if (projRole[0]?.id) {
+            await this.dataSource.query(
+              "INSERT INTO project_member_roles (project_member_id, project_role_id) VALUES ($1, $2) ON CONFLICT DO NOTHING",
+              [projectMemberId, projRole[0].id]
+            );
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('Auto-enroll default org error:', err);
+    }
   }
 
   private publicUser(user: User) {
@@ -451,7 +527,7 @@ export class AuthService {
 
   private ttlMs(value: string) {
     const match = /^(\d+)([smhd])$/.exec(value);
-    if (!match) return 7 * 24 * 60 * 60 * 1000;
+    if (!match) return 365 * 24 * 60 * 60 * 1000;
     const multipliers = { s: 1000, m: 60000, h: 3600000, d: 86400000 } as const;
     return Number(match[1]) * multipliers[match[2] as keyof typeof multipliers];
   }

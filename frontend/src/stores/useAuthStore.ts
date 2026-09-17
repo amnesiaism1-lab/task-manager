@@ -38,6 +38,8 @@ export const useAuthStore = create<AuthState>((set) => {
 
     login: (token: string, user: User) => {
       localStorage.setItem('tm_token', token);
+      localStorage.removeItem('tm_org');
+      localStorage.removeItem('tm_project');
       set({ token, user, authMode: 'login', authMessage: '' });
     },
 
