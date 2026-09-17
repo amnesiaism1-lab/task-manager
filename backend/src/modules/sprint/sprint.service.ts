@@ -25,12 +25,44 @@ export class SprintService {
     private readonly dataSource: DataSource,
   ) {}
 
+  async createForProject(orgId: string, projectId: string, input: CreateSprintDto & { boardId?: string }) {
+    if (!await this.projects.exists({ where: { id: projectId, orgId, archivedAt: IsNull() } })) throw new NotFoundException('Project not found');
+    let board: Board | null = null;
+    if (input.boardId) {
+      board = await this.boards.findOne({ where: { id: input.boardId, projectId } });
+    }
+    if (!board) {
+      board = await this.boards.findOne({ where: { projectId, boardType: 'scrum' } });
+    }
+    if (!board) {
+      board = await this.boards.findOne({ where: { projectId } });
+      if (board) {
+        board.boardType = 'scrum';
+        await this.boards.save(board);
+      }
+    }
+    if (!board) {
+      const project = await this.projects.findOne({ where: { id: projectId } });
+      board = await this.boards.save(this.boards.create({
+        projectId,
+        boardType: 'scrum',
+        name: `${project?.name || 'Project'} Scrum Board`,
+        description: null,
+      }));
+    }
+    return this.create(orgId, projectId, board.id, input);
+  }
+
   async create(orgId: string, projectId: string, boardId: string, input: CreateSprintDto) {
     if (!await this.projects.exists({ where: { id: projectId, orgId, archivedAt: IsNull() } })) throw new NotFoundException('Project not found');
-    const board = await this.boards.findOne({ where: { id: boardId, projectId, boardType: 'scrum' } });
-    if (!board) throw new ConflictException('Sprints require a Scrum board');
-    const sprint = await this.sprints.save(this.sprints.create({ projectId, boardId, name: input.name.trim(), goal: input.goal?.trim() ?? null, state: 'planned', startAt: null, endAt: null, closedAt: null }));
-    const payload = { sprintId: sprint.id, projectId, boardId, name: sprint.name };
+    let board = await this.boards.findOne({ where: { id: boardId, projectId } });
+    if (!board) throw new NotFoundException('Board not found');
+    if (board.boardType !== 'scrum') {
+      board.boardType = 'scrum';
+      board = await this.boards.save(board);
+    }
+    const sprint = await this.sprints.save(this.sprints.create({ projectId, boardId: board.id, name: input.name.trim(), goal: input.goal?.trim() ?? null, state: 'planned', startAt: null, endAt: null, closedAt: null }));
+    const payload = { sprintId: sprint.id, projectId, boardId: board.id, name: sprint.name };
     await this.activityLogs.save(this.activityLogs.create({ orgId, actorType: 'system', projectId, eventType: EVENT_TYPES.SPRINT_CREATED, payloadJson: payload }));
     return sprint;
   }

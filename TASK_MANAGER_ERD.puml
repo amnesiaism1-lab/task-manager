@@ -94,10 +94,6 @@ package "Identity & Org" {
 
   entity "org_role_permission_entries" as org_role_permission_entries {
     * role_id : UUID <<FK org_roles.id>>
-  }
-
-  entity "org_role_permission_entries" as org_role_permission_entries {
-    * role_id : UUID <<FK org_roles.id>>
     * permission_key : VARCHAR
     --
     ' e.g., MANAGE_ORG, MANAGE_USERS, CREATE_PROJECT

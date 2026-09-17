@@ -1,4 +1,4 @@
-import { IsBoolean, IsDefined, IsIn, IsInt, IsOptional, IsString, IsUUID, Length, Min } from 'class-validator';
+import { IsBoolean, IsIn, IsInt, IsOptional, IsString, IsUUID, Length, Min } from 'class-validator';
 
 export class CreateCustomFieldDto {
   @IsString() @Length(1, 64) key!: string;
@@ -20,6 +20,8 @@ export class CreateOptionDto {
 }
 
 export class SetValueDto {
-  @IsUUID() contextId!: string;
-  @IsDefined() value!: unknown;
+  @IsOptional() @IsUUID() contextId?: string;
+  @IsOptional() @IsUUID() customFieldContextId?: string;
+  @IsOptional() value?: unknown;
+  @IsOptional() valueJson?: unknown;
 }

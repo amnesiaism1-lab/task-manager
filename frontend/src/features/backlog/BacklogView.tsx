@@ -93,7 +93,10 @@ export const BacklogView: React.FC = () => {
       queryClient.invalidateQueries({ queryKey: ['sprints'] });
       queryClient.invalidateQueries({ queryKey: ['boardData'] });
     } catch (err: any) {
-      showToast(err.message || 'Failed to start sprint', 'error');
+      const msg = err.message?.includes('already has an active sprint')
+        ? 'Cannot start: This board already has an active sprint. Please complete it first.'
+        : (err.message || 'Failed to start sprint');
+      showToast(msg, 'error');
     }
   };
 

@@ -78,6 +78,8 @@ export class PermissionResolverService {
 
   async hasProjectPermissions(memberId: string, projectId: string, permissions: string[]): Promise<boolean> {
     if (permissions.length === 0) return true;
+    const isOrgAdmin = await this.hasOrgPermissions(memberId, ['MANAGE_ORG']);
+    if (isOrgAdmin) return true;
     const now = Date.now();
     const cacheKey = `proj:${memberId}:${projectId}`;
     const cached = projectPermCache.get(cacheKey);

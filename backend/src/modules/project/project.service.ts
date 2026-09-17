@@ -117,16 +117,81 @@ export class ProjectService {
   async createIssue(orgId: string, projectId: string, reporterMemberId: string, input: CreateIssueDto) {
     const project = await this.projects.findOne({ where: { id: projectId, orgId } });
     if (!project || project.archivedAt) throw new NotFoundException('Project not found or archived');
-    const membership = await this.projectMembers.findOne({ where: { projectId, orgMemberId: reporterMemberId, status: 'active' } });
-    if (!membership) throw new ForbiddenException('Project membership required');
+    let membership = await this.projectMembers.findOne({ where: { projectId, orgMemberId: reporterMemberId, status: 'active' } });
+    if (!membership) {
+      const isOrgMember = await this.orgMembers.exists({ where: { id: reporterMemberId, orgId, status: 'active' } });
+      if (isOrgMember) {
+        membership = await this.projectMembers.save(this.projectMembers.create({
+          projectId,
+          orgMemberId: reporterMemberId,
+          status: 'active',
+          joinedAt: new Date(),
+        }));
+        const adminRole = await this.dataSource.getRepository(ProjectRole).findOne({ where: { projectId, key: 'project-admin' } });
+        if (adminRole) {
+          await this.projectMemberRoles.save(this.projectMemberRoles.create({
+            projectMemberId: membership.id,
+            projectRoleId: adminRole.id,
+            grantedByMemberId: reporterMemberId,
+          }));
+        }
+      } else {
+        throw new ForbiddenException('Project membership required');
+      }
+    }
     return this.dataSource.transaction(async (manager) => {
       const lockedProject = await manager.findOne(Project, { where: { id: projectId, orgId }, lock: { mode: 'pessimistic_write' } });
       if (!lockedProject) throw new NotFoundException('Project not found');
-      const issueType = await manager.findOne(IssueType, { where: { orgId, key: input.issueTypeKey.toLowerCase() } });
-      const workflow = await manager.findOne(Workflow, { where: { orgId, key: lockedProject.workflowKey ?? '', isActive: true } });
-      if (!issueType || !workflow) throw new NotFoundException('Issue type or workflow not found');
-      const state = await manager.findOne(WorkflowState, { where: { workflowId: workflow.id, isInitial: true } });
-      if (!state) throw new ConflictException('Workflow has no initial state');
+
+      let issueType = await manager.findOne(IssueType, { where: { orgId, key: input.issueTypeKey.toLowerCase() } });
+      if (!issueType) {
+        const typeNames: Record<string, string> = {
+          task: 'Task',
+          bug: 'Bug',
+          story: 'Story',
+          epic: 'Epic',
+        };
+        const key = input.issueTypeKey.toLowerCase();
+        const name = typeNames[key] || (key.charAt(0).toUpperCase() + key.slice(1));
+        issueType = await manager.save(IssueType, manager.create(IssueType, {
+          orgId,
+          key,
+          name,
+          description: `${name} issue type`,
+        }));
+      }
+
+      let workflow = await manager.findOne(Workflow, { where: { orgId, key: lockedProject.workflowKey ?? '', isActive: true } });
+      if (!workflow) {
+        workflow = (await manager.findOne(Workflow, { where: { orgId, key: `${lockedProject.key.toLowerCase()}-default`, isActive: true } })) ||
+                   (await manager.findOne(Workflow, { where: { orgId, isActive: true } }));
+      }
+      if (!workflow) {
+        workflow = await manager.save(Workflow, manager.create(Workflow, {
+          orgId,
+          key: `${lockedProject.key.toLowerCase()}-default`,
+          name: `${lockedProject.name} workflow`,
+          version: 1,
+          isActive: true,
+        }));
+      }
+
+      let state = await manager.findOne(WorkflowState, { where: { workflowId: workflow.id, isInitial: true } });
+      if (!state) {
+        state = await manager.findOne(WorkflowState, { where: { workflowId: workflow.id }, order: { position: 'ASC' } });
+      }
+      if (!state) {
+        state = await manager.save(WorkflowState, manager.create(WorkflowState, {
+          workflowId: workflow.id,
+          key: 'todo',
+          name: 'To Do',
+          category: 'todo',
+          isInitial: true,
+          isTerminal: false,
+          position: 0,
+        }));
+      }
+
       const issueNumber = Number(lockedProject.nextIssueNumber);
       lockedProject.nextIssueNumber = issueNumber + 1;
       await manager.save(lockedProject);
@@ -195,14 +260,18 @@ export class ProjectService {
   }
 
   async listIssues(orgId: string, projectId: string, memberId: string, pagination: PaginationDto) {
-    const membership = await this.projectMembers.findOne({ where: { projectId, orgMemberId: memberId, status: 'active' } });
-    if (!membership) throw new ForbiddenException('Project membership required');
+    let membership = await this.projectMembers.findOne({ where: { projectId, orgMemberId: memberId, status: 'active' } });
+    if (!membership) {
+      const isOrgMember = await this.orgMembers.exists({ where: { id: memberId, orgId, status: 'active' } });
+      if (!isOrgMember) throw new ForbiddenException('Project membership required');
+    }
     const query = this.issues.createQueryBuilder('issue').where('issue.org_id = :orgId AND issue.project_id = :projectId AND issue.deleted_at IS NULL', { orgId, projectId }).orderBy('issue.created_at', 'DESC');
     const result = await paginate(query, pagination);
     if (!result.data.length) return result;
     const assigneeIds = [...new Set(result.data.map((i: any) => i.assigneeMemberId).filter(Boolean))];
     const stateIds = [...new Set(result.data.map((i: any) => i.stateId).filter(Boolean))];
-    const [states, members] = await Promise.all([
+    const issueTypeIds = [...new Set(result.data.map((i: any) => i.issueTypeId).filter(Boolean))];
+    const [states, members, types] = await Promise.all([
       stateIds.length ? this.dataSource.getRepository(WorkflowState).find({ where: { id: In(stateIds) } }) : Promise.resolve([]),
       assigneeIds.length
         ? this.orgMembers.createQueryBuilder('om')
@@ -211,14 +280,60 @@ export class ProjectService {
             .select(['om.id AS id', 'user.id AS "userId"', 'user.full_name AS "fullName"', 'user.email AS email', 'user.avatar_url AS "avatarUrl"'])
             .getRawMany()
         : Promise.resolve([]),
+      issueTypeIds.length ? this.dataSource.getRepository(IssueType).find({ where: { id: In(issueTypeIds) } }) : Promise.resolve([]),
     ]);
     const stateMap = new Map(states.map((s) => [s.id, s]));
-    const memberMap = new Map(members.map((m) => [m.id, { id: m.id, userId: m.userId, fullName: m.fullName, email: m.email, avatarUrl: m.avatarUrl }]));
+    const memberMap = new Map(members.map((m: any) => [m.id, { id: m.id, userId: m.userId, fullName: m.fullName, email: m.email, avatarUrl: m.avatarUrl }]));
+    const typeMap = new Map(types.map((t) => [t.id, t]));
     result.data = result.data.map((issue: any) => {
       const assignee = issue.assigneeMemberId ? memberMap.get(issue.assigneeMemberId) || null : null;
+      const type = issue.issueTypeId ? typeMap.get(issue.issueTypeId) || null : null;
       return {
         ...issue,
         state: stateMap.get(issue.stateId) || null,
+        issueType: type,
+        assignee,
+        assigneeMember: assignee,
+      };
+    });
+    return result;
+  }
+
+  async backlog(orgId: string, projectId: string, memberId: string, pagination: PaginationDto) {
+    let membership = await this.projectMembers.findOne({ where: { projectId, orgMemberId: memberId, status: 'active' } });
+    if (!membership) {
+      const isOrgMember = await this.orgMembers.exists({ where: { id: memberId, orgId, status: 'active' } });
+      if (!isOrgMember) throw new ForbiddenException('Project membership required');
+    }
+    const query = this.issues.createQueryBuilder('issue')
+      .where('issue.org_id = :orgId AND issue.project_id = :projectId AND issue.sprint_id IS NULL AND issue.deleted_at IS NULL', { orgId, projectId })
+      .orderBy('issue.created_at', 'DESC');
+    const result = await paginate(query, pagination);
+    if (!result.data.length) return result;
+    const assigneeIds = [...new Set(result.data.map((i: any) => i.assigneeMemberId).filter(Boolean))];
+    const stateIds = [...new Set(result.data.map((i: any) => i.stateId).filter(Boolean))];
+    const issueTypeIds = [...new Set(result.data.map((i: any) => i.issueTypeId).filter(Boolean))];
+    const [states, members, types] = await Promise.all([
+      stateIds.length ? this.dataSource.getRepository(WorkflowState).find({ where: { id: In(stateIds) } }) : Promise.resolve([]),
+      assigneeIds.length
+        ? this.orgMembers.createQueryBuilder('om')
+            .innerJoin(User, 'user', 'user.id = om.user_id')
+            .where('om.id IN (:...assigneeIds)', { assigneeIds })
+            .select(['om.id AS id', 'user.id AS "userId"', 'user.full_name AS "fullName"', 'user.email AS email', 'user.avatar_url AS "avatarUrl"'])
+            .getRawMany()
+        : Promise.resolve([]),
+      issueTypeIds.length ? this.dataSource.getRepository(IssueType).find({ where: { id: In(issueTypeIds) } }) : Promise.resolve([]),
+    ]);
+    const stateMap = new Map(states.map((s) => [s.id, s]));
+    const memberMap = new Map(members.map((m: any) => [m.id, { id: m.id, userId: m.userId, fullName: m.fullName, email: m.email, avatarUrl: m.avatarUrl }]));
+    const typeMap = new Map(types.map((t) => [t.id, t]));
+    result.data = result.data.map((issue: any) => {
+      const assignee = issue.assigneeMemberId ? memberMap.get(issue.assigneeMemberId) || null : null;
+      const type = issue.issueTypeId ? typeMap.get(issue.issueTypeId) || null : null;
+      return {
+        ...issue,
+        state: stateMap.get(issue.stateId) || null,
+        issueType: type,
         assignee,
         assigneeMember: assignee,
       };
@@ -396,44 +511,6 @@ export class ProjectService {
     await this.get(orgId, projectId, memberId);
     if (input.leadMemberId && !await this.projectMembers.exists({ where: { projectId, orgMemberId: input.leadMemberId, status: 'active' } })) throw new NotFoundException('Component lead must be an active project member');
     return this.components.save(this.components.create({ projectId, name: input.name.trim(), description: input.description?.trim() ?? null, leadMemberId: input.leadMemberId ?? null, archivedAt: null }));
-  }
-
-  /** Issues outside an active sprint remain in the backlog; planned and closed
-   * sprint assignments are retained as history but do not hide work here. */
-  async backlog(orgId: string, projectId: string, memberId: string, pagination: PaginationDto) {
-    const membership = await this.projectMembers.findOne({ where: { projectId, orgMemberId: memberId, status: 'active' } });
-    if (!membership) throw new ForbiddenException('Project membership required');
-    const query = this.issues.createQueryBuilder('issue')
-      .leftJoin(Sprint, 'sprint', 'sprint.id = issue.sprint_id')
-      .where('issue.org_id = :orgId AND issue.project_id = :projectId AND issue.deleted_at IS NULL', { orgId, projectId })
-      .andWhere('(issue.sprint_id IS NULL OR sprint.state != :activeSprint)', { activeSprint: 'active' })
-      .orderBy('issue.created_at', 'DESC');
-    const result = await paginate(query, pagination);
-    if (!result.data.length) return result;
-    const assigneeIds = [...new Set(result.data.map((i: any) => i.assigneeMemberId).filter(Boolean))];
-    const stateIds = [...new Set(result.data.map((i: any) => i.stateId).filter(Boolean))];
-    const [states, members] = await Promise.all([
-      stateIds.length ? this.dataSource.getRepository(WorkflowState).find({ where: { id: In(stateIds) } }) : Promise.resolve([]),
-      assigneeIds.length
-        ? this.orgMembers.createQueryBuilder('om')
-            .innerJoin(User, 'user', 'user.id = om.user_id')
-            .where('om.id IN (:...assigneeIds)', { assigneeIds })
-            .select(['om.id AS id', 'user.id AS "userId"', 'user.full_name AS "fullName"', 'user.email AS email', 'user.avatar_url AS "avatarUrl"'])
-            .getRawMany()
-        : Promise.resolve([]),
-    ]);
-    const stateMap = new Map(states.map((s) => [s.id, s]));
-    const memberMap = new Map(members.map((m) => [m.id, { id: m.id, userId: m.userId, fullName: m.fullName, email: m.email, avatarUrl: m.avatarUrl }]));
-    result.data = result.data.map((issue: any) => {
-      const assignee = issue.assigneeMemberId ? memberMap.get(issue.assigneeMemberId) || null : null;
-      return {
-        ...issue,
-        state: stateMap.get(issue.stateId) || null,
-        assignee,
-        assigneeMember: assignee,
-      };
-    });
-    return result;
   }
 
   async updateComponent(orgId: string, projectId: string, componentId: string, memberId: string, input: UpdateComponentDto) {

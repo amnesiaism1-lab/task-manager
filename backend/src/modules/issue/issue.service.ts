@@ -16,6 +16,7 @@ import { WorkflowState } from '../../database/entities/workflow/workflow-state.e
 import { WorkflowTransition } from '../../database/entities/workflow/workflow-transition.entity';
 import { WorkflowTransitionGuard } from '../../database/entities/workflow/workflow-transition-guard.entity';
 import { IssueStateHistory } from '../../database/entities/issue/issue-state-history.entity';
+import { IssueSprintHistory } from '../../database/entities/issue/issue-sprint-history.entity';
 import { IssueType } from '../../database/entities/issue/issue-type.entity';
 import { ProjectComponent } from '../../database/entities/project/project-component.entity';
 import { ProjectVersion } from '../../database/entities/project/project-version.entity';
@@ -325,7 +326,24 @@ export class IssueService {
       if (input.priority !== undefined) locked.priority = input.priority;
       const newAssigneeId = input.assigneeMemberId !== undefined ? input.assigneeMemberId : input.assigneeId;
       if (newAssigneeId !== undefined) locked.assigneeMemberId = newAssigneeId || null;
-      if (input.sprintId !== undefined) locked.sprintId = input.sprintId || null;
+      if (input.sprintId !== undefined) {
+        const targetSprintId = input.sprintId || null;
+        if (locked.sprintId !== targetSprintId) {
+          if (locked.sprintId) {
+            await manager.update(IssueSprintHistory, { issueId: locked.id, sprintId: locked.sprintId, removedAt: IsNull() }, { removedAt: new Date(), removedByMemberId: memberId });
+          }
+          if (targetSprintId) {
+            await manager.save(IssueSprintHistory, manager.create(IssueSprintHistory, {
+              issueId: locked.id,
+              sprintId: targetSprintId,
+              addedByMemberId: memberId,
+              removedByMemberId: null,
+              removedAt: null,
+            }));
+          }
+          locked.sprintId = targetSprintId;
+        }
+      }
       if (input.dueAt !== undefined) locked.dueAt = input.dueAt ? new Date(input.dueAt) : null;
       if (input.originalEstimateSeconds !== undefined) locked.originalEstimateSeconds = input.originalEstimateSeconds;
       if (input.remainingEstimateSeconds !== undefined) locked.remainingEstimateSeconds = input.remainingEstimateSeconds;

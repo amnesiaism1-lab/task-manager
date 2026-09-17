@@ -13,6 +13,9 @@ import { Group } from '../../database/entities/identity/group.entity';
 import { GroupMember } from '../../database/entities/identity/group-member.entity';
 import { OrganizationInvitation } from '../../database/entities/identity/organization-invitation.entity';
 import { User } from '../../database/entities/identity/user.entity';
+import { IssueType } from '../../database/entities/issue/issue-type.entity';
+import { Priority } from '../../database/entities/issue/priority.entity';
+import { IssueLinkType } from '../../database/entities/issue/issue-link-type.entity';
 import { generateSecureToken, hashToken } from '../../common/utils/token.util';
 import { AddMemberDto, AssignOrgRoleDto, CreateDepartmentDto, CreateGroupDto, CreateOrgRoleDto, CreateOrganizationDto, InviteMemberDto, UpdateDepartmentDto, UpdateGroupDto, UpdateOrganizationDto } from './dto/organization.dto';
 import { ORG_PERMISSIONS } from '../../common/constants/permission-keys';
@@ -115,6 +118,39 @@ export class OrganizationService {
           grantedByMemberId: member.id,
         }),
       );
+
+      // Seed default issue types for the organization
+      const defaultTypes = [
+        { key: 'task', name: 'Task', description: 'A task that needs to be done.' },
+        { key: 'bug', name: 'Bug', description: 'A problem which impairs or prevents the functions of the product.' },
+        { key: 'story', name: 'Story', description: 'A user story representing a deliverable requirement.' },
+        { key: 'epic', name: 'Epic', description: 'A large body of work that can be broken down into smaller tasks.' },
+      ];
+      for (const t of defaultTypes) {
+        await manager.save(IssueType, manager.create(IssueType, { orgId: organization.id, key: t.key, name: t.name, description: t.description }));
+      }
+
+      // Seed default priorities
+      const defaultPriorities = [
+        { key: 'lowest', name: 'Lowest', color: '#94a3b8', orderNum: 10, isDefault: false },
+        { key: 'low', name: 'Low', color: '#38bdf8', orderNum: 20, isDefault: false },
+        { key: 'medium', name: 'Medium', color: '#f59e0b', orderNum: 30, isDefault: true },
+        { key: 'high', name: 'High', color: '#f97316', orderNum: 40, isDefault: false },
+        { key: 'highest', name: 'Highest', color: '#ef4444', orderNum: 50, isDefault: false },
+      ];
+      for (const p of defaultPriorities) {
+        await manager.save(Priority, manager.create(Priority, { orgId: organization.id, key: p.key, name: p.name, color: p.color, orderNum: p.orderNum, isDefault: p.isDefault }));
+      }
+
+      // Seed default link types
+      const defaultLinks = [
+        { key: 'blocks', outwardLabel: 'blocks', inwardLabel: 'is blocked by', directionality: 'directed' as const },
+        { key: 'relates_to', outwardLabel: 'relates to', inwardLabel: 'relates to', directionality: 'symmetric' as const },
+        { key: 'duplicates', outwardLabel: 'duplicates', inwardLabel: 'is duplicated by', directionality: 'directed' as const },
+      ];
+      for (const l of defaultLinks) {
+        await manager.save(IssueLinkType, manager.create(IssueLinkType, { orgId: organization.id, key: l.key, outwardLabel: l.outwardLabel, inwardLabel: l.inwardLabel, directionality: l.directionality, archivedAt: null }));
+      }
 
       return organization;
     });

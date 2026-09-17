@@ -1,4 +1,4 @@
-import { ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { CustomField } from '../../database/entities/custom-field/custom-field.entity';
@@ -64,24 +64,29 @@ export class CustomFieldService {
   }
 
   async setValue(orgId: string, issueId: string, memberId: string, input: SetValueDto) {
+    const contextId = input.contextId || input.customFieldContextId;
+    if (!contextId) throw new BadRequestException('contextId is required');
+    const value = input.value !== undefined ? input.value : input.valueJson;
+    if (value === undefined) throw new BadRequestException('value is required');
+
     const issue = await this.issueAccess.getAccessibleIssue(orgId, issueId, memberId);
     if (!(await this.permissions.hasProjectPermissions(memberId, issue.projectId, ['EDIT_ISSUE']))) throw new ForbiddenException('Insufficient project permissions');
-    const context = await this.contexts.findOne({ where: { id: input.contextId } });
+    const context = await this.contexts.findOne({ where: { id: contextId } });
     if (!context || context.projectId !== issue.projectId || context.issueTypeId !== issue.issueTypeId) throw new ConflictException('Custom field context does not match issue');
     const field = await this.fields.findOneByOrFail({ id: context.customFieldId, orgId });
-    this.validateValue(field, input.value);
-    const existing = await this.values.findOne({ where: { issueId, customFieldContextId: input.contextId } });
+    this.validateValue(field, value);
+    const existing = await this.values.findOne({ where: { issueId, customFieldContextId: contextId } });
     let saved: IssueCustomFieldValue;
     if (existing) {
-      existing.valueJson = input.value;
+      existing.valueJson = value;
       saved = await this.values.save(existing);
     } else {
-      saved = await this.values.save(this.values.create({ issueId, customFieldContextId: input.contextId, valueJson: input.value }));
+      saved = await this.values.save(this.values.create({ issueId, customFieldContextId: contextId, valueJson: value }));
     }
 
-    const payload = { issueId, customFieldId: field.id, customFieldName: field.name, value: input.value, memberId };
+    const payload = { issueId, customFieldId: field.id, customFieldName: field.name, value, memberId };
     await this.activityLogs.save(this.activityLogs.create({ orgId, actorType: 'member', actorMemberId: memberId, projectId: issue.projectId, issueId, eventType: EVENT_TYPES.ISSUE_UPDATED, payloadJson: payload }));
-    await this.outboxEvents.save(this.outboxEvents.create({ orgId, aggregateType: 'issue', aggregateId: issueId, eventType: EVENT_TYPES.ISSUE_UPDATED, payloadJson: payload, status: 'pending', idempotencyKey: `cf-updated:${issueId}:${input.contextId}:${Date.now()}`, publishedAt: null, retryCount: 0, lastError: null }));
+    await this.outboxEvents.save(this.outboxEvents.create({ orgId, aggregateType: 'issue', aggregateId: issueId, eventType: EVENT_TYPES.ISSUE_UPDATED, payloadJson: payload, status: 'pending', idempotencyKey: `cf-updated:${issueId}:${contextId}:${Date.now()}`, publishedAt: null, retryCount: 0, lastError: null }));
 
     return saved;
   }

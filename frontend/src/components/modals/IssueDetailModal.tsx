@@ -125,7 +125,9 @@ export const IssueDetailModal: React.FC = () => {
       await request(`/organizations/${activeOrgId}/custom-fields/issues/${issue.id}/value`, {
         method: 'POST',
         body: JSON.stringify({
+          contextId,
           customFieldContextId: contextId,
+          value,
           valueJson: value,
         }),
       });

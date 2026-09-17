@@ -38,11 +38,13 @@ import { CustomFieldOption } from '../../database/entities/custom-field/custom-f
 import { IssueCustomFieldValue } from '../../database/entities/custom-field/issue-custom-field-value.entity';
 import { ActivityLog } from '../../database/entities/audit/activity-log.entity';
 import { OutboxEvent } from '../../database/entities/audit/outbox-event.entity';
+import { IssueSprintHistory } from '../../database/entities/issue/issue-sprint-history.entity';
 
 @Module({
 	imports: [
 		TypeOrmModule.forFeature([
 			Issue,
+			IssueSprintHistory,
 			Comment,
 			WorkLog,
 			ProjectMember,
