@@ -75,6 +75,57 @@ export const AuthView: React.FC = () => {
     }
   }, []);
 
+  const handleGoogleCredentialResponse = async (response: any) => {
+    if (!response?.credential) return;
+    try {
+      setGoogleLoading(true);
+      setError('');
+      const res = await request('/auth/google', {
+        method: 'POST',
+        body: JSON.stringify({
+          credential: response.credential,
+        }),
+      });
+      if (res.accessToken && res.user) {
+        setShowGoogleModal(false);
+        login(res.accessToken, res.user);
+        showToast(`Signed in with Google as ${res.user?.fullName || res.user?.email}!`, 'success');
+      }
+    } catch (err: any) {
+      setError(err.message || 'Google OAuth authentication failed');
+    } finally {
+      setGoogleLoading(false);
+    }
+  };
+
+  // Initialize Google Identity Services if client ID is configured
+  useEffect(() => {
+    const googleClientId = (import.meta as any).env?.VITE_GOOGLE_CLIENT_ID || (typeof window !== 'undefined' ? (window as any).__GOOGLE_CLIENT_ID : '');
+    if (googleClientId && typeof window !== 'undefined' && (window as any).google?.accounts?.id) {
+      try {
+        (window as any).google.accounts.id.initialize({
+          client_id: googleClientId,
+          callback: handleGoogleCredentialResponse,
+          auto_select: false,
+          cancel_on_tap_outside: true,
+        });
+        const container = document.getElementById('google-signin-btn-container');
+        if (container) {
+          (window as any).google.accounts.id.renderButton(container, {
+            theme: 'filled_blue',
+            size: 'large',
+            type: 'standard',
+            shape: 'rectangular',
+            text: 'continue_with',
+            width: '100%',
+          });
+        }
+      } catch (err) {
+        console.warn('[Google Auth] Initialization notice:', err);
+      }
+    }
+  }, [authMode]);
+
   const handleAutoVerify = async (tokenToVerify: string, emailToVerify: string) => {
     try {
       setIsLoading(true);
@@ -405,10 +456,19 @@ export const AuthView: React.FC = () => {
         {/* Google Auth Button on Login / Register */}
         {(authMode === 'login' || authMode === 'register') && (
           <>
+            <div id="google-signin-btn-container" className="w-full flex justify-center mb-3 empty:hidden" />
+
             <button
               id="btn-google-auth"
               type="button"
               onClick={() => {
+                const googleClientId = (import.meta as any).env?.VITE_GOOGLE_CLIENT_ID || (typeof window !== 'undefined' ? (window as any).__GOOGLE_CLIENT_ID : '');
+                if (googleClientId && typeof window !== 'undefined' && (window as any).google?.accounts?.id) {
+                  try {
+                    (window as any).google.accounts.id.prompt();
+                    return;
+                  } catch {}
+                }
                 setError('');
                 setShowGoogleModal(true);
               }}
@@ -876,8 +936,8 @@ export const AuthView: React.FC = () => {
               </svg>
             </div>
             <div>
-              <p className="text-xs font-semibold text-text-primary">Google Account Verification</p>
-              <p className="text-[11px] text-text-muted">Direct OAuth 2.0 / Workspace ID Token</p>
+              <p className="text-xs font-semibold text-text-primary">Google OAuth 2.0 / Direct Verification</p>
+              <p className="text-[11px] text-text-muted">Enter your Google account email below to connect</p>
             </div>
           </div>
 
